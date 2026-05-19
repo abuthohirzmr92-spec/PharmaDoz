@@ -1,0 +1,680 @@
+import { create } from "zustand";
+import type {
+  ProductBatch,
+  Supplier,
+  PurchaseInvoice,
+  PurchaseStatus,
+  StockMovement,
+  StockOpname,
+  InventoryProduct,
+  DashboardSummary,
+} from "@/types/inventory";
+import {
+  DEMO_BATCHES,
+  DEMO_SUPPLIERS,
+  DEMO_PURCHASE_INVOICES,
+  DEMO_STOCK_MOVEMENTS,
+  DEMO_STOCK_OPNAME,
+  getFefoBatches,
+  getNearExpiryBatches,
+  getExpiredBatches,
+  allocateFefo,
+  applySaleDeduction,
+  buildInventoryProducts,
+  buildDashboardSummary,
+} from "@/lib/inventory-demo";
+import { productRepo, supplierRepo, inventoryRepo } from "@/lib/repository-instances";
+
+/* ------------------------------------------------------------------ */
+/*  State                                                              */
+/* ------------------------------------------------------------------ */
+
+export type InventoryTab =
+  | "dashboard"
+  | "stock"
+  | "purchase"
+  | "movement"
+  | "expired"
+  | "opname";
+
+interface InventoryState {
+  /* Data */
+  batches: ProductBatch[];
+  suppliers: Supplier[];
+  purchaseInvoices: PurchaseInvoice[];
+  stockMovements: StockMovement[];
+  stockOpnames: StockOpname[];
+
+  /* UI */
+  activeTab: InventoryTab;
+  searchQuery: string;
+  isDemoMode: boolean;
+  dataSource: "demo" | "database" | "loading";
+  isLoading: boolean;
+  isSubmitting: boolean;
+
+  /* Actions — UI */
+  setActiveTab: (tab: InventoryTab) => void;
+  setSearchQuery: (query: string) => void;
+
+  /* Actions — purchase */
+  addPurchase: (invoice: PurchaseInvoice) => Promise<void>;
+
+  /* Actions — batch queries */
+  getFefoBatches: (productId?: string) => ProductBatch[];
+  getNearExpiryBatches: (daysThreshold?: number) => ProductBatch[];
+  getExpiredBatches: () => ProductBatch[];
+  allocateFefo: (productId: string, neededQty: number) => ReturnType<typeof allocateFefo>;
+
+  /* Actions — stock opname */
+  performOpname: (opname: StockOpname) => Promise<void>;
+
+  /* Actions — write-off */
+  writeOffExpiredBatches: (batchIds: string[], note?: string) => Promise<void>;
+
+  /* Actions — payment */
+  recordPayment: (invoiceId: string, amount: number) => Promise<void>;
+
+  /* Actions — sale deduction */
+  deductForSale: (cart: { productId: string; quantity: number }[], transactionId: string) => Promise<void>;
+
+  /* Actions — computed */
+  getInventoryProducts: () => InventoryProduct[];
+  getDashboardSummary: () => DashboardSummary;
+  getLowStockProducts: () => InventoryProduct[];
+
+  /* Actions — demo */
+  loadDemoData: () => Promise<void>;
+  _loadDemoFallback: () => void;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                            */
+/* ------------------------------------------------------------------ */
+
+function generateUUID(): string {
+  return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+    const r = (Math.random() * 16) | 0;
+    const v = c === "x" ? r : (r & 0x3) | 0x8;
+    return v.toString(16);
+  });
+}
+
+/* ------------------------------------------------------------------ */
+/*  Store                                                              */
+/* ------------------------------------------------------------------ */
+
+export const useInventoryStore = create<InventoryState>()((set, get) => ({
+  /* ---- initial state ---- */
+  batches: [],
+  suppliers: [],
+  purchaseInvoices: [],
+  stockMovements: [],
+  stockOpnames: [],
+  activeTab: "dashboard",
+  searchQuery: "",
+  isDemoMode: true,
+  dataSource: "demo" as const,
+  isLoading: false,
+  isSubmitting: false,
+
+  /* ---- UI ---- */
+  setActiveTab: (tab) => set({ activeTab: tab, searchQuery: "" }),
+  setSearchQuery: (query) => set({ searchQuery: query }),
+
+  /* ---- purchase ---- */
+  addPurchase: async (invoice) => {
+    const state = get();
+
+    // DB-aware path
+    if (state.dataSource === 'database') {
+      set({ isSubmitting: true });
+      try {
+        // 1. Create purchase invoice with items in the DB
+        await supplierRepo.createPurchaseInvoice({
+          invoiceNumber: invoice.invoiceNumber,
+          supplierId: invoice.supplierId,
+          supplierName: invoice.supplierName,
+          purchaseDate: invoice.purchaseDate,
+          dueDate: invoice.dueDate,
+          status: invoice.status,
+          totalAmount: invoice.totalAmount,
+          paidAmount: invoice.paidAmount,
+          items: invoice.items.map(item => ({
+            productId: item.productId,
+            productName: item.productName,
+            batchNumber: item.batchNumber,
+            expiredDate: item.expiredDate,
+            quantity: item.quantity,
+            unitPrice: item.unitPrice,
+            sellingPrice: item.sellingPrice,
+          })),
+        });
+
+        // 2. For each item: upsert batch + create stock movement
+        for (const item of invoice.items) {
+          const existingBatches = await inventoryRepo.getBatchesByProduct(item.productId);
+          const existing = existingBatches.find(b => b.batchNumber === item.batchNumber);
+
+          if (existing) {
+            const qtyBefore = existing.quantity;
+            const qtyAfter = qtyBefore + item.quantity;
+            await inventoryRepo.updateBatchQuantity(existing.id, qtyAfter);
+            await inventoryRepo.createStockMovement({
+              type: 'purchase',
+              productId: item.productId,
+              productName: item.productName,
+              batchId: existing.id,
+              batchNumber: item.batchNumber,
+              qtyBefore,
+              qtyChange: item.quantity,
+              qtyAfter,
+              referenceNumber: invoice.invoiceNumber,
+              note: `Pembelian dari ${invoice.supplierName}`,
+            });
+          } else {
+            const newBatch = await inventoryRepo.createBatch({
+              productId: item.productId,
+              batchNumber: item.batchNumber,
+              expiredDate: item.expiredDate,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              sellingPrice: item.sellingPrice,
+            });
+            await inventoryRepo.createStockMovement({
+              type: 'purchase',
+              productId: item.productId,
+              productName: item.productName,
+              batchId: newBatch.id,
+              batchNumber: item.batchNumber,
+              qtyBefore: 0,
+              qtyChange: item.quantity,
+              qtyAfter: item.quantity,
+              referenceNumber: invoice.invoiceNumber,
+              note: `Pembelian baru dari ${invoice.supplierName}`,
+            });
+          }
+        }
+
+        // 3. Reload state from DB
+        await get().loadDemoData();
+        set({ isSubmitting: false });
+        return;
+      } catch (e) {
+        console.error('DB purchase failed, falling back to demo mode:', e);
+        set({ isSubmitting: false });
+        // Fall through to existing demo logic
+      }
+    }
+
+    // ---- EXISTING DEMO LOGIC (unchanged) ----
+    const now = new Date().toISOString();
+
+    // Upsert batches
+    let updatedBatches = [...state.batches];
+    const newMovements: StockMovement[] = [];
+
+    for (const item of invoice.items) {
+      const existingIdx = updatedBatches.findIndex(
+        (b) =>
+          b.productId === item.productId &&
+          b.batchNumber === item.batchNumber,
+      );
+
+      if (existingIdx !== -1) {
+        const existing = updatedBatches[existingIdx]!;
+        const qtyBefore = existing.quantity;
+        const qtyAfter = qtyBefore + item.quantity;
+
+        // Replace with new object (immutable update)
+        updatedBatches = updatedBatches.map((b, i) =>
+          i === existingIdx
+            ? { ...b, quantity: qtyAfter, unitPrice: item.unitPrice, sellingPrice: item.sellingPrice }
+            : b,
+        );
+
+        newMovements.push({
+          id: `mov-${generateUUID()}`,
+          timestamp: now,
+          type: "purchase",
+          productId: item.productId,
+          productName: item.productName,
+          batchId: existing.id,
+          batchNumber: item.batchNumber,
+          qtyBefore,
+          qtyChange: item.quantity,
+          qtyAfter,
+          referenceNumber: invoice.invoiceNumber,
+          note: `Pembelian dari ${invoice.supplierName}`,
+          userId: "user-demo",
+          userName: "Admin Demo",
+        });
+      } else {
+        const newBatch: ProductBatch = {
+          id: `bat-${generateUUID()}`,
+          productId: item.productId,
+          productName: item.productName,
+          batchNumber: item.batchNumber,
+          expiredDate: item.expiredDate,
+          quantity: item.quantity,
+          unitPrice: item.unitPrice,
+          sellingPrice: item.sellingPrice,
+          createdAt: now,
+        };
+        updatedBatches.push(newBatch);
+
+        newMovements.push({
+          id: `mov-${generateUUID()}`,
+          timestamp: now,
+          type: "purchase",
+          productId: item.productId,
+          productName: item.productName,
+          batchId: newBatch.id,
+          batchNumber: item.batchNumber,
+          qtyBefore: 0,
+          qtyChange: item.quantity,
+          qtyAfter: item.quantity,
+          referenceNumber: invoice.invoiceNumber,
+          note: `Pembelian baru dari ${invoice.supplierName}`,
+          userId: "user-demo",
+          userName: "Admin Demo",
+        });
+      }
+    }
+
+    set({
+      batches: updatedBatches,
+      purchaseInvoices: [invoice, ...state.purchaseInvoices],
+      stockMovements: [...newMovements, ...state.stockMovements],
+    });
+  },
+
+  /* ---- batch queries ---- */
+
+  getFefoBatches: (productId) => getFefoBatches(get().batches, productId),
+
+  getNearExpiryBatches: (daysThreshold = 90) =>
+    getNearExpiryBatches(get().batches, daysThreshold),
+
+  getExpiredBatches: () => getExpiredBatches(get().batches),
+
+  allocateFefo: (productId, neededQty) =>
+    allocateFefo(get().batches, productId, neededQty),
+
+  /* ---- stock opname ---- */
+
+  performOpname: async (opname) => {
+    const state = get();
+
+    if (state.dataSource === 'database') {
+      set({ isSubmitting: true });
+      try {
+        // Create stock opname in DB
+        await inventoryRepo.createStockOpname({
+          opnameDate: opname.date,
+          status: opname.status,
+          conductedBy: opname.conductedBy || undefined,
+          notes: opname.notes || undefined,
+          items: opname.items
+            .filter(item => item.difference !== 0)
+            .map(item => ({
+              productId: item.productId,
+              batchId: item.batchId,
+              systemQty: item.systemQty,
+              physicalQty: item.physicalQty,
+              note: item.note || undefined,
+            })),
+        });
+
+        // For each item with difference: update batch + create movement
+        for (const item of opname.items) {
+          if (item.difference === 0) continue;
+
+          await inventoryRepo.updateBatchQuantity(item.batchId, item.physicalQty);
+          await inventoryRepo.createStockMovement({
+            type: 'adjustment',
+            productId: item.productId,
+            productName: item.productName,
+            batchId: item.batchId,
+            batchNumber: item.batchNumber,
+            qtyBefore: item.systemQty,
+            qtyChange: item.difference,
+            qtyAfter: item.physicalQty,
+            referenceNumber: `OPN-${opname.id.slice(0, 8)}`,
+            note: item.note || `Penyesuaian dari opname ${opname.date}`,
+          });
+        }
+
+        await get().loadDemoData();
+        set({ isSubmitting: false });
+        return;
+      } catch (e) {
+        console.error('DB opname failed, falling back to demo:', e);
+        set({ isSubmitting: false });
+      }
+    }
+
+    // ---- EXISTING DEMO LOGIC (unchanged) ----
+    const now = new Date().toISOString();
+
+    // Create adjustment movements for differences
+    const newMovements: StockMovement[] = [];
+    for (const item of opname.items) {
+      if (item.difference === 0) continue;
+
+      newMovements.push({
+        id: `mov-${generateUUID()}`,
+        timestamp: now,
+        type: "adjustment",
+        productId: item.productId,
+        productName: item.productName,
+        batchId: item.batchId,
+        batchNumber: item.batchNumber,
+        qtyBefore: item.systemQty,
+        qtyChange: item.difference,
+        qtyAfter: item.physicalQty,
+        referenceNumber: `OPN-${opname.id}`,
+        note: item.note || `Penyesuaian dari opname ${opname.date}`,
+        userId: "user-demo",
+        userName: "Admin Demo",
+      });
+
+    }
+
+    // Apply batch quantity updates immutably
+    let updatedBatches = get().batches;
+    for (const item of opname.items) {
+      if (item.difference === 0) continue;
+      updatedBatches = updatedBatches.map((b) =>
+        b.id === item.batchId ? { ...b, quantity: item.physicalQty } : b,
+      );
+    }
+
+    set({
+      stockOpnames: [opname, ...state.stockOpnames],
+      stockMovements: [...newMovements, ...state.stockMovements],
+      batches: updatedBatches,
+    });
+  },
+
+  /* ---- write-off ---- */
+
+  writeOffExpiredBatches: async (batchIds, note) => {
+    const state = get();
+
+    if (state.dataSource === 'database') {
+      set({ isSubmitting: true });
+      try {
+        for (const id of batchIds) {
+          const batch = state.batches.find(b => b.id === id);
+          if (!batch || batch.quantity === 0) continue;
+
+          await inventoryRepo.updateBatchQuantity(id, 0);
+          await inventoryRepo.createStockMovement({
+            type: 'expired',
+            productId: batch.productId,
+            productName: batch.productName,
+            batchId: batch.id,
+            batchNumber: batch.batchNumber,
+            qtyBefore: batch.quantity,
+            qtyChange: -batch.quantity,
+            qtyAfter: 0,
+            referenceNumber: `WO-${new Date().toISOString().slice(0, 10)}`,
+            note: note || 'Write-off kadaluarsa',
+          });
+        }
+
+        await get().loadDemoData();
+        set({ isSubmitting: false });
+        return;
+      } catch (e) {
+        console.error('DB write-off failed, falling back to demo:', e);
+        set({ isSubmitting: false });
+      }
+    }
+
+    // ---- EXISTING DEMO LOGIC (unchanged) ----
+    const now = new Date().toISOString();
+    const newMovements: StockMovement[] = [];
+
+    let updatedBatches = state.batches;
+    for (const id of batchIds) {
+      const batch = updatedBatches.find((b) => b.id === id);
+      if (!batch || batch.quantity === 0) continue;
+
+      newMovements.push({
+        id: `mov-${generateUUID()}`,
+        timestamp: now,
+        type: "expired",
+        productId: batch.productId,
+        productName: batch.productName,
+        batchId: batch.id,
+        batchNumber: batch.batchNumber,
+        qtyBefore: batch.quantity,
+        qtyChange: -batch.quantity,
+        qtyAfter: 0,
+        referenceNumber: `WO-${now.slice(0, 10)}`,
+        note: note || "Write-off kadaluarsa",
+        userId: "user-demo",
+        userName: "Admin Demo",
+      });
+
+      updatedBatches = updatedBatches.map((b) =>
+        b.id === id ? { ...b, quantity: 0 } : b,
+      );
+    }
+
+    set({
+      batches: updatedBatches,
+      stockMovements: [...newMovements, ...state.stockMovements],
+    });
+  },
+
+  /* ---- payment ---- */
+
+  recordPayment: async (invoiceId, amount) => {
+    const state = get();
+
+    if (state.dataSource === 'database') {
+      const invoice = state.purchaseInvoices.find(inv => inv.id === invoiceId);
+      if (invoice) {
+        const newPaid = invoice.paidAmount + amount;
+        try {
+          await supplierRepo.updatePurchaseInvoicePayment(invoiceId, newPaid);
+          await get().loadDemoData();
+          return;
+        } catch (e) {
+          console.error('DB payment failed, falling back to demo:', e);
+        }
+      }
+    }
+
+    // ---- EXISTING DEMO LOGIC (unchanged) ----
+    set({
+      purchaseInvoices: get().purchaseInvoices.map((inv) => {
+        if (inv.id !== invoiceId) return inv;
+        const newPaid = inv.paidAmount + amount;
+        const newStatus: PurchaseStatus =
+          newPaid >= inv.totalAmount ? "paid" :
+          newPaid > 0 ? "partial" : "unpaid";
+        return { ...inv, paidAmount: newPaid, status: newStatus };
+      }),
+    });
+  },
+
+  /* ---- computed ---- */
+
+  getInventoryProducts: () => buildInventoryProducts(get().batches),
+
+  getDashboardSummary: () =>
+    buildDashboardSummary(
+      get().batches,
+      get().purchaseInvoices,
+      get().stockMovements,
+    ),
+
+  getLowStockProducts: () => {
+    const products = buildInventoryProducts(get().batches);
+    return products.filter((p) => p.totalStock <= p.minStock);
+  },
+
+  /* ---- sale deduction ---- */
+
+  deductForSale: async (cart, transactionId) => {
+    const state = get();
+    const now = new Date().toISOString();
+    const newMovements: StockMovement[] = [];
+    let updatedBatches = [...state.batches];
+
+    // Process each cart item
+    for (const item of cart) {
+      const { productId, quantity } = item;
+
+      // 1. FEFO allocation — which batches to draw from
+      const allocations = allocateFefo(updatedBatches, productId, quantity);
+
+      // Validate total allocated matches requested quantity
+      const totalAllocated = allocations.reduce((sum, a) => sum + a.take, 0);
+      if (totalAllocated < quantity) {
+        // Try to get product name from any matching batch
+        const batch = updatedBatches.find((b) => b.productId === productId);
+        const name = batch?.productName ?? productId;
+        throw new Error(
+          `Stok tidak mencukupi untuk ${name}: butuh ${quantity}, tersedia ${totalAllocated}`,
+        );
+      }
+
+      // Get product name from the first allocation's batch
+      const firstAlloc = allocations[0];
+      const batch = updatedBatches.find((b) => b.id === firstAlloc?.batchId);
+      const productName = batch?.productName ?? "";
+
+      // 2. Apply deductions (immutable update)
+      updatedBatches = applySaleDeduction(updatedBatches, allocations);
+
+      // 3. Create stock movements for each batch draw
+      for (const alloc of allocations) {
+        newMovements.push({
+          id: `mov-${generateUUID()}`,
+          timestamp: now,
+          type: "sale",
+          productId,
+          productName,
+          batchId: alloc.batchId,
+          batchNumber: alloc.batchNumber,
+          qtyBefore: alloc.remainingAfter + alloc.take,
+          qtyChange: -alloc.take,
+          qtyAfter: alloc.remainingAfter,
+          referenceNumber: transactionId,
+          note: `Penjualan transaksi ${transactionId}`,
+          userId: "user-demo",
+          userName: "Admin Demo",
+        });
+      }
+    }
+
+    // 4. Persist — DB or in-memory
+    if (state.dataSource === "database") {
+      set({ isSubmitting: true });
+      try {
+        for (const movement of newMovements) {
+          await inventoryRepo.updateBatchQuantity(
+            movement.batchId,
+            movement.qtyAfter,
+          );
+          await inventoryRepo.createStockMovement({
+            type: "sale",
+            productId: movement.productId,
+            productName: movement.productName,
+            batchId: movement.batchId,
+            batchNumber: movement.batchNumber,
+            qtyBefore: movement.qtyBefore,
+            qtyChange: movement.qtyChange,
+            qtyAfter: movement.qtyAfter,
+            referenceNumber: transactionId,
+            note: `Penjualan transaksi ${transactionId}`,
+          });
+        }
+
+        await get().loadDemoData();
+        set({ isSubmitting: false });
+        return;
+      } catch (e) {
+        console.error(
+          "DB deductForSale failed, falling back to demo:",
+          e,
+        );
+        set({ isSubmitting: false });
+        // Fall through to demo-mode logic
+      }
+    }
+
+    // ---- DEMO / FALLBACK MODE ----
+    set({
+      batches: updatedBatches,
+      stockMovements: [...newMovements, ...state.stockMovements],
+    });
+  },
+
+  /* ---- demo ---- */
+
+  loadDemoData: async () => {
+    const state = get();
+    if (state.dataSource !== "demo" || state.batches.length > 0) return;
+
+    if (productRepo.isConnected) {
+      set({ dataSource: "loading", isLoading: true });
+      try {
+        const [products, suppliers] = await Promise.all([
+          productRepo.getProducts(),
+          supplierRepo.getSuppliers(),
+        ]);
+
+        // Extract batches from InventoryProduct[] into ProductBatch[]
+        const allBatches: ProductBatch[] = [];
+        for (const p of products) {
+          for (const b of p.batches) {
+            allBatches.push({ ...b, productName: p.name });
+          }
+        }
+
+        // Load purchase invoices and stock movements from inventory repo
+        const purchaseInvoices =
+          await supplierRepo.getPurchaseInvoices();
+        const stockMovements =
+          await inventoryRepo.getStockMovements();
+
+        set({
+          batches: allBatches,
+          suppliers,
+          purchaseInvoices,
+          stockMovements,
+          dataSource: "database",
+          isDemoMode: false,
+          isLoading: false,
+        });
+      } catch (e) {
+        console.error(
+          "Failed to load from database, falling back to demo:",
+          e,
+        );
+        get()._loadDemoFallback();
+      }
+    } else {
+      get()._loadDemoFallback();
+    }
+  },
+
+  _loadDemoFallback: () => {
+    set({
+      batches: DEMO_BATCHES.map((b) => ({ ...b })),
+      suppliers: [...DEMO_SUPPLIERS],
+      purchaseInvoices: [...DEMO_PURCHASE_INVOICES],
+      stockMovements: [...DEMO_STOCK_MOVEMENTS],
+      stockOpnames: [DEMO_STOCK_OPNAME],
+      dataSource: "demo",
+      isDemoMode: true,
+      isLoading: false,
+    });
+  },
+}));

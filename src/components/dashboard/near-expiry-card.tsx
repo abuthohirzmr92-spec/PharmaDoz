@@ -1,0 +1,77 @@
+"use client";
+
+import { useEffect } from "react";
+import { Clock } from "lucide-react";
+import { useInventoryStore } from "@/store/inventory-store";
+import { getDaysUntilExpiry } from "@/lib/inventory-demo";
+import { cn } from "@/lib/cn";
+
+export function NearExpiryCard() {
+  const isLoading = useInventoryStore((s) => s.isLoading);
+  const load = useInventoryStore((s) => s.loadDemoData);
+  const batches = useInventoryStore((s) => s.batches);
+  const getNearExpiry = useInventoryStore((s) => s.getNearExpiryBatches);
+
+  useEffect(() => {
+    if (batches.length === 0) load();
+  }, [batches.length, load]);
+
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
+
+  const near = getNearExpiry(30).slice(0, 5);
+
+  return (
+    <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
+        <h3 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
+          Mendekati Kadaluarsa (H-30)
+        </h3>
+      </div>
+      <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+        {near.length === 0 ? (
+          <p className="px-4 py-6 text-center text-xs text-green-600 font-medium">
+            Tidak ada obat mendekati ED
+          </p>
+        ) : (
+          near.map((b) => {
+            const days = getDaysUntilExpiry(b.expiredDate);
+            return (
+              <div key={b.id} className="flex items-center gap-3 px-4 py-2.5">
+                <Clock
+                  className={cn(
+                    "h-4 w-4 shrink-0",
+                    days <= 7 ? "text-red-500" : "text-amber-500",
+                  )}
+                />
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-neutral-900 dark:text-neutral-50 truncate">
+                    {b.productName}
+                  </p>
+                  <p className="text-[10px] text-neutral-400">
+                    {b.batchNumber} · {b.quantity} unit · Rp {(b.quantity * b.sellingPrice).toLocaleString("id-ID")}
+                  </p>
+                </div>
+                <span
+                  className={cn(
+                    "text-xs font-bold tabular-nums",
+                    days <= 7 ? "text-red-600" : "text-amber-600",
+                  )}
+                >
+                  {days}h
+                </span>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </div>
+  );
+}
