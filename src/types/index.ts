@@ -283,3 +283,140 @@ export interface PlatformHealth {
   quotaAlerts: number;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------------
+// Audit Trail
+// ---------------------------------------------------------------------------
+export type AuditAction =
+  | "auth.login"
+  | "auth.logout"
+  | "auth.session_expired"
+  | "auth.role_switch"
+  | "transaction.create"
+  | "transaction.void"
+  | "inventory.movement"
+  | "inventory.opname"
+  | "inventory.expired_writeoff"
+  | "expansion.approve"
+  | "expansion.reject"
+  | "quota.change"
+  | "maintenance.enable"
+  | "maintenance.disable"
+  | "tenant.suspend"
+  | "tenant.activate";
+
+export interface AuditEntry {
+  id: string;
+  action: AuditAction;
+  actorId: string;
+  actorName: string;
+  pharmacyId: string | null;
+  resourceType: string;
+  resourceId: string;
+  /** JSON snapshot before change */
+  before: Record<string, unknown> | null;
+  /** JSON snapshot after change */
+  after: Record<string, unknown> | null;
+  /** Additional structured metadata */
+  metadata: Record<string, unknown> | null;
+  createdAt: string;
+}
+
+export interface AuditFilter {
+  action?: AuditAction;
+  actorId?: string;
+  resourceType?: string;
+  from?: string;
+  to?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Operational Event Logging
+// ---------------------------------------------------------------------------
+export type EventLevel = "debug" | "info" | "warn" | "error" | "critical";
+
+export type EventCategory =
+  | "transaction"
+  | "auth"
+  | "sync"
+  | "maintenance"
+  | "network"
+  | "permission"
+  | "recovery"
+  | "backup";
+
+export interface OperationalEvent {
+  id: string;
+  level: EventLevel;
+  category: EventCategory;
+  message: string;
+  details: Record<string, unknown> | null;
+  pharmacyId: string | null;
+  timestamp: string;
+}
+
+// ---------------------------------------------------------------------------
+// Recovery & Resilience
+// ---------------------------------------------------------------------------
+export type RecoveryState = "idle" | "retrying" | "recovering" | "degraded" | "restored";
+
+export interface RecoveryAction {
+  id: string;
+  type: string;
+  status: "pending" | "retrying" | "completed" | "failed";
+  attempts: number;
+  maxAttempts: number;
+  lastAttempt: string | null;
+  error: string | null;
+  result: Record<string, unknown> | null;
+}
+
+// ---------------------------------------------------------------------------
+// Operational Metrics
+// ---------------------------------------------------------------------------
+export type MetricName =
+  | "transaction.latency_ms"
+  | "transaction.volume"
+  | "auth.success_rate"
+  | "auth.failure_rate"
+  | "sync.pending_count"
+  | "sync.failure_rate"
+  | "network.offline_duration_s"
+  | "network.degraded_count"
+  | "maintenance.active"
+  | "tenant.active_count"
+  | "recovery.attempts"
+  | "queue.backlog_depth";
+
+export interface MetricPoint {
+  name: MetricName;
+  value: number;
+  unit?: string;
+  tags?: Record<string, string>;
+  timestamp: string;
+}
+
+export interface HealthSnapshot {
+  overall: "healthy" | "degraded" | "down";
+  components: Record<string, "healthy" | "degraded" | "down">;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Backup & Disaster Recovery
+// ---------------------------------------------------------------------------
+export type BackupType = "snapshot" | "incremental" | "full";
+
+export type BackupStatus = "pending" | "in_progress" | "completed" | "failed";
+
+export interface BackupMetadata {
+  id: string;
+  type: BackupType;
+  status: BackupStatus;
+  pharmacyId: string | null;
+  startedAt: string;
+  completedAt: string | null;
+  size: number | null;
+  checksum: string | null;
+  error: string | null;
+}

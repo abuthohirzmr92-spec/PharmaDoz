@@ -11,8 +11,12 @@ import {
   AlertTriangle,
   Clock,
   Activity,
+  FileText,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { useMaintenanceStore } from "@/store/maintenance-store";
+import { HealthMetricsCard } from "@/components/admin/health-metrics-card";
+import AuditLogTable from "@/components/admin/audit-log-table";
 import { cn } from "@/lib/cn";
 
 /* ------------------------------------------------------------------ */
@@ -223,6 +227,24 @@ const ACTIVITY_STYLES: Record<
 
 export default function MonitoringPage() {
   const isSystemUser = useAuthStore((s) => s.isSystemUser());
+  const maintenanceConfig = useMaintenanceStore((s) => s.config);
+
+  /* ---- Maintenance gate ---- */
+  if (maintenanceConfig.mode === "full") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-950/30">
+          <Wrench className="h-6 w-6" />
+        </div>
+        <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
+          Pemeliharaan
+        </h2>
+        <p className="max-w-xs text-sm text-neutral-500">
+          Halaman admin tidak tersedia selama pemeliharaan penuh.
+        </p>
+      </div>
+    );
+  }
 
   if (!isSystemUser) {
     return (
@@ -304,6 +326,9 @@ export default function MonitoringPage() {
         })}
       </div>
 
+      {/* Health Metrics KPI */}
+      <HealthMetricsCard />
+
       {/* Activity log */}
       <div>
         <div className="mb-3 flex items-center gap-2">
@@ -340,6 +365,17 @@ export default function MonitoringPage() {
         <p className="mt-3 text-[10px] text-neutral-400">
           Activity log real-time akan tersedia setelah integrasi database.
         </p>
+      </div>
+
+      {/* Audit Trail */}
+      <div>
+        <div className="mb-3 flex items-center gap-2">
+          <FileText className="h-4 w-4 text-neutral-400" />
+          <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+            Audit Trail
+          </h2>
+        </div>
+        <AuditLogTable />
       </div>
     </div>
   );

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useEffect, useState } from "react";
+import { useMemo, useEffect, useState, memo, useCallback } from "react";
 import { Search, Clock, Trash2 } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { getDaysUntilExpiry, getExpiredBatches, getNearExpiryBatches } from "@/lib/inventory-demo";
@@ -9,6 +9,91 @@ import { cn } from "@/lib/cn";
 import { usePermission } from "@/hooks/use-auth";
 
 type ViewMode = "expired" | "near" | "all";
+
+/* ------------------------------------------------------------------ */
+/*  Expired Row (memoized)                                             */
+/* ------------------------------------------------------------------ */
+
+const ExpiredRow = memo(function ExpiredRow({
+  batch,
+  isSelected,
+  onToggleSelect,
+}: {
+  batch: ProductBatch;
+  isSelected: boolean;
+  onToggleSelect: (id: string) => void;
+}) {
+  const days = getDaysUntilExpiry(batch.expiredDate);
+  const isExpired = days < 0;
+
+  return (
+    <tr
+      className={cn(
+        "group",
+        isExpired && "bg-red-50/50 dark:bg-red-950/10",
+        !isExpired && days <= 30 && "bg-amber-50/50 dark:bg-amber-950/10",
+      )}
+    >
+      <td className="px-3 py-2.5">
+        {isExpired && batch.quantity > 0 ? (
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={() => onToggleSelect(batch.id)}
+            className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-800 dark:checked:bg-brand-600"
+          />
+        ) : null}
+      </td>
+      <td className="px-3 py-2.5">
+        <span className="text-xs text-neutral-700 dark:text-neutral-300 truncate block">
+          {batch.productName}
+        </span>
+      </td>
+      <td className="px-3 py-2.5">
+        <span className="text-[11px] font-mono text-neutral-600 dark:text-neutral-400">
+          {batch.batchNumber}
+        </span>
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2.5 text-right">
+        <span className="text-xs tabular-nums text-neutral-500">
+          {new Date(batch.expiredDate).toLocaleDateString("id-ID", {
+            day: "numeric",
+            month: "short",
+            year: "2-digit",
+          })}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        <span
+          className={cn(
+            "text-xs font-semibold tabular-nums",
+            isExpired
+              ? "text-red-600"
+              : days <= 30
+                ? "text-amber-600"
+                : "text-amber-500",
+          )}
+        >
+          {isExpired ? `+${Math.abs(days)}` : days}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        <span className="text-xs font-medium tabular-nums text-neutral-900 dark:text-neutral-50">
+          {batch.quantity}
+        </span>
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2.5 text-right">
+        <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+          {(batch.quantity * batch.sellingPrice).toLocaleString("id-ID")}
+        </span>
+      </td>
+    </tr>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function InventoryExpiredTable() {
   const searchQuery = useInventoryStore((s) => s.searchQuery);
@@ -25,16 +110,16 @@ export function InventoryExpiredTable() {
   const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-  const toggleSelect = (id: string) => {
+  const toggleSelect = useCallback((id: string) => {
     setSelectedIds((prev) => {
       const next = new Set(prev);
       if (next.has(id)) next.delete(id);
       else next.add(id);
       return next;
     });
-  };
+  }, []);
 
-  const handleWriteOff = () => {
+  const handleWriteOff = useCallback(() => {
     if (selectedIds.size === 0) return;
     const ok = window.confirm(
       `Yakin ingin write-off ${selectedIds.size} batch kadaluarsa?\n\nBatch yang sudah di write-off akan dihapus dari stok dan dicatat sebagai kerugian.`,
@@ -42,7 +127,7 @@ export function InventoryExpiredTable() {
     if (!ok) return;
     useInventoryStore.getState().writeOffExpiredBatches(Array.from(selectedIds));
     setSelectedIds(new Set());
-  };
+  }, [selectedIds]);
 
   const expiredBatches = useMemo(() => getExpiredBatches(batches), [batches]);
   const nearBatches = useMemo(() => getNearExpiryBatches(batches, 90), [batches]);
@@ -192,75 +277,14 @@ export function InventoryExpiredTable() {
                 </td>
               </tr>
             ) : (
-              filtered.map((b) => {
-                const days = getDaysUntilExpiry(b.expiredDate);
-                const isExpired = days < 0;
-
-                return (
-                  <tr
-                    key={b.id}
-                    className={cn(
-                      "group",
-                      isExpired && "bg-red-50/50 dark:bg-red-950/10",
-                      !isExpired && days <= 30 && "bg-amber-50/50 dark:bg-amber-950/10",
-                    )}
-                  >
-                    <td className="px-3 py-2.5">
-                      {isExpired && b.quantity > 0 ? (
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.has(b.id)}
-                          onChange={() => toggleSelect(b.id)}
-                          className="h-4 w-4 rounded border-neutral-300 text-brand-600 focus:ring-brand-500 dark:border-neutral-600 dark:bg-neutral-800 dark:checked:bg-brand-600"
-                        />
-                      ) : null}
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs text-neutral-700 dark:text-neutral-300 truncate block">
-                        {b.productName}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-[11px] font-mono text-neutral-600 dark:text-neutral-400">
-                        {b.batchNumber}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5 text-right">
-                      <span className="text-xs tabular-nums text-neutral-500">
-                        {new Date(b.expiredDate).toLocaleDateString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          year: "2-digit",
-                        })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span
-                        className={cn(
-                          "text-xs font-semibold tabular-nums",
-                          isExpired
-                            ? "text-red-600"
-                            : days <= 30
-                              ? "text-amber-600"
-                              : "text-amber-500",
-                        )}
-                      >
-                        {isExpired ? `+${Math.abs(days)}` : days}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs font-medium tabular-nums text-neutral-900 dark:text-neutral-50">
-                        {b.quantity}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5 text-right">
-                      <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
-                        {(b.quantity * b.sellingPrice).toLocaleString("id-ID")}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })
+              filtered.map((b) => (
+                <ExpiredRow
+                  key={b.id}
+                  batch={b}
+                  isSelected={selectedIds.has(b.id)}
+                  onToggleSelect={toggleSelect}
+                />
+              ))
             )}
           </tbody>
         </table>

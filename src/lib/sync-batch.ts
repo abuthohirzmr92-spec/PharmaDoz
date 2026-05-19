@@ -15,6 +15,12 @@ import type { SyncBatch } from "@/types";
 // ---------------------------------------------------------------------------
 
 /**
+ * Maximum age (in hours) before a SyncBatch is considered stale.
+ * Used by isBatchHealthy to determine whether the batch is still viable.
+ */
+const SYNC_BATCH_MAX_AGE_HOURS = 24;
+
+/**
  * Generate a random hexadecimal string of the given length.
  * Uses crypto.getRandomValues where available; falls back to Math.random.
  */
@@ -153,4 +159,66 @@ export function createSyncBatch(
     stage: "staging",
     createdAt: new Date().toISOString(),
   };
+}
+
+/**
+ * Return the staged-replacement lifecycle progress for a batch.
+ * Progress is 0-100 based on position in the stage sequence:
+ *   staging (25%) -> validated (50%) -> replaced (75%) -> finalized (100%).
+ */
+export function getStagedReplacementStatus(batch: SyncBatch): {
+  stage: string;
+  progress: number;
+  isComplete: boolean;
+} {
+  const stages: SyncBatch["stage"][] = [
+    "staging",
+    "validated",
+    "replaced",
+    "finalized",
+  ];
+  const index = stages.indexOf(batch.stage);
+  const progress = index >= 0 ? Math.round(((index + 1) / stages.length) * 100) : 0;
+  return {
+    stage: batch.stage,
+    progress,
+    isComplete: batch.stage === "finalized",
+  };
+}
+
+/**
+ * Format a staged-replacement stage into an Indonesian human-readable label.
+ *
+ *  - staging   -> "Persiapan"
+ *  - validated -> "Tervalidasi"
+ *  - replaced  -> "Terganti"
+ *  - finalized -> "Final"
+ */
+export function formatStagedReplacementStage(stage: string): string {
+  const labels: Record<string, string> = {
+    staging: "Persiapan",
+    validated: "Tervalidasi",
+    replaced: "Terganti",
+    finalized: "Final",
+  };
+  return labels[stage] ?? stage;
+}
+
+/**
+ * Return the age of a SyncBatch in hours, based on its `createdAt` timestamp.
+ * Returns a floating-point number (e.g. 3.5 for three and a half hours).
+ */
+export function getBatchAge(batch: SyncBatch): number {
+  const created = new Date(batch.createdAt).getTime();
+  const now = Date.now();
+  return (now - created) / (1000 * 60 * 60);
+}
+
+/**
+ * Determine whether a SyncBatch is still healthy/viable.
+ * A batch is healthy when its stage is "finalized" (already applied) or
+ * its age is less than the configured maximum age threshold (24 hours).
+ */
+export function isBatchHealthy(batch: SyncBatch): boolean {
+  return batch.stage === "finalized" || getBatchAge(batch) < SYNC_BATCH_MAX_AGE_HOURS;
 }

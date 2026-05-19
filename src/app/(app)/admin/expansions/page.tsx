@@ -10,9 +10,11 @@ import {
   CheckCircle,
   XCircle,
   Loader2,
+  Wrench,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
+import { useMaintenanceStore } from "@/store/maintenance-store";
 import { useExpansionStore } from "@/store/expansion-store";
 import type { ExpansionStatus } from "@/types";
 import { cn } from "@/lib/cn";
@@ -90,12 +92,30 @@ function formatDate(iso: string): string {
 export default function ExpansionsPage() {
   const isSystemUser = useAuthStore((s) => s.isSystemUser());
   const user = useAuthStore((s) => s.user);
+  const maintenanceConfig = useMaintenanceStore((s) => s.config);
   const { requests, approveRequest, rejectRequest } = useExpansionStore();
 
   const [modalMode, setModalMode] = useState<ModalMode>(null);
   const [modalRequestId, setModalRequestId] = useState<string | null>(null);
   const [modalNotes, setModalNotes] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  /* ---- Maintenance gate ---- */
+  if (maintenanceConfig.mode === "full") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-950/30">
+          <Wrench className="h-6 w-6" />
+        </div>
+        <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
+          Pemeliharaan
+        </h2>
+        <p className="max-w-xs text-sm text-neutral-500">
+          Halaman admin tidak tersedia selama pemeliharaan penuh.
+        </p>
+      </div>
+    );
+  }
 
   /* ---- Auth gate ---- */
   if (!isSystemUser) {

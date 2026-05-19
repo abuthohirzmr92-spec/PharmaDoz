@@ -25,3 +25,26 @@ export const QUOTA_WARNING_THRESHOLD = 0.8;
 
 /** Max hours a sync batch remains valid before expiry */
 export const SYNC_BATCH_MAX_AGE_HOURS = 24;
+
+/** Enterprise hardening */
+
+/** Days of audit entries retained before pruning */
+export const AUDIT_RETENTION_DAYS = 90;
+
+/** Max entries in operational event ring buffer */
+export const EVENT_LOG_MAX_SIZE = 1000;
+
+/** Max retry attempts for recovery actions */
+export const RECOVERY_MAX_RETRIES = 3;
+
+/** Base delay between recovery retries (ms) */
+export const RECOVERY_RETRY_DELAY_MS = 2000;
+
+/** Interval for flushing metrics collection (ms) */
+export const METRICS_FLUSH_INTERVAL_MS = 30000;
+
+/** Number of backup checkpoints retained */
+export const BACKUP_CHECKPOINT_COUNT = 5;
+
+/** Per-page limit for audit log tables */
+export const MAX_AUDIT_PAGE_SIZE = 50;

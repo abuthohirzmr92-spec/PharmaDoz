@@ -8,8 +8,10 @@ import {
   Store,
   ChevronRight,
   Circle,
+  Wrench,
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { useMaintenanceStore } from "@/store/maintenance-store";
 import type { TenantSummary, TenantPackage } from "@/types";
 import { cn } from "@/lib/cn";
 import { TenantDetailPanel } from "@/components/admin/tenant-detail-panel";
@@ -178,6 +180,7 @@ function getBarColor(percent: number): string {
 
 export default function TenantsPage() {
   const isSystemUser = useAuthStore((s) => s.isSystemUser());
+  const maintenanceConfig = useMaintenanceStore((s) => s.config);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<StatusFilter>("all");
@@ -200,6 +203,23 @@ export default function TenantsPage() {
   }, [searchQuery, statusFilter]);
 
   const hasData = filteredTenants.length > 0;
+
+  /* ---- Maintenance gate ---- */
+  if (maintenanceConfig.mode === "full") {
+    return (
+      <div className="flex flex-col items-center justify-center gap-3 py-24 text-center">
+        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-amber-50 text-amber-500 dark:bg-amber-950/30">
+          <Wrench className="h-6 w-6" />
+        </div>
+        <h2 className="text-base font-semibold text-neutral-700 dark:text-neutral-300">
+          Pemeliharaan
+        </h2>
+        <p className="max-w-xs text-sm text-neutral-500">
+          Halaman admin tidak tersedia selama pemeliharaan penuh.
+        </p>
+      </div>
+    );
+  }
 
   /* ---- Auth gate ---- */
   if (!isSystemUser) {

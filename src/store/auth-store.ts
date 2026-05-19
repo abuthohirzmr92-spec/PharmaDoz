@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import type { AppRole, Permission, UserProfile } from "@/types";
 import { hasPermission } from "@/lib/auth/permissions";
+import { isSessionStale } from "@/lib/auth/roles";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { authRepo, productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
 import { useCashierStore } from "@/store/cashier-store";
@@ -32,6 +33,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   authMode: "demo" | "supabase";
+  lastActiveAt: string;
 
   // Demo actions
   loginAs: (role: AppRole) => void;
@@ -45,6 +47,9 @@ interface AuthState {
   // Shared actions
   logout: () => Promise<void>;
 
+  // Session actions
+  touchSession: () => void;
+
   // Permission checks
   can: (permission: Permission) => boolean;
   canAny: (permissions: Permission[]) => boolean;
@@ -53,6 +58,7 @@ interface AuthState {
   isSystemUser: () => boolean;
   getPharmacyId: () => string | undefined;
   isDemoMode: () => boolean;
+  isSessionExpired: () => boolean;
 }
 
 const DEMO_USERS: Record<
@@ -93,6 +99,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isAuthenticated: false,
   isLoading: false,
   authMode: "demo",
+  lastActiveAt: new Date().toISOString(),
 
   /* ---- Demo: loginAs ---- */
   loginAs: (role) => {
@@ -107,7 +114,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       pharmacyName: demo.pharmacyName,
     };
     syncRepositoryContext(user);
-    set({ user, isAuthenticated: true, isLoading: false, authMode: "demo" });
+    set({ user, isAuthenticated: true, isLoading: false, authMode: "demo", lastActiveAt: new Date().toISOString() });
   },
 
   /* ---- Demo: switchRole ---- */
@@ -203,6 +210,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       isAuthenticated: true,
       isLoading: false,
       authMode: "supabase",
+      lastActiveAt: new Date().toISOString(),
     });
 
     return true;
@@ -270,6 +278,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     return true;
   },
 
+  /* ---- Session actions ---- */
+  touchSession: () => {
+    set({ lastActiveAt: new Date().toISOString() });
+  },
+
   /* ---- Permission checks ---- */
   can: (permission) => {
     const { user } = get();
@@ -300,6 +313,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   getPharmacyId: () => get().user?.pharmacyId,
 
   isDemoMode: () => get().authMode === "demo",
+
+  isSessionExpired: () => {
+    const { user, lastActiveAt } = get();
+    if (!user) return false;
+    return isSessionStale(lastActiveAt);
+  },
 }));
 
 /* ---- localStorage hydration ---- */
@@ -316,12 +335,38 @@ if (stored) {
         isAuthenticated: true,
         isLoading: false,
         authMode: parsed.authMode ?? "demo",
+        lastActiveAt: parsed.lastActiveAt ?? new Date().toISOString(),
       });
       syncRepositoryContext(parsed.user);
     }
   } catch {
     /* ignore corrupt storage */
   }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Session staleness hook                                              */
+/* ------------------------------------------------------------------ */
+
+/**
+ * Hook that returns session staleness information and a refresh action.
+ * Returns isStale (boolean), lastActiveAt (ISO string or null when logged out),
+ * and refreshSession (calls touchSession to reset the staleness timer).
+ */
+export function useSessionStaleness(): {
+  isStale: boolean;
+  lastActiveAt: string | null;
+  refreshSession: () => void;
+} {
+  const lastActiveAt = useAuthStore((s) => s.lastActiveAt);
+  const user = useAuthStore((s) => s.user);
+  const touchSession = useAuthStore((s) => s.touchSession);
+
+  return {
+    isStale: user && lastActiveAt ? isSessionStale(lastActiveAt) : false,
+    lastActiveAt: user ? lastActiveAt : null,
+    refreshSession: touchSession,
+  };
 }
 
 /* ---- localStorage persistence ---- */
@@ -334,6 +379,7 @@ useAuthStore.subscribe((state) => {
           user: state.user,
           isAuthenticated: state.isAuthenticated,
           authMode: state.authMode,
+          lastActiveAt: state.lastActiveAt,
         }),
       );
     } else {

@@ -142,7 +142,7 @@ export function useDemoCashier() {
   const [dbLoading, setDbLoading] = useState(false);
 
   /** Dynamically determined — true when Supabase is not connected. */
-  const isDemoMode = !productRepo.isConnected;
+  const isDemoMode = useMemo(() => !productRepo.isConnected, []);
 
   /** Load products from the database when connected. */
   useEffect(() => {
@@ -191,7 +191,10 @@ export function useDemoCashier() {
   );
 
   /** Combine DB products (when loaded) or fall back to DEMO_PRODUCTS. */
-  const sourceProducts = dbProducts ?? DEMO_PRODUCTS;
+  const sourceProducts = useMemo(
+    () => dbProducts ?? DEMO_PRODUCTS,
+    [dbProducts],
+  );
 
   /** Products filtered by the current search query. */
   const filteredProducts = useMemo(() => {
@@ -211,10 +214,13 @@ export function useDemoCashier() {
     [],
   );
 
+  /** Stable all-demo-products array reference. */
+  const allDemoProducts = useMemo(() => [...DEMO_PRODUCTS], []);
+
   return {
     isDemoMode,
     demoProducts: filteredProducts,
-    allDemoProducts: [...DEMO_PRODUCTS],
+    allDemoProducts,
     categories,
     startDemoSale,
     addDemoProductToCart,

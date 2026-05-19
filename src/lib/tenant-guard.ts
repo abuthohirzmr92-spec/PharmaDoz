@@ -1,3 +1,5 @@
+import type { AppRole } from "@/types";
+
 /**
  * Returns a pharmacy_id filter for repository queries.
  * Returns empty object (no filter) when pharmacyId is missing.
@@ -49,4 +51,38 @@ export function resolveTenantId(
 ): string | undefined {
   if (!role || isCrossTenantRole(role)) return undefined;
   return pharmacyId || undefined;
+}
+
+// ---------------------------------------------------------------------------
+// Tenant access validation helpers
+// ---------------------------------------------------------------------------
+
+/**
+ * Validates that a user has access to a specific tenant scope.
+ * System roles always pass (cross-tenant access).
+ * Business roles pass only if their pharmacyId matches the requested tenant.
+ */
+export function validateTenantAccess(
+  userPharmacyId: string | undefined,
+  requestedPharmacyId: string,
+  userRole: AppRole,
+): boolean {
+  if (isCrossTenantRole(userRole)) return true;
+  return userPharmacyId === requestedPharmacyId;
+}
+
+/**
+ * Validates tenant access and throws with an Indonesian error message
+ * if the user does not have access to the requested tenant.
+ */
+export function assertTenantAccess(
+  userPharmacyId: string | undefined,
+  requestedPharmacyId: string,
+  userRole: AppRole,
+): void {
+  if (!validateTenantAccess(userPharmacyId, requestedPharmacyId, userRole)) {
+    throw new Error(
+      "Akses ditolak: Anda tidak memiliki akses ke tenant ini.",
+    );
+  }
 }

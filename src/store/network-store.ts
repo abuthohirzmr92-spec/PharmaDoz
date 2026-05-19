@@ -11,10 +11,27 @@ interface NetworkState {
   lastOfflineAt: string | null;
   pendingSyncCount: number;
   isSyncing: boolean;
+  queueBacklog: number; // number of pending operations in queue
+  lastSyncAttempt: string | null; // ISO timestamp of last sync attempt
+  lastSyncSuccess: string | null; // ISO timestamp of last successful sync
 
   setStatus: (status: NetworkStatus) => void;
   setPendingSyncCount: (count: number) => void;
   setIsSyncing: (v: boolean) => void;
+  setQueueBacklog: (count: number) => void;
+  recordSyncAttempt: () => void;
+  recordSyncSuccess: () => void;
+  getQueueHealth: () => {
+    status: "clear" | "backlog" | "stalled";
+    depth: number;
+    oldestEntry: string | null;
+  };
+  getSyncSummary: () => {
+    lastAttempt: string | null;
+    lastSuccess: string | null;
+    pendingCount: number;
+    isHealthy: boolean;
+  };
   reset: () => void;
 }
 
@@ -29,9 +46,12 @@ const INITIAL_STATE = {
   lastOfflineAt: null as string | null,
   pendingSyncCount: 0,
   isSyncing: false,
+  queueBacklog: 0,
+  lastSyncAttempt: null as string | null,
+  lastSyncSuccess: null as string | null,
 };
 
-export const useNetworkStore = create<NetworkState>()((set) => ({
+export const useNetworkStore = create<NetworkState>()((set, get) => ({
   ...INITIAL_STATE,
 
   setStatus: (status) =>
@@ -47,6 +67,51 @@ export const useNetworkStore = create<NetworkState>()((set) => ({
   setPendingSyncCount: (count) => set({ pendingSyncCount: count }),
 
   setIsSyncing: (v) => set({ isSyncing: v }),
+
+  setQueueBacklog: (count) => set({ queueBacklog: count }),
+
+  recordSyncAttempt: () => set({ lastSyncAttempt: new Date().toISOString() }),
+
+  recordSyncSuccess: () =>
+    set({
+      lastSyncSuccess: new Date().toISOString(),
+      queueBacklog: 0,
+    }),
+
+  getQueueHealth: () => {
+    const state = get();
+    if (state.queueBacklog === 0) {
+      return { status: "clear", depth: 0, oldestEntry: null };
+    }
+    // Stalled if no sync success within the last hour while backlog exists
+    const oneHourAgo = Date.now() - 60 * 60 * 1000;
+    const hasRecentSuccess =
+      state.lastSyncSuccess !== null &&
+      new Date(state.lastSyncSuccess).getTime() > oneHourAgo;
+    if (!hasRecentSuccess) {
+      return {
+        status: "stalled",
+        depth: state.queueBacklog,
+        oldestEntry: state.lastSyncAttempt,
+      };
+    }
+    return {
+      status: "backlog",
+      depth: state.queueBacklog,
+      oldestEntry: state.lastSyncAttempt,
+    };
+  },
+
+  getSyncSummary: () => {
+    const state = get();
+    return {
+      lastAttempt: state.lastSyncAttempt,
+      lastSuccess: state.lastSyncSuccess,
+      pendingCount: state.queueBacklog,
+      isHealthy:
+        state.queueBacklog === 0 && state.status === "online" && !state.isSyncing,
+    };
+  },
 
   reset: () => set({ ...INITIAL_STATE }),
 }));

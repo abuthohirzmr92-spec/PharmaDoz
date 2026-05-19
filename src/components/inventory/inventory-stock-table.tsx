@@ -1,10 +1,181 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { Search, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { cn } from "@/lib/cn";
 import { getDaysUntilExpiry, buildInventoryProducts } from "@/lib/inventory-demo";
+
+/* ------------------------------------------------------------------ */
+/*  Stock Row (memoized)                                               */
+/* ------------------------------------------------------------------ */
+
+const StockRow = memo(function StockRow({
+  product,
+  isExpanded,
+  onToggleExpand,
+}: {
+  product: ReturnType<typeof buildInventoryProducts>[number];
+  isExpanded: boolean;
+  onToggleExpand: (id: string) => void;
+}) {
+  const fefoBatches = useMemo(
+    () =>
+      [...product.batches].sort(
+        (a, b) =>
+          new Date(a.expiredDate).getTime() -
+          new Date(b.expiredDate).getTime(),
+      ),
+    [product.batches],
+  );
+  const hasNearExpiry = useMemo(
+    () =>
+      fefoBatches.some(
+        (b) => getDaysUntilExpiry(b.expiredDate) <= 90 && b.quantity > 0,
+      ),
+    [fefoBatches],
+  );
+  const hasExpired = useMemo(
+    () =>
+      fefoBatches.some(
+        (b) => getDaysUntilExpiry(b.expiredDate) < 0 && b.quantity > 0,
+      ),
+    [fefoBatches],
+  );
+
+  return (
+    <tr className="group">
+      <td className="px-3 py-2.5">
+        <button
+          onClick={() => onToggleExpand(product.id)}
+          className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+        >
+          {isExpanded ? (
+            <ChevronDown className="h-4 w-4" />
+          ) : (
+            <ChevronRight className="h-4 w-4" />
+          )}
+        </button>
+      </td>
+      <td className="px-3 py-2.5">
+        <div className="flex items-center gap-1.5">
+          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
+            {product.name}
+          </span>
+          {product.requiresPrescription && (
+            <span className="shrink-0 rounded bg-red-50 px-1 py-0.5 text-[9px] font-semibold text-red-600 dark:bg-red-950/30">
+              R
+            </span>
+          )}
+        </div>
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2.5">
+        <span className="text-xs text-neutral-500">{product.category}</span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        <span
+          className={cn(
+            "text-sm font-semibold tabular-nums",
+            product.totalStock <= product.minStock
+              ? "text-amber-600"
+              : product.totalStock === 0
+                ? "text-red-500"
+                : "text-neutral-900 dark:text-neutral-50",
+          )}
+        >
+          {product.totalStock}
+        </span>
+        {product.totalStock <= product.minStock && product.totalStock > 0 && (
+          <span className="ml-1 text-[10px] text-amber-500">MIN</span>
+        )}
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2.5 text-right">
+        <span className="text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
+          {product.batches.filter((b) => b.quantity > 0).length}
+        </span>
+      </td>
+      <td className="hidden md:table-cell px-3 py-2.5">
+        <div className="flex gap-1">
+          {hasExpired && (
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 dark:bg-red-950/30">
+              EXP
+            </span>
+          )}
+          {hasNearExpiry && (
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+              DE
+            </span>
+          )}
+          {!hasExpired && !hasNearExpiry && (
+            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-green-600 bg-green-50 dark:bg-green-950/30">
+              OK
+            </span>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/*  Batch Row (memoized)                                               */
+/* ------------------------------------------------------------------ */
+
+const BatchRow = memo(function BatchRow({
+  batch,
+}: {
+  batch: ReturnType<typeof buildInventoryProducts>[number]["batches"][number];
+}) {
+  const days = getDaysUntilExpiry(batch.expiredDate);
+  const isExpired = days < 0;
+  const isNear = days >= 0 && days <= 90;
+
+  return (
+    <tr>
+      <td className="py-1.5 pr-2 font-mono text-neutral-700 dark:text-neutral-300">
+        {batch.batchNumber}
+      </td>
+      <td className="py-1.5 pr-2 text-right tabular-nums font-medium">
+        {batch.quantity}
+      </td>
+      <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
+        {batch.unitPrice.toLocaleString("id-ID")}
+      </td>
+      <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
+        {batch.sellingPrice.toLocaleString("id-ID")}
+      </td>
+      <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
+        {new Date(batch.expiredDate).toLocaleDateString("id-ID", {
+          day: "numeric",
+          month: "short",
+          year: "2-digit",
+        })}
+      </td>
+      <td className="py-1.5">
+        <span
+          className={cn(
+            "rounded px-1.5 py-0.5 text-[10px] font-medium",
+            isExpired
+              ? "text-red-600 bg-red-50 dark:bg-red-950/30"
+              : isNear
+                ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30"
+                : "text-green-600 bg-green-50 dark:bg-green-950/30",
+          )}
+        >
+          {isExpired
+            ? `EXPIRED`
+            : isNear
+              ? `${days}h`
+              : `OK (${days}h)`}
+        </span>
+      </td>
+    </tr>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function InventoryStockTable() {
   const searchQuery = useInventoryStore((s) => s.searchQuery);
@@ -19,6 +190,14 @@ export function InventoryStockTable() {
 
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
 
+  const handleToggleExpand = useCallback((id: string) => {
+    setExpandedProduct((prev) => (prev === id ? null : id));
+  }, []);
+
+  const handleCloseDetail = useCallback(() => {
+    setExpandedProduct(null);
+  }, []);
+
   const filtered = useMemo(() => {
     if (!searchQuery) return products;
     const q = searchQuery.toLowerCase();
@@ -30,7 +209,6 @@ export function InventoryStockTable() {
     );
   }, [products, searchQuery]);
 
-  
   return (
     <div>
       {/* Search */}
@@ -77,95 +255,14 @@ export function InventoryStockTable() {
                 </td>
               </tr>
             ) : (
-              filtered.map((product) => {
-                const isExpanded = expandedProduct === product.id;
-                const fefoBatches = [...product.batches].sort(
-                  (a, b) =>
-                    new Date(a.expiredDate).getTime() -
-                    new Date(b.expiredDate).getTime(),
-                );
-                const hasNearExpiry = fefoBatches.some(
-                  (b) => getDaysUntilExpiry(b.expiredDate) <= 90 && b.quantity > 0,
-                );
-                const hasExpired = fefoBatches.some(
-                  (b) => getDaysUntilExpiry(b.expiredDate) < 0 && b.quantity > 0,
-                );
-
-                return (
-                  <tr key={product.id} className="group">
-                    <td className="px-3 py-2.5">
-                      <button
-                        onClick={() =>
-                          setExpandedProduct(isExpanded ? null : product.id)
-                        }
-                        className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-                      >
-                        {isExpanded ? (
-                          <ChevronDown className="h-4 w-4" />
-                        ) : (
-                          <ChevronRight className="h-4 w-4" />
-                        )}
-                      </button>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <div className="flex items-center gap-1.5">
-                        <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
-                          {product.name}
-                        </span>
-                        {product.requiresPrescription && (
-                          <span className="shrink-0 rounded bg-red-50 px-1 py-0.5 text-[9px] font-semibold text-red-600 dark:bg-red-950/30">
-                            R
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5">
-                      <span className="text-xs text-neutral-500">{product.category}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span
-                        className={cn(
-                          "text-sm font-semibold tabular-nums",
-                          product.totalStock <= product.minStock
-                            ? "text-amber-600"
-                            : product.totalStock === 0
-                              ? "text-red-500"
-                              : "text-neutral-900 dark:text-neutral-50",
-                        )}
-                      >
-                        {product.totalStock}
-                      </span>
-                      {product.totalStock <= product.minStock && product.totalStock > 0 && (
-                        <span className="ml-1 text-[10px] text-amber-500">MIN</span>
-                      )}
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5 text-right">
-                      <span className="text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
-                        {product.batches.filter((b) => b.quantity > 0).length}
-                      </span>
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-2.5">
-                      <div className="flex gap-1">
-                        {hasExpired && (
-                          <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 dark:bg-red-950/30">
-                            EXP
-                          </span>
-                        )}
-                        {hasNearExpiry && (
-                          <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30">
-                            DE
-                          </span>
-                        )}
-                        {!hasExpired && !hasNearExpiry && (
-                          <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-green-600 bg-green-50 dark:bg-green-950/30">
-                            OK
-                          </span>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
+              filtered.map((product) => (
+                <StockRow
+                  key={product.id}
+                  product={product}
+                  isExpanded={expandedProduct === product.id}
+                  onToggleExpand={handleToggleExpand}
+                />
+              ))
             )}
           </tbody>
         </table>
@@ -175,14 +272,18 @@ export function InventoryStockTable() {
       {expandedProduct && (
         <BatchDetailPanel
           productId={expandedProduct}
-          onClose={() => setExpandedProduct(null)}
+          onClose={handleCloseDetail}
         />
       )}
     </div>
   );
 }
 
-function BatchDetailPanel({
+/* ------------------------------------------------------------------ */
+/*  Batch Detail Panel (memoized)                                      */
+/* ------------------------------------------------------------------ */
+
+const BatchDetailPanel = memo(function BatchDetailPanel({
   productId,
   onClose,
 }: {
@@ -241,55 +342,11 @@ function BatchDetailPanel({
           </tr>
         </thead>
         <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-          {productBatches.map((b) => {
-            const days = getDaysUntilExpiry(b.expiredDate);
-            const isExpired = days < 0;
-            const isNear = days >= 0 && days <= 90;
-
-            return (
-              <tr key={b.id}>
-                <td className="py-1.5 pr-2 font-mono text-neutral-700 dark:text-neutral-300">
-                  {b.batchNumber}
-                </td>
-                <td className="py-1.5 pr-2 text-right tabular-nums font-medium">
-                  {b.quantity}
-                </td>
-                <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-                  {b.unitPrice.toLocaleString("id-ID")}
-                </td>
-                <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-                  {b.sellingPrice.toLocaleString("id-ID")}
-                </td>
-                <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-                  {new Date(b.expiredDate).toLocaleDateString("id-ID", {
-                    day: "numeric",
-                    month: "short",
-                    year: "2-digit",
-                  })}
-                </td>
-                <td className="py-1.5">
-                  <span
-                    className={cn(
-                      "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                      isExpired
-                        ? "text-red-600 bg-red-50 dark:bg-red-950/30"
-                        : isNear
-                          ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30"
-                          : "text-green-600 bg-green-50 dark:bg-green-950/30",
-                    )}
-                  >
-                    {isExpired
-                      ? `EXPIRED`
-                      : isNear
-                        ? `${days}h`
-                        : `OK (${days}h)`}
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
+          {productBatches.length === 0 ? null : (
+            productBatches.map((b) => <BatchRow key={b.id} batch={b} />)
+          )}
         </tbody>
       </table>
     </div>
   );
-}
+});

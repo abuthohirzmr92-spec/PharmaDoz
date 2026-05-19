@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useTransactionStore } from "@/store/transaction-store";
 import { computeSalesTrend } from "@/lib/report-aggregate";
@@ -16,10 +16,9 @@ export function SalesChartCard() {
     if (!isLoaded) loadTxns();
   }, [isLoaded, loadTxns]);
 
-  const range = resolveDateRange("last7");
-  const trend = computeSalesTrend(transactions, range);
-
-  const hasData = trend.some((d) => d.total > 0);
+  const range = useMemo(() => resolveDateRange("last7"), []);
+  const trend = useMemo(() => computeSalesTrend(transactions, range), [transactions, range]);
+  const hasData = useMemo(() => trend.some((d) => d.total > 0), [trend]);
 
   if (isLoading) {
     return (

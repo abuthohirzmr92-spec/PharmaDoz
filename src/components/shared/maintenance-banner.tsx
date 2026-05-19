@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Wrench, Clock } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { formatMaintenanceTime } from "@/lib/maintenance";
@@ -53,6 +54,41 @@ export function MaintenanceBanner({
   const config = BANNER_CONFIG[mode];
   const Icon = config.icon;
 
+  const [remaining, setRemaining] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (mode !== "scheduled" || !scheduledEndAt) {
+      setRemaining(null);
+      return;
+    }
+
+    const endAt = scheduledEndAt;
+
+    function calc() {
+      const end = new Date(endAt).getTime();
+      const now = Date.now();
+      const diff = end - now;
+
+      if (diff <= 0) {
+        setRemaining("Berakhir");
+        return;
+      }
+
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+
+      if (hours > 0) {
+        setRemaining(`Tersisa ${hours}j ${minutes}m`);
+      } else {
+        setRemaining(`Tersisa ${minutes} menit`);
+      }
+    }
+
+    calc();
+    const interval = setInterval(calc, 60000);
+    return () => clearInterval(interval);
+  }, [mode, scheduledEndAt]);
+
   const defaultMessage: Record<string, string> = {
     readonly:
       "Transaksi baru sementara ditutup. Transaksi aktif tetap dapat diselesaikan.",
@@ -70,6 +106,7 @@ export function MaintenanceBanner({
       <div
         className={cn(
           "sticky top-0 z-30 flex h-10 items-center justify-center gap-2 border-b px-4 text-xs font-medium",
+          "border-t-2",
           "animate-[bannerFadeIn_0.3s_ease-in-out]",
           config.bgClass,
           config.textClass,
@@ -88,6 +125,9 @@ export function MaintenanceBanner({
           <span className="opacity-80">
             &mdash; Selesai: {formatMaintenanceTime(scheduledEndAt)}
           </span>
+        )}
+        {mode === "scheduled" && remaining && (
+          <span className="opacity-70">&middot; {remaining}</span>
         )}
       </div>
     </>

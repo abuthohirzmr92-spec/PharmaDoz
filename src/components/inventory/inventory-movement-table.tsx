@@ -1,9 +1,9 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { Search, TrendingUp, TrendingDown, RotateCcw, AlertTriangle, Clipboard, Settings } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
-import type { MovementType } from "@/types/inventory";
+import type { MovementType, StockMovement } from "@/types/inventory";
 import { cn } from "@/lib/cn";
 
 const TYPE_CONFIG: Record<MovementType, { icon: typeof TrendingUp; cls: string; label: string }> = {
@@ -24,6 +24,76 @@ const TYPE_FILTERS: { label: string; value: MovementType | "all" }[] = [
   { label: "Opname", value: "opname" },
   { label: "Adjust", value: "adjustment" },
 ];
+
+/* ------------------------------------------------------------------ */
+/*  Movement Row (memoized)                                            */
+/* ------------------------------------------------------------------ */
+
+const MovementRow = memo(function MovementRow({
+  movement,
+}: {
+  movement: StockMovement;
+}) {
+  const cfg = TYPE_CONFIG[movement.type];
+  const Icon = cfg.icon;
+  const isNegative = movement.qtyChange < 0;
+
+  return (
+    <tr className="group">
+      <td className="hidden md:table-cell px-3 py-2.5">
+        <span className="text-[11px] text-neutral-500">
+          {new Date(movement.timestamp).toLocaleString("id-ID", {
+            day: "numeric",
+            month: "short",
+            hour: "2-digit",
+            minute: "2-digit",
+          })}
+        </span>
+      </td>
+      <td className="px-3 py-2.5">
+        <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium", cfg.cls)}>
+          <Icon className="h-3 w-3" />
+          {cfg.label}
+        </span>
+      </td>
+      <td className="px-3 py-2.5">
+        <span className="text-xs text-neutral-700 dark:text-neutral-300 truncate block">
+          {movement.productName}
+        </span>
+      </td>
+      <td className="hidden sm:table-cell px-3 py-2.5">
+        <span className="text-[11px] font-mono text-neutral-500">
+          {movement.batchNumber || "—"}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        <span className="text-xs tabular-nums text-neutral-500">{movement.qtyBefore}</span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        <span className={cn(
+          "text-xs font-semibold tabular-nums",
+          isNegative ? "text-red-600" : "text-green-600",
+        )}>
+          {isNegative ? movement.qtyChange : `+${movement.qtyChange}`}
+        </span>
+      </td>
+      <td className="px-3 py-2.5 text-right">
+        <span className="text-xs font-medium tabular-nums text-neutral-900 dark:text-neutral-50">
+          {movement.qtyAfter}
+        </span>
+      </td>
+      <td className="hidden lg:table-cell px-3 py-2.5">
+        <span className="text-[11px] font-mono text-neutral-400">
+          {movement.referenceNumber || "—"}
+        </span>
+      </td>
+    </tr>
+  );
+});
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                     */
+/* ------------------------------------------------------------------ */
 
 export function InventoryMovementTable() {
   const searchQuery = useInventoryStore((s) => s.searchQuery);
@@ -128,63 +198,9 @@ export function InventoryMovementTable() {
                 </td>
               </tr>
             ) : (
-              filtered.map((m) => {
-                const cfg = TYPE_CONFIG[m.type];
-                const Icon = cfg.icon;
-                const isNegative = m.qtyChange < 0;
-
-                return (
-                  <tr key={m.id} className="group">
-                    <td className="hidden md:table-cell px-3 py-2.5">
-                      <span className="text-[11px] text-neutral-500">
-                        {new Date(m.timestamp).toLocaleString("id-ID", {
-                          day: "numeric",
-                          month: "short",
-                          hour: "2-digit",
-                          minute: "2-digit",
-                        })}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className={cn("inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[10px] font-medium", cfg.cls)}>
-                        <Icon className="h-3 w-3" />
-                        {cfg.label}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs text-neutral-700 dark:text-neutral-300 truncate block">
-                        {m.productName}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5">
-                      <span className="text-[11px] font-mono text-neutral-500">
-                        {m.batchNumber || "—"}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs tabular-nums text-neutral-500">{m.qtyBefore}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className={cn(
-                        "text-xs font-semibold tabular-nums",
-                        isNegative ? "text-red-600" : "text-green-600",
-                      )}>
-                        {isNegative ? m.qtyChange : `+${m.qtyChange}`}
-                      </span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs font-medium tabular-nums text-neutral-900 dark:text-neutral-50">
-                        {m.qtyAfter}
-                      </span>
-                    </td>
-                    <td className="hidden lg:table-cell px-3 py-2.5">
-                      <span className="text-[11px] font-mono text-neutral-400">
-                        {m.referenceNumber || "—"}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })
+              filtered.map((m) => (
+                <MovementRow key={m.id} movement={m} />
+              ))
             )}
           </tbody>
         </table>

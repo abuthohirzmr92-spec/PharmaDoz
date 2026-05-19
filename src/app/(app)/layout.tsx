@@ -1,6 +1,7 @@
 "use client";
 
 import { OfflineBanner } from "@/components/shared/offline-banner";
+import { RecoveryBanner } from "@/components/shared/recovery-banner";
 import { SidebarLayout } from "@/components/shared/sidebar-layout";
 import { useAuthStore } from "@/store/auth-store";
 import { useRouter } from "next/navigation";
@@ -25,6 +26,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   return (
     <>
       <OfflineBanner />
+      <RecoveryBanner />
       <SidebarLayout>{children}</SidebarLayout>
     </>
   );

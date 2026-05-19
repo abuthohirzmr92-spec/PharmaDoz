@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { ReceiptText } from "lucide-react";
 import { useTransactionStore } from "@/store/transaction-store";
 import { formatCurrencyID } from "@/lib/date-utils";
@@ -23,7 +23,7 @@ export function RecentTransactionsCard() {
     if (!isLoaded) loadTxns();
   }, [isLoaded, loadTxns]);
 
-  const recent = transactions.slice(0, 5);
+  const recent = useMemo(() => transactions.slice(0, 5), [transactions]);
 
   if (isLoading) {
     return (

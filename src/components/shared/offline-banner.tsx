@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { WifiOff, AlertTriangle, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useNetworkStore } from "@/store/network-store";
@@ -47,6 +48,34 @@ const BANNER_CONFIG: Record<Exclude<NetworkStatus, "online">, BannerStyle> = {
 
 export function OfflineBanner() {
   const status = useNetworkStore((s) => s.status);
+  const lastOfflineAt = useNetworkStore((s) => s.lastOfflineAt);
+
+  const [duration, setDuration] = useState("");
+
+  useEffect(() => {
+    if (status !== "offline" || !lastOfflineAt) {
+      setDuration("");
+      return;
+    }
+
+    const offlineAt = lastOfflineAt;
+
+    function calc() {
+      const offline = new Date(offlineAt).getTime();
+      const now = Date.now();
+      const diff = now - offline;
+      const hours = Math.floor(diff / 3600000);
+      const minutes = Math.floor((diff % 3600000) / 60000);
+
+      if (hours > 0) return `${hours}j ${minutes}m offline`;
+      if (minutes > 0) return `${minutes} menit offline`;
+      return "Baru saja offline";
+    }
+
+    setDuration(calc());
+    const interval = setInterval(() => setDuration(calc()), 30000);
+    return () => clearInterval(interval);
+  }, [status, lastOfflineAt]);
 
   if (status === "online") return null;
 
@@ -80,6 +109,17 @@ export function OfflineBanner() {
           aria-hidden
         />
         <span>{config.message}</span>
+        {duration && (
+          <span className="opacity-80">&mdash; {duration}</span>
+        )}
+        {status === "offline" && (
+          <button
+            onClick={() => window.location.reload()}
+            className="ml-1 rounded-md border border-current px-2 py-0.5 text-[11px] font-medium hover:bg-white/10"
+          >
+            Sambungkan Ulang
+          </button>
+        )}
       </div>
     </>
   );

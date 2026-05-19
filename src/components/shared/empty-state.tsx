@@ -6,6 +6,7 @@ interface EmptyStateProps {
   title: string;
   description: string;
   badge?: string;
+  action?: ReactNode;
   className?: string;
 }
 
@@ -14,6 +15,7 @@ export function EmptyState({
   title,
   description,
   badge,
+  action,
   className,
 }: EmptyStateProps) {
   return (
@@ -35,6 +37,7 @@ export function EmptyState({
           {badge}
         </span>
       )}
+      {action && <div className="mt-4">{action}</div>}
     </div>
   );
 }
