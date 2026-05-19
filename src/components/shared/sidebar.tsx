@@ -7,6 +7,8 @@ import { useAuthStore } from "@/store/auth-store";
 import { ChevronLeft } from "lucide-react";
 import { mainNavigation } from "@/config/navigation";
 import { NavItem } from "./nav-item";
+import { OfflineIndicator } from "./offline-indicator";
+import { SyncStatus } from "./sync-status";
 import { RoleSwitcher } from "./role-switcher";
 import { SessionPanel } from "./session-panel";
 
@@ -28,7 +30,7 @@ export function Sidebar() {
       )}
     >
       {/* Brand */}
-      <div className="flex h-14 items-center border-b border-neutral-200 px-4 dark:border-neutral-800">
+      <div className="flex h-14 items-center justify-between border-b border-neutral-200 px-4 dark:border-neutral-800">
         <Link
           href="/dashboard"
           className="flex items-center gap-2 font-bold text-brand-600"
@@ -36,6 +38,7 @@ export function Sidebar() {
           <span className="text-xl">+</span>
           {expanded && <span className="text-base">Apotek</span>}
         </Link>
+        <OfflineIndicator />
       </div>
 
       {/* Navigation */}
@@ -50,6 +53,11 @@ export function Sidebar() {
           />
         ))}
       </nav>
+
+      {/* Sync Status */}
+      <div className="px-3 pb-1">
+        <SyncStatus />
+      </div>
 
       {/* Session Panel */}
       <SessionPanel collapsed={!expanded} />

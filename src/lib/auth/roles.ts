@@ -26,6 +26,12 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "logs.view",
     "expired.view",
     "expired.edit",
+    "platform.view",
+    "platform.tenants.manage",
+    "platform.expansions.approve",
+    "platform.quotas.manage",
+    "platform.maintenance.manage",
+    "platform.monitoring.view",
   ],
 
   developer: [
@@ -48,6 +54,12 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "logs.view",
     "expired.view",
     "expired.edit",
+    "platform.view",
+    "platform.tenants.manage",
+    "platform.expansions.approve",
+    "platform.quotas.manage",
+    "platform.maintenance.manage",
+    "platform.monitoring.view",
   ],
 
   support: [

@@ -1,7 +1,8 @@
 "use client";
 
-import { useAuthStore } from "@/store/auth-store";
+import { OfflineBanner } from "@/components/shared/offline-banner";
 import { SidebarLayout } from "@/components/shared/sidebar-layout";
+import { useAuthStore } from "@/store/auth-store";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 
@@ -21,5 +22,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   if (isLoading) return null;
   if (!isAuthenticated) return null;
 
-  return <SidebarLayout>{children}</SidebarLayout>;
+  return (
+    <>
+      <OfflineBanner />
+      <SidebarLayout>{children}</SidebarLayout>
+    </>
+  );
 }

@@ -15,3 +15,13 @@ export const BUSINESS_DAY_HOUR = 5;
 
 /** Max sync retry attempts for failed pending entries */
 export const MAX_SYNC_RETRIES = 3;
+
+/** Default maintenance banner message (Indonesian) */
+export const MAINTENANCE_DEFAULT_MESSAGE =
+  "Sistem sedang dalam pemeliharaan. Transaksi baru sementara ditutup. Silakan selesaikan transaksi aktif.";
+
+/** Quota warning threshold — warn when usage reaches this percentage */
+export const QUOTA_WARNING_THRESHOLD = 0.8;
+
+/** Max hours a sync batch remains valid before expiry */
+export const SYNC_BATCH_MAX_AGE_HOURS = 24;

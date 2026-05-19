@@ -41,7 +41,13 @@ export type Permission =
   | "settings.edit"
   | "logs.view"
   | "expired.view"
-  | "expired.edit";
+  | "expired.edit"
+  | "platform.view"
+  | "platform.tenants.manage"
+  | "platform.expansions.approve"
+  | "platform.quotas.manage"
+  | "platform.maintenance.manage"
+  | "platform.monitoring.view";
 
 // ---------------------------------------------------------------------------
 // Auth mode
@@ -179,4 +185,101 @@ export interface SyncValidationResult {
   checksumMatch: boolean;
   transactionCountMatch: boolean;
   errors: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Maintenance
+// ---------------------------------------------------------------------------
+export type MaintenanceMode = "none" | "readonly" | "scheduled" | "full";
+
+export type MaintenanceScope = "global" | "tenant";
+
+export interface MaintenanceConfig {
+  mode: MaintenanceMode;
+  scope: MaintenanceScope;
+  message: string;
+  startedAt: string | null;
+  scheduledEndAt: string | null;
+  /** Tenant IDs affected when scope is "tenant" */
+  tenantIds: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Store Expansion
+// ---------------------------------------------------------------------------
+export type ExpansionStatus = "pending" | "approved" | "rejected" | "provisioned";
+
+export interface ExpansionRequest {
+  id: string;
+  pharmacyId: string;
+  pharmacyName: string;
+  ownerId: string;
+  ownerName: string;
+  requestedStoreName: string;
+  requestedLocation: string;
+  reason: string;
+  status: ExpansionStatus;
+  approverId: string | null;
+  approverName: string | null;
+  approvalNotes: string | null;
+  createdAt: string;
+  updatedAt: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Tenant Governance
+// ---------------------------------------------------------------------------
+export interface TenantSummary {
+  pharmacyId: string;
+  pharmacyName: string;
+  packageName: TenantPackage;
+  ownerName: string;
+  userCount: number;
+  branchCount: number;
+  isActive: boolean;
+  lastActiveAt: string | null;
+  lastSyncAt: string | null;
+  transactionVolume: number;
+  createdAt: string;
+}
+
+export interface TenantDetail extends TenantSummary {
+  quotaUsage: TenantQuotaInfo;
+  recentTransactions: number;
+  pendingExpansions: number;
+  activeMaintenance: boolean;
+}
+
+// ---------------------------------------------------------------------------
+// Category & Supplier Master
+// ---------------------------------------------------------------------------
+export interface ProductCategory {
+  id: string;
+  name: string;
+  description: string | null;
+  productCount: number;
+  createdAt: string;
+}
+
+export interface SupplierActivity {
+  id: string;
+  supplierId: string;
+  type: "purchase" | "payment" | "update" | "note";
+  description: string;
+  amount: number | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Platform Monitoring
+// ---------------------------------------------------------------------------
+export interface PlatformHealth {
+  activeTenants: number;
+  totalTenants: number;
+  failedTransactions24h: number;
+  offlineTenants: number;
+  syncFailures24h: number;
+  activeMaintenances: number;
+  quotaAlerts: number;
+  updatedAt: string;
 }

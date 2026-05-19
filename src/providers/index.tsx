@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import { AuthProvider } from "./auth-provider";
+import { MaintenanceProvider } from "./maintenance-provider";
 import { NetworkProvider } from "./network-provider";
 import { QueryProvider } from "./query-provider";
 import { ThemeProvider } from "./theme-provider";
@@ -12,10 +13,12 @@ export function AppProviders({ children }: { children: ReactNode }) {
     <ThemeProvider>
       <NetworkProvider>
         <AuthProvider>
-          <QueryProvider>
-            {children}
-            <ToastProvider />
-          </QueryProvider>
+          <MaintenanceProvider>
+            <QueryProvider>
+              {children}
+              <ToastProvider />
+            </QueryProvider>
+          </MaintenanceProvider>
         </AuthProvider>
       </NetworkProvider>
     </ThemeProvider>
