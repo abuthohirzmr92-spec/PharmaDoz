@@ -19,6 +19,14 @@ function devLog(...args: unknown[]) {
   if (DEV) console.log("[auth-provider]", ...args);
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   TEMPORARY — Deep debug tracing for silent redirect-to-login bug
+   Prefix: [MEDISYNC-TRACE] — REMOVE AFTER FIX CONFIRMED
+   ═══════════════════════════════════════════════════════════════════════════ */
+function trace(tag: string, ...args: unknown[]) {
+  console.log(`[MEDISYNC-TRACE] [${tag}]`, ...args);
+}
+
 /* ------------------------------------------------------------------ */
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
@@ -64,6 +72,7 @@ function clearAllDomainStores() {
 }
 
 function clearAuthState() {
+  console.log("[MEDISYNC-TRACE] [CLEAR_AUTH_STATE] clearing auth state! caller stack:", new Error().stack?.split("\n").slice(1, 4).join(" → "));
   syncRepositoryContext(null);
   useAuthStore.setState({
     user: null,
@@ -105,6 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     /* Public routes never block — render immediately */
     if (isPublic) {
+      trace("HYDRATE", "public path, skip hydration:", pathname);
       devLog("public path, skip hydration:", pathname);
       setIsHydrating(false);
       return;
@@ -113,13 +123,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     /* Already authenticated (navigation between protected routes) */
     const { isAuthenticated, user } = useAuthStore.getState();
     if (isAuthenticated && user) {
+      trace("HYDRATE", "already authenticated, skip. role =", user.role, "pathname =", pathname);
       devLog("already authenticated, skip hydration. role =", user.role);
       setIsHydrating(false);
       return;
     }
 
+    trace("HYDRATE", "starting hydration for", pathname, "isAuthenticated =", isAuthenticated);
     /* Prevent duplicate concurrent hydrations (React strict mode) */
     if (hydratingRef.current) {
+      trace("HYDRATE", "duplicate — already hydrating");
       devLog("hydration in progress, skip duplicate");
       return;
     }
@@ -137,43 +150,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, HYDRATION_TIMEOUT_MS);
 
     async function hydrate() {
+      trace("HYDRATE_START", "pathname =", pathname);
       devLog("hydrate: start for", pathname);
 
       try {
         /* 1. Supabase session (with sub-timeout) */
         if (isSupabaseConnected()) {
+          trace("HYDRATE", "supabase connected, checking session...");
           devLog("hydrate: checking supabase session");
           try {
-            await withTimeout(
+            const initResult = await withTimeout(
               initFromSupabaseSession(),
               SESSION_CHECK_TIMEOUT_MS,
               "initFromSupabaseSession",
             );
-            if (!cancelled && useAuthStore.getState().isAuthenticated) {
+            const authAfterInit = useAuthStore.getState().isAuthenticated;
+            trace("HYDRATE", "initFromSupabaseSession result =", initResult, "isAuthenticated =", authAfterInit);
+            if (!cancelled && authAfterInit) {
               devLog("hydrate: session restored, role =", useAuthStore.getState().user?.role);
+              trace("HYDRATE", "session restored! clearing timeout and exiting hydration. role =", useAuthStore.getState().user?.role);
               clearTimeout(hydrationTimerRef.current!);
               setIsHydrating(false);
               hydratingRef.current = false;
               return;
             }
+            trace("HYDRATE", "session NOT restored. initResult =", initResult, "cancelled =", cancelled);
           } catch (err) {
+            trace("HYDRATE", "session check timed out or failed:", String(err));
             devLog("hydrate: session check timed out or failed", err);
             /* Continue — might be demo mode or redirect to login */
           }
         } else {
+          trace("HYDRATE", "supabase NOT connected");
           devLog("hydrate: supabase not connected");
         }
 
-        if (cancelled) return;
+        if (cancelled) {
+          trace("HYDRATE", "cancelled after supabase check");
+          return;
+        }
 
         /* 2. Demo mode fallback */
         if (isDemoMode()) {
+          trace("HYDRATE", "demo mode active");
           devLog("hydrate: demo mode active");
           try {
             const stored = localStorage.getItem("apotek-auth");
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.user && parsed.isAuthenticated) {
+                trace("HYDRATE", "demo session restored from localStorage");
                 devLog("hydrate: demo session from localStorage");
                 clearTimeout(hydrationTimerRef.current!);
                 setIsHydrating(false);
@@ -186,6 +212,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
 
           if (!useAuthStore.getState().isAuthenticated) {
+            trace("HYDRATE", "auto-login as tenant_owner");
             devLog("hydrate: auto-login as tenant_owner");
             useAuthStore.getState().loginAs("tenant_owner");
           }
@@ -197,6 +224,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         /* 3. Production with no session → redirect to /login */
         if (!cancelled) {
+          trace("HYDRATE", "NO SESSION — redirecting to /login. isDemoMode =", isDemoMode(), "isSupabaseConnected =", isSupabaseConnected());
           devLog("hydrate: no session, redirect /login");
           router.replace("/login");
           clearTimeout(hydrationTimerRef.current!);
@@ -204,6 +232,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hydratingRef.current = false;
         }
       } catch (err) {
+        trace("HYDRATE", "unexpected error:", String(err));
         devLog("hydrate: unexpected error", err);
         if (!cancelled) {
           setHydrationError("Gagal memulihkan sesi. Silakan muat ulang halaman.");
@@ -237,33 +266,42 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
+    trace("AUTH_LISTENER", "subscribing to onAuthStateChange");
     devLog("auth listener: subscribing to onAuthStateChange");
 
     const {
       data: { subscription },
     } = supabase!.auth.onAuthStateChange(async (event) => {
+      trace("AUTH_EVENT", "event =", event, "loginInProgress =", isLoginInProgress(), "pathname =", pathname);
       devLog("onAuthStateChange:", event);
 
       try {
         if (event === "SIGNED_OUT") {
+          trace("AUTH_EVENT", "SIGNED_OUT — clearing all state and redirecting to /login");
           devLog("onAuthStateChange: SIGNED_OUT — clearing all state");
           clearAllDomainStores();
           clearAuthState();
           if (pathname !== "/login") {
+            trace("AUTH_EVENT", "SIGNED_OUT — router.push(/login)");
             router.push("/login");
           }
         } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
           /* If loginWithEmail is in progress, it handles the full profile chain.
            * Calling initFromSupabaseSession here would race on the same queries. */
           if (isLoginInProgress()) {
+            trace("AUTH_EVENT", event, "— suppressed (login in progress)");
             devLog("onAuthStateChange:", event, "— suppressed (login in progress)");
             return;
           }
+          trace("AUTH_EVENT", event, "— re-initializing session");
           devLog("onAuthStateChange:", event, "— re-initializing session");
           await initFromSupabaseSession();
+        } else {
+          trace("AUTH_EVENT", event, "— unhandled event type (no action)");
         }
         /* INITIAL_SESSION and USER_UPDATED are handled by the hydrate effect */
       } catch (err) {
+        trace("AUTH_EVENT", "error in handler:", String(err));
         devLog("onAuthStateChange: error", err);
       }
     });

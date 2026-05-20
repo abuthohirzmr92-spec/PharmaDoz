@@ -70,6 +70,7 @@ export default function LoginPage() {
     });
 
     try {
+      console.log("[MEDISYNC-TRACE] [LOGIN_PAGE] calling loginWithEmail...");
       const result = await Promise.race([
         loginWithEmail(email.trim(), password),
         deadline,
@@ -77,8 +78,11 @@ export default function LoginPage() {
       clearTimeout(deadlineTimer);
       setIsSubmitting(false);
 
+      console.log("[MEDISYNC-TRACE] [LOGIN_PAGE] result =", JSON.stringify({ success: result.success, error: result.error ?? null, hasRouter: !!router }));
       if (result.success) {
+        console.log("[MEDISYNC-TRACE] [LOGIN_PAGE] pushing to /dashboard...");
         router.push("/dashboard");
+        console.log("[MEDISYNC-TRACE] [LOGIN_PAGE] router.push completed");
       } else {
         setError(result.error ?? "Gagal masuk. Coba lagi.");
       }
@@ -86,6 +90,7 @@ export default function LoginPage() {
       /* Deadline fired — loginWithEmail hung/stalled */
       clearTimeout(deadlineTimer);
       setIsSubmitting(false);
+      console.log("[MEDISYNC-TRACE] [LOGIN_PAGE] deadline fired — timeout!");
       setError(
         "Login memakan waktu terlalu lama. Periksa koneksi internet Anda dan coba lagi.",
       );
