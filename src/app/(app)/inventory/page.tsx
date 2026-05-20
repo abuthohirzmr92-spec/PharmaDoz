@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useInventoryStore, type InventoryTab } from "@/store/inventory-store";
 import { buildInventoryProducts } from "@/lib/inventory-demo";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 import { Container } from "@/components/shared/container";
 import { InventoryDashboardCards } from "@/components/inventory/inventory-dashboard-cards";
 import { InventoryStockTable } from "@/components/inventory/inventory-stock-table";
@@ -44,9 +45,11 @@ export default function InventoryPage() {
   const searchQuery = useInventoryStore((s) => s.searchQuery);
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
 
-  // Load demo data on mount
+  // Load demo data on mount (demo mode only)
   useEffect(() => {
-    loadDemoData();
+    if (checkDemoMode()) {
+      loadDemoData();
+    }
   }, [loadDemoData]);
 
   return (

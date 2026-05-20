@@ -5,6 +5,7 @@ import { X } from "lucide-react";
 import { toast } from "sonner";
 import { generateProductCode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -55,8 +56,12 @@ export function QuickCreateProductModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
 
-  const [categories, setCategories] = useState<string[]>(DEMO_CATEGORIES);
-  const [units, setUnits] = useState<string[]>(DEMO_UNITS);
+  const [categories, setCategories] = useState<string[]>(
+    checkDemoMode() ? DEMO_CATEGORIES : [],
+  );
+  const [units, setUnits] = useState<string[]>(
+    checkDemoMode() ? DEMO_UNITS : [],
+  );
   const categoryIdMapRef = useRef<Map<string, string>>(new Map());
   const nameRef = useRef<HTMLInputElement>(null);
 

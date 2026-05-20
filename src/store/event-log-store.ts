@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type { OperationalEvent, EventLevel, EventCategory } from "@/types";
 import { generateDemoEvents } from "@/lib/event-logger";
 import { EVENT_LOG_MAX_SIZE } from "@/config/constants";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 interface EventLogState {
   events: OperationalEvent[];
@@ -31,7 +32,7 @@ interface EventLogState {
 }
 
 export const useEventLogStore = create<EventLogState>((set, get) => ({
-  events: generateDemoEvents(),
+  events: checkDemoMode() ? generateDemoEvents() : [],
   isLoading: false,
 
   logEvent(event) {

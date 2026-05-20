@@ -8,6 +8,7 @@ import {
   getMetricAverage,
   type ComponentHealth,
 } from "@/lib/metrics";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 interface MetricsState {
   metrics: MetricPoint[];
@@ -30,7 +31,7 @@ interface MetricsState {
 }
 
 export const useMetricsStore = create<MetricsState>((set, get) => ({
-  metrics: generateDemoMetrics(),
+  metrics: checkDemoMode() ? generateDemoMetrics() : [],
   snapshot: null,
   isLoading: false,
 

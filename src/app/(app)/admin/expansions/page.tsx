@@ -164,14 +164,15 @@ export default function ExpansionsPage() {
     setIsSubmitting(true);
 
     const approverName = user?.displayName ?? "Super Admin";
+    const approverId = user?.id ?? "system";
 
     // Simulate processing delay
     setTimeout(() => {
       if (modalMode === "approve") {
-        approveRequest(modalRequestId, approverName, modalNotes.trim());
+        approveRequest(modalRequestId, approverName, approverId, modalNotes.trim());
         toast.success("Permintaan ekspansi disetujui");
       } else {
-        rejectRequest(modalRequestId, approverName, modalNotes.trim());
+        rejectRequest(modalRequestId, approverName, approverId, modalNotes.trim());
         toast.success("Permintaan ekspansi ditolak");
       }
       setIsSubmitting(false);

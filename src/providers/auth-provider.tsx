@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           transactions: [],
           isLoaded: false,
           isLoading: false,
-          isDemoMode: true,
+          isDemoMode: isDemoMode(),
         });
         useInventoryStore.setState({
           batches: [],
@@ -101,8 +101,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           purchaseInvoices: [],
           stockMovements: [],
           stockOpnames: [],
-          dataSource: "demo",
-          isDemoMode: true,
+          dataSource: isDemoMode() ? "demo" : "loading",
+          isDemoMode: isDemoMode(),
           isLoading: false,
           isSubmitting: false,
         });

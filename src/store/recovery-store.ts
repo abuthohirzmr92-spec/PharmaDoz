@@ -11,6 +11,7 @@ import {
   getRecoveryState,
   generateDemoRecoveryActions,
 } from "@/lib/recovery/recovery-manager";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 /* ------------------------------------------------------------------ */
 /*  Store interface                                                    */
@@ -45,7 +46,7 @@ interface RecoveryState2 {
 /* ------------------------------------------------------------------ */
 
 export const useRecoveryStore = create<RecoveryState2>((set, get) => ({
-  actions: generateDemoRecoveryActions(),
+  actions: checkDemoMode() ? generateDemoRecoveryActions() : [],
   isLoading: false,
 
   queueAction(type, maxAttempts) {

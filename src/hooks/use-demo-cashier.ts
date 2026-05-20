@@ -3,6 +3,7 @@
 import { useMemo, useCallback, useState, useEffect } from "react";
 import { useCashierStore, type CartItem } from "@/store/cashier-store";
 import { productRepo } from "@/lib/repository-instances";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 /* ------------------------------------------------------------------ */
 /*  Demo product catalogue                                             */
@@ -141,8 +142,8 @@ export function useDemoCashier() {
   );
   const [dbLoading, setDbLoading] = useState(false);
 
-  /** Dynamically determined — true when Supabase is not connected. */
-  const isDemoMode = useMemo(() => !productRepo.isConnected, []);
+  /** True only when NEXT_PUBLIC_DEMO_MODE=true AND Supabase is not connected. */
+  const isDemoMode = useMemo(() => checkDemoMode() && !productRepo.isConnected, []);
 
   /** Load products from the database when connected. */
   useEffect(() => {
@@ -190,9 +191,9 @@ export function useDemoCashier() {
     [store],
   );
 
-  /** Combine DB products (when loaded) or fall back to DEMO_PRODUCTS. */
+  /** Combine DB products (when loaded) or fall back to DEMO_PRODUCTS in demo mode. */
   const sourceProducts = useMemo(
-    () => dbProducts ?? DEMO_PRODUCTS,
+    () => dbProducts ?? (checkDemoMode() ? DEMO_PRODUCTS : []),
     [dbProducts],
   );
 

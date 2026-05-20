@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import type { Transaction } from "@/types/transaction";
 import { generateDemoTransactions } from "@/lib/demo-transactions";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 import { isInRange } from "@/lib/date-utils";
 import type { DateRange } from "@/types/report";
 import { transactionRepo } from "@/lib/repository-instances";
@@ -42,7 +43,7 @@ export const useTransactionStore = create<TransactionState>()((set, get) => ({
   transactions: [],
   isLoaded: false,
   isLoading: false,
-  isDemoMode: true,
+  isDemoMode: checkDemoMode(),
 
   loadDemoTransactions: async () => {
     if (get().isLoaded) return;
@@ -59,20 +60,26 @@ export const useTransactionStore = create<TransactionState>()((set, get) => ({
         });
       } catch (e) {
         console.error('Failed to load transactions from DB, falling back to demo:', e);
-        set({
-          transactions: generateDemoTransactions(90),
-          isLoaded: true,
-          isDemoMode: true,
-          isLoading: false,
-        });
+        if (checkDemoMode()) {
+          set({
+            transactions: generateDemoTransactions(90),
+            isLoaded: true,
+            isDemoMode: true,
+            isLoading: false,
+          });
+        } else {
+          set({ isLoaded: true, isDemoMode: false, isLoading: false });
+        }
       }
-    } else {
+    } else if (checkDemoMode()) {
       set({
         transactions: generateDemoTransactions(90),
         isLoaded: true,
         isDemoMode: true,
         isLoading: false,
       });
+    } else {
+      set({ isLoaded: true, isDemoMode: false, isLoading: false });
     }
   },
 

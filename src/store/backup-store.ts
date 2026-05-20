@@ -11,6 +11,7 @@ import {
   getRpoEstimate,
   shouldTriggerBackup,
 } from "@/lib/backup/backup-manager";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 interface BackupState {
   backups: BackupMetadata[];
@@ -38,7 +39,7 @@ interface BackupState {
 }
 
 export const useBackupStore = create<BackupState>((set, get) => ({
-  backups: generateDemoBackups(),
+  backups: checkDemoMode() ? generateDemoBackups() : [],
   isLoading: false,
 
   startBackup(type, pharmacyId) {

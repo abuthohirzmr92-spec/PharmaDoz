@@ -2,6 +2,7 @@
 
 import { create } from "zustand";
 import type { ExpansionRequest, ExpansionStatus } from "@/types";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 /* ------------------------------------------------------------------ */
 /*  Expansion State                                                     */
@@ -10,8 +11,8 @@ import type { ExpansionRequest, ExpansionStatus } from "@/types";
 interface ExpansionState {
   requests: ExpansionRequest[];
   isLoading: boolean;
-  approveRequest: (id: string, approverName: string, notes: string) => void;
-  rejectRequest: (id: string, approverName: string, notes: string) => void;
+  approveRequest: (id: string, approverName: string, approverId: string, notes: string) => void;
+  rejectRequest: (id: string, approverName: string, approverId: string, notes: string) => void;
   getPendingCount: () => number;
 }
 
@@ -96,17 +97,17 @@ const DEMO_REQUESTS: ExpansionRequest[] = [
 /* ------------------------------------------------------------------ */
 
 export const useExpansionStore = create<ExpansionState>()((set, get) => ({
-  requests: DEMO_REQUESTS,
+  requests: checkDemoMode() ? DEMO_REQUESTS : [],
   isLoading: false,
 
-  approveRequest: (id, approverName, notes) =>
+  approveRequest: (id, approverName, approverId, notes) =>
     set((state) => ({
       requests: state.requests.map((req) =>
         req.id === id
           ? {
               ...req,
               status: "approved" as ExpansionStatus,
-              approverId: "demo-super_admin",
+              approverId,
               approverName,
               approvalNotes: notes,
               updatedAt: new Date().toISOString(),
@@ -115,14 +116,14 @@ export const useExpansionStore = create<ExpansionState>()((set, get) => ({
       ),
     })),
 
-  rejectRequest: (id, approverName, notes) =>
+  rejectRequest: (id, approverName, approverId, notes) =>
     set((state) => ({
       requests: state.requests.map((req) =>
         req.id === id
           ? {
               ...req,
               status: "rejected" as ExpansionStatus,
-              approverId: "demo-super_admin",
+              approverId,
               approverName,
               approvalNotes: notes,
               updatedAt: new Date().toISOString(),

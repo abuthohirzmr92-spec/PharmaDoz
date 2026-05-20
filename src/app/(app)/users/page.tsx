@@ -6,14 +6,15 @@ import { useAuth } from "@/hooks/use-auth";
 import { ROLE_LABELS, ROLE_PERMISSIONS } from "@/lib/auth/roles";
 import { RoleSwitcher } from "@/components/shared/role-switcher";
 import { canAddUser, getQuotaLockMessage } from "@/lib/quota-guard";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 export default function UsersPage() {
   const { user, can, getRole } = useAuth();
+  const isDemo = checkDemoMode();
 
   const currentRole = getRole();
   const permissions = currentRole ? ROLE_PERMISSIONS[currentRole] : [];
 
-  // Demo: simulate 3 current users on "basic" package (limit = 3)
   const quotaCheck = canAddUser(3, "basic");
 
   return (
@@ -29,27 +30,31 @@ export default function UsersPage() {
               Users &amp; Permissions
             </h1>
             <p className="text-xs text-neutral-500">
-              Demo Mode — Role-Based Access Control aktif
+              {isDemo
+                ? "Demo Mode — Role-Based Access Control aktif"
+                : "Kelola pengguna dan izin akses"}
             </p>
           </div>
         </div>
       </div>
 
-      {/* Demo mode alert */}
-      <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
-        <div className="flex items-start gap-3">
-          <Shield className="mt-0.5 h-5 w-5 text-brand-500" />
-          <div>
-            <p className="text-sm font-medium text-brand-700 dark:text-brand-300">
-              Demo Mode — Role-Based Access Control aktif
-            </p>
-            <p className="mt-1 text-xs text-neutral-500">
-              Gunakan role switcher di sidebar untuk berganti role dan melihat
-              perubahan permission secara real-time.
-            </p>
+      {/* Demo mode alert — only visible in demo mode */}
+      {isDemo && (
+        <div className="rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
+          <div className="flex items-start gap-3">
+            <Shield className="mt-0.5 h-5 w-5 text-brand-500" />
+            <div>
+              <p className="text-sm font-medium text-brand-700 dark:text-brand-300">
+                Demo Mode — Role-Based Access Control aktif
+              </p>
+              <p className="mt-1 text-xs text-neutral-500">
+                Gunakan role switcher di sidebar untuk berganti role dan melihat
+                perubahan permission secara real-time.
+              </p>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Current User Info */}
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-800">
@@ -152,17 +157,19 @@ export default function UsersPage() {
         </div>
       </div>
 
-      {/* Quick Role Switcher */}
-      <div className="rounded-xl border border-neutral-200 dark:border-neutral-800">
-        <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
-          <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
-            Quick Role Switch
-          </h2>
+      {/* Quick Role Switcher — demo only */}
+      {isDemo && (
+        <div className="rounded-xl border border-neutral-200 dark:border-neutral-800">
+          <div className="border-b border-neutral-200 px-4 py-3 dark:border-neutral-800">
+            <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">
+              Quick Role Switch
+            </h2>
+          </div>
+          <div className="p-2">
+            <RoleSwitcher />
+          </div>
         </div>
-        <div className="p-2">
-          <RoleSwitcher />
-        </div>
-      </div>
+      )}
 
       {/* Permissions List */}
       <div className="rounded-xl border border-neutral-200 dark:border-neutral-800">

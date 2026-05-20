@@ -81,8 +81,8 @@ export const useHoldCartStore = create<HoldCartState>()((set, get) => ({
     // If active cart has items, ask confirmation via consumer
     cashier.clearCart();
     cashier.setCurrentSale(
-      `demo-sale-${Date.now()}`,
-      `INV-DEMO-${Date.now()}`,
+      `sale-${Date.now()}`,
+      `INV-${Date.now()}`,
     );
 
     for (const item of entry.cart) {

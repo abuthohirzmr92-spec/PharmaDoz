@@ -14,6 +14,7 @@ import { useAuthStore } from "@/store/auth-store";
 import { useMaintenanceStore } from "@/store/maintenance-store";
 import type { TenantSummary, TenantPackage } from "@/types";
 import { cn } from "@/lib/cn";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 import { TenantDetailPanel } from "@/components/admin/tenant-detail-panel";
 
 /* ------------------------------------------------------------------ */
@@ -190,7 +191,8 @@ export default function TenantsPage() {
 
   /* ---- Filtered tenants ---- */
   const filteredTenants = useMemo(() => {
-    return DEMO_TENANTS.filter((t) => {
+    const source = checkDemoMode() ? DEMO_TENANTS : [];
+    return source.filter((t) => {
       const matchesSearch = t.pharmacyName
         .toLowerCase()
         .includes(searchQuery.toLowerCase());

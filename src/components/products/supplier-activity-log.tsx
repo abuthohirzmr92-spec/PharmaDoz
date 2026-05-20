@@ -2,6 +2,7 @@
 
 import { Truck, DollarSign, Edit, StickyNote, Activity } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -140,7 +141,7 @@ const TYPE_CONFIG = {
 export function SupplierActivityLog({
   supplierName,
 }: SupplierActivityLogProps) {
-  const activities = generateDemoActivities(supplierName);
+  const activities = checkDemoMode() ? generateDemoActivities(supplierName) : [];
 
   if (activities.length === 0) {
     return (

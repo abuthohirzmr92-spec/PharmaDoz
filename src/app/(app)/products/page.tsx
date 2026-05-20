@@ -11,6 +11,7 @@ import { ProductFormModal } from "@/components/products/product-form-modal";
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo } from "@/lib/repository-instances";
 import { useInventoryStore } from "@/store/inventory-store";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 import { cn } from "@/lib/cn";
 
 /* ------------------------------------------------------------------ */
@@ -30,7 +31,7 @@ export default function ProductsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [showInactive, setShowInactive] = useState(false);
-  const [isDemoMode, setIsDemoMode] = useState(false);
+  const [isDemoMode, setIsDemoMode] = useState(checkDemoMode());
 
   /* ---- Load products ---- */
   const loadProducts = useCallback(async () => {
@@ -68,7 +69,7 @@ export default function ProductsPage() {
         }));
 
         setProducts(mapped);
-      } else {
+      } else if (checkDemoMode()) {
         setIsDemoMode(true);
 
         // Load demo data if needed

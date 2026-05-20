@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type { AuditEntry, AuditFilter } from "@/types";
 import { generateDemoAuditEntries } from "@/lib/audit/audit-logger";
 import { MAX_AUDIT_PAGE_SIZE } from "@/config/constants";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 interface AuditState {
   entries: AuditEntry[];
@@ -19,7 +20,7 @@ interface AuditState {
 }
 
 export const useAuditStore = create<AuditState>((set, get) => ({
-  entries: generateDemoAuditEntries(),
+  entries: checkDemoMode() ? generateDemoAuditEntries() : [],
   isLoading: false,
 
   addEntry(entry) {

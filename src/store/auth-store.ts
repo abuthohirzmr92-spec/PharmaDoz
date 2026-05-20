@@ -37,7 +37,7 @@ function clearDomainStores() {
     transactions: [],
     isLoaded: false,
     isLoading: false,
-    isDemoMode: true,
+    isDemoMode: isDemoMode(),
   });
   useInventoryStore.setState({
     batches: [],
@@ -45,8 +45,8 @@ function clearDomainStores() {
     purchaseInvoices: [],
     stockMovements: [],
     stockOpnames: [],
-    dataSource: "demo",
-    isDemoMode: true,
+    dataSource: isDemoMode() ? "demo" : "loading",
+    isDemoMode: isDemoMode(),
     isLoading: false,
     isSubmitting: false,
   });

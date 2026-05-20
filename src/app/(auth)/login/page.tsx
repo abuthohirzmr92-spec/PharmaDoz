@@ -80,7 +80,9 @@ export default function LoginPage() {
             <p className="text-sm text-neutral-500">
               {hasSupabase
                 ? "Masuk dengan akun Anda"
-                : "Demo Mode — Pilih role untuk masuk"}
+                : isDemo
+                  ? "Demo Mode — Pilih role untuk masuk"
+                  : "Layanan sedang tidak tersedia"}
             </p>
           </div>
         </div>

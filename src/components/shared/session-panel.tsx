@@ -6,6 +6,7 @@ import { LogOut, Building2, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 
 interface SessionPanelProps {
   collapsed: boolean;
@@ -15,7 +16,8 @@ export function SessionPanel({ collapsed }: SessionPanelProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const isDemo = useAuthStore((s) => s.isDemoMode());
+  const isDemo = checkDemoMode();
+  const isConnected = useAuthStore((s) => !s.isDemoMode());
   const logout = useAuthStore((s) => s.logout);
 
   if (!user) return null;
@@ -67,10 +69,15 @@ export function SessionPanel({ collapsed }: SessionPanelProps) {
               <WifiOff className="h-3 w-3 shrink-0 text-amber-500" />
               <span className="text-[11px] text-amber-600 dark:text-amber-500">Demo Mode</span>
             </>
-          ) : (
+          ) : isConnected ? (
             <>
               <Wifi className="h-3 w-3 shrink-0 text-emerald-500" />
-              <span className="text-[11px] text-emerald-600 dark:text-emerald-500">Connected to Supabase</span>
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-500">Connected</span>
+            </>
+          ) : (
+            <>
+              <WifiOff className="h-3 w-3 shrink-0 text-red-500" />
+              <span className="text-[11px] text-red-600 dark:text-red-500">Offline</span>
             </>
           )}
         </div>

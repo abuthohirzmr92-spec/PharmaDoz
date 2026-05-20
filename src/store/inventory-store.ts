@@ -25,6 +25,7 @@ import {
   buildInventoryProducts,
   buildDashboardSummary,
 } from "@/lib/inventory-demo";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 import { productRepo, supplierRepo, inventoryRepo } from "@/lib/repository-instances";
 
 /* ------------------------------------------------------------------ */
@@ -115,8 +116,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   stockOpnames: [],
   activeTab: "dashboard",
   searchQuery: "",
-  isDemoMode: true,
-  dataSource: "demo" as const,
+  isDemoMode: checkDemoMode(),
+  dataSource: checkDemoMode() ? ("demo" as const) : ("loading" as const),
   isLoading: false,
   isSubmitting: false,
 
@@ -628,7 +629,10 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   loadDemoData: async () => {
     const state = get();
-    if (state.dataSource !== "demo" || state.batches.length > 0) return;
+    // Skip if already loaded from database
+    if (state.dataSource === "database" && state.batches.length > 0) return;
+    // Skip if already loaded demo data
+    if (state.dataSource === "demo" && state.batches.length > 0) return;
 
     if (productRepo.isConnected) {
       set({ dataSource: "loading", isLoading: true });
@@ -674,15 +678,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   },
 
   _loadDemoFallback: () => {
-    set({
-      batches: DEMO_BATCHES.map((b) => ({ ...b })),
-      suppliers: [...DEMO_SUPPLIERS],
-      purchaseInvoices: [...DEMO_PURCHASE_INVOICES],
-      stockMovements: [...DEMO_STOCK_MOVEMENTS],
-      stockOpnames: [DEMO_STOCK_OPNAME],
-      dataSource: "demo",
-      isDemoMode: true,
-      isLoading: false,
-    });
+    if (checkDemoMode()) {
+      set({
+        batches: DEMO_BATCHES.map((b) => ({ ...b })),
+        suppliers: [...DEMO_SUPPLIERS],
+        purchaseInvoices: [...DEMO_PURCHASE_INVOICES],
+        stockMovements: [...DEMO_STOCK_MOVEMENTS],
+        stockOpnames: [DEMO_STOCK_OPNAME],
+        dataSource: "demo",
+        isDemoMode: true,
+        isLoading: false,
+      });
+    } else {
+      set({ isLoading: false });
+    }
   },
 }));
