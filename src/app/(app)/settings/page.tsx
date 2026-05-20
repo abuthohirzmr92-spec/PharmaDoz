@@ -66,7 +66,7 @@ export default function SettingsPage() {
       )}
 
       {/* Business owner: locked "Buka Toko Baru" card */}
-      {!isSystemUser && user?.role === "owner" && (
+      {!isSystemUser && user?.role === "tenant_owner" && (
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-800 dark:bg-amber-950">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">

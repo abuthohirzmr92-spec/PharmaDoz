@@ -1,18 +1,25 @@
+"use client";
+
 import { create } from "zustand";
 import type { AppRole, Permission, UserProfile } from "@/types";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isSessionStale } from "@/lib/auth/roles";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
-import { authRepo, productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
+import { isDemoMode } from "@/config/env";
+import {
+  authRepo,
+  productRepo,
+  supplierRepo,
+  inventoryRepo,
+  transactionRepo,
+} from "@/lib/repository-instances";
 import { useCashierStore } from "@/store/cashier-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useHoldCartStore } from "@/store/hold-cart-store";
 
-const AUTH_STORAGE_KEY = "apotek-auth";
-
 /* ------------------------------------------------------------------ */
-/*  Helpers                                                             */
+/*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
 function syncRepositoryContext(user: UserProfile | null) {
@@ -24,51 +31,38 @@ function syncRepositoryContext(user: UserProfile | null) {
   authRepo.setPharmacyContext(pharmacyId);
 }
 
-/* ------------------------------------------------------------------ */
-/*  Auth State                                                          */
-/* ------------------------------------------------------------------ */
-
-interface AuthState {
-  user: UserProfile | null;
-  isAuthenticated: boolean;
-  isLoading: boolean;
-  authMode: "demo" | "supabase";
-  lastActiveAt: string;
-
-  // Demo actions
-  loginAs: (role: AppRole) => void;
-  switchRole: (role: AppRole) => void;
-
-  // Supabase actions
-  loginWithEmail: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-  initFromSupabaseSession: () => Promise<boolean>;
-  refreshUserProfile: () => Promise<boolean>;
-
-  // Shared actions
-  logout: () => Promise<void>;
-
-  // Session actions
-  touchSession: () => void;
-
-  // Permission checks
-  can: (permission: Permission) => boolean;
-  canAny: (permissions: Permission[]) => boolean;
-  canAll: (permissions: Permission[]) => boolean;
-  getRole: () => AppRole | null;
-  isSystemUser: () => boolean;
-  getPharmacyId: () => string | undefined;
-  isDemoMode: () => boolean;
-  isSessionExpired: () => boolean;
+function clearDomainStores() {
+  useCashierStore.getState().resetCashier();
+  useTransactionStore.setState({
+    transactions: [],
+    isLoaded: false,
+    isLoading: false,
+    isDemoMode: true,
+  });
+  useInventoryStore.setState({
+    batches: [],
+    suppliers: [],
+    purchaseInvoices: [],
+    stockMovements: [],
+    stockOpnames: [],
+    dataSource: "demo",
+    isDemoMode: true,
+    isLoading: false,
+    isSubmitting: false,
+  });
+  useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
 }
+
+/* ------------------------------------------------------------------ */
+/*  Demo users (only used in demo mode)                                */
+/* ------------------------------------------------------------------ */
 
 const DEMO_USERS: Record<
   AppRole,
   { email: string; displayName: string; pharmacyId?: string; pharmacyName?: string }
 > = {
   super_admin: { email: "super@apotek-manage.id", displayName: "Super Admin" },
-  developer: { email: "dev@apotek-manage.id", displayName: "Developer Demo" },
-  support: { email: "support@apotek-manage.id", displayName: "Support Demo" },
-  owner: {
+  tenant_owner: {
     email: "owner@apotek-sehat.id",
     displayName: "Budi Santoso",
     pharmacyId: "pharm-001",
@@ -92,54 +86,113 @@ const DEMO_USERS: Record<
     pharmacyId: "pharm-001",
     pharmacyName: "Apotek Sehat",
   },
+  staff: {
+    email: "staff@apotek-sehat.id",
+    displayName: "Rina Wijaya",
+    pharmacyId: "pharm-001",
+    pharmacyName: "Apotek Sehat",
+  },
 };
+
+function buildDemoUser(role: AppRole): UserProfile {
+  const demo = DEMO_USERS[role];
+  return {
+    id: `demo-${role}`,
+    email: demo.email,
+    displayName: demo.displayName,
+    role,
+    isActive: true,
+    pharmacyId: demo.pharmacyId,
+    pharmacyName: demo.pharmacyName,
+    tenantId: demo.pharmacyId,
+    tenantName: demo.pharmacyName,
+  };
+}
+
+/* ------------------------------------------------------------------ */
+/*  Auth State                                                         */
+/* ------------------------------------------------------------------ */
+
+interface AuthState {
+  user: UserProfile | null;
+  isAuthenticated: boolean;
+  isLoading: boolean;
+  lastActiveAt: string;
+  error: string | null;
+
+  /* Demo actions (development / testing only) */
+  loginAs: (role: AppRole) => void;
+  switchRole: (role: AppRole) => void;
+
+  /* Supabase actions */
+  loginWithEmail: (
+    email: string,
+    password: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  initFromSupabaseSession: () => Promise<boolean>;
+  refreshUserProfile: () => Promise<boolean>;
+
+  /* Shared actions */
+  logout: () => Promise<void>;
+  touchSession: () => void;
+  clearError: () => void;
+
+  /* Permission checks */
+  can: (permission: Permission) => boolean;
+  canAny: (permissions: Permission[]) => boolean;
+  canAll: (permissions: Permission[]) => boolean;
+  getRole: () => AppRole | null;
+  isSystemUser: () => boolean;
+  getPharmacyId: () => string | undefined;
+  isDemoMode: () => boolean;
+  isSessionExpired: () => boolean;
+}
 
 export const useAuthStore = create<AuthState>()((set, get) => ({
   user: null,
   isAuthenticated: false,
   isLoading: false,
-  authMode: "demo",
   lastActiveAt: new Date().toISOString(),
+  error: null,
 
   /* ---- Demo: loginAs ---- */
   loginAs: (role) => {
-    const demo = DEMO_USERS[role];
-    const user: UserProfile = {
-      id: `demo-${role}`,
-      email: demo.email,
-      displayName: demo.displayName,
-      role,
-      isActive: true,
-      pharmacyId: demo.pharmacyId,
-      pharmacyName: demo.pharmacyName,
-    };
+    if (!isDemoMode()) {
+      set({ error: "Demo login hanya tersedia di development mode." });
+      return;
+    }
+    const user = buildDemoUser(role);
     syncRepositoryContext(user);
-    set({ user, isAuthenticated: true, isLoading: false, authMode: "demo", lastActiveAt: new Date().toISOString() });
+    set({
+      user,
+      isAuthenticated: true,
+      isLoading: false,
+      lastActiveAt: new Date().toISOString(),
+      error: null,
+    });
   },
 
   /* ---- Demo: switchRole ---- */
   switchRole: (role) => {
-    const demo = DEMO_USERS[role];
-    const user: UserProfile = {
-      id: `demo-${role}`,
-      email: demo.email,
-      displayName: demo.displayName,
-      role,
-      isActive: true,
-      pharmacyId: demo.pharmacyId,
-      pharmacyName: demo.pharmacyName,
-    };
+    if (!isDemoMode()) {
+      set({ error: "Demo role switch hanya tersedia di development mode." });
+      return;
+    }
+    const user = buildDemoUser(role);
     syncRepositoryContext(user);
-    set({ user });
+    set({ user, error: null });
   },
 
   /* ---- Supabase: loginWithEmail ---- */
   loginWithEmail: async (email, password) => {
     if (!isSupabaseConnected()) {
-      return { success: false, error: "Demo mode — Supabase tidak tersedia." };
+      return {
+        success: false,
+        error: "Supabase tidak tersedia. Gunakan NEXT_PUBLIC_DEMO_MODE=true untuk development.",
+      };
     }
 
-    set({ isLoading: true });
+    set({ isLoading: true, error: null });
 
     const { data, error } = await supabase!.auth.signInWithPassword({
       email,
@@ -162,17 +215,25 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return { success: false, error: "Gagal mendapatkan data pengguna." };
     }
 
-    // Resolve user profile from database
-    const profile = await authRepo.getUserBySupabaseUid(data.user.id);
+    // Resolve user profile — create on first login if missing
+    const supabaseUser = data.user;
+    let profile = await authRepo.getUserBySupabaseUid(supabaseUser.id);
 
     if (!profile) {
-      // User exists in Supabase Auth but not in our users table
-      // Sign them out of Supabase since they're not registered in the app
+      // First login — auto-create profile from Supabase auth user
+      profile = await authRepo.ensureProfile({
+        id: supabaseUser.id,
+        email: supabaseUser.email ?? email,
+        displayName: supabaseUser.user_metadata?.display_name ?? email,
+      });
+    }
+
+    if (!profile) {
       await supabase!.auth.signOut();
       set({ isLoading: false });
       return {
         success: false,
-        error: "Akun belum terdaftar di sistem. Hubungi Super Admin.",
+        error: "Gagal membuat profil pengguna. Hubungi Super Admin.",
       };
     }
 
@@ -181,11 +242,9 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       user: profile,
       isAuthenticated: true,
       isLoading: false,
-      authMode: "supabase",
+      lastActiveAt: new Date().toISOString(),
+      error: null,
     });
-
-    // TODO: Optionally update `last_login_at` on the users table here.
-    // Skipped because the anon key typically lacks write access.
 
     return { success: true };
   },
@@ -195,12 +254,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!isSupabaseConnected()) return false;
 
     const { data } = await supabase!.auth.getSession();
-
     if (!data.session?.user) return false;
 
-    const profile = await authRepo.getUserBySupabaseUid(
-      data.session.user.id,
-    );
+    const supabaseUser = data.session.user;
+    let profile = await authRepo.getUserBySupabaseUid(supabaseUser.id);
+
+    if (!profile) {
+      profile = await authRepo.ensureProfile({
+        id: supabaseUser.id,
+        email: supabaseUser.email ?? "",
+        displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email ?? "",
+      });
+    }
 
     if (!profile) return false;
 
@@ -209,49 +274,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       user: profile,
       isAuthenticated: true,
       isLoading: false,
-      authMode: "supabase",
       lastActiveAt: new Date().toISOString(),
+      error: null,
     });
 
     return true;
-  },
-
-  /* ---- logout (shared, async) ---- */
-  logout: async () => {
-    const { authMode } = get();
-
-    if (authMode === "supabase" && isSupabaseConnected()) {
-      await supabase!.auth.signOut();
-    }
-
-    // Clear domain stores to prevent tenant/session leakage
-    useCashierStore.getState().resetCashier();
-    useTransactionStore.setState({
-      transactions: [],
-      isLoaded: false,
-      isLoading: false,
-      isDemoMode: true,
-    });
-    useInventoryStore.setState({
-      batches: [],
-      suppliers: [],
-      purchaseInvoices: [],
-      stockMovements: [],
-      stockOpnames: [],
-      dataSource: "demo",
-      isDemoMode: true,
-      isLoading: false,
-      isSubmitting: false,
-    });
-    useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
-
-    syncRepositoryContext(null);
-
-    if (typeof window !== "undefined") {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
-
-    set({ user: null, isAuthenticated: false, isLoading: false, authMode: "demo" });
   },
 
   /* ---- refreshUserProfile ---- */
@@ -261,10 +288,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const { data } = await supabase!.auth.getSession();
     if (!data.session?.user) return false;
 
-    const profile = await authRepo.getUserBySupabaseUid(
-      data.session.user.id,
-    );
-
+    const profile = await authRepo.getUserBySupabaseUid(data.session.user.id);
     if (!profile) return false;
 
     syncRepositoryContext(profile);
@@ -272,16 +296,38 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       user: profile,
       isAuthenticated: true,
       isLoading: false,
-      authMode: "supabase",
     });
 
     return true;
+  },
+
+  /* ---- logout (shared, async) ---- */
+  logout: async () => {
+    if (isSupabaseConnected()) {
+      await supabase!.auth.signOut();
+    }
+
+    clearDomainStores();
+    syncRepositoryContext(null);
+
+    if (typeof window !== "undefined") {
+      localStorage.removeItem("apotek-auth");
+    }
+
+    set({
+      user: null,
+      isAuthenticated: false,
+      isLoading: false,
+      error: null,
+    });
   },
 
   /* ---- Session actions ---- */
   touchSession: () => {
     set({ lastActiveAt: new Date().toISOString() });
   },
+
+  clearError: () => set({ error: null }),
 
   /* ---- Permission checks ---- */
   can: (permission) => {
@@ -307,12 +353,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isSystemUser: () => {
     const { user } = get();
     if (!user) return false;
-    return ["super_admin", "developer", "support"].includes(user.role);
+    return ["super_admin"].includes(user.role);
   },
 
   getPharmacyId: () => get().user?.pharmacyId,
 
-  isDemoMode: () => get().authMode === "demo",
+  isDemoMode: () => !isSupabaseConnected(),
 
   isSessionExpired: () => {
     const { user, lastActiveAt } = get();
@@ -321,38 +367,49 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 }));
 
-/* ---- localStorage hydration ---- */
-const stored =
-  typeof window !== "undefined"
-    ? localStorage.getItem(AUTH_STORAGE_KEY)
-    : null;
-if (stored) {
-  try {
-    const parsed = JSON.parse(stored);
-    if (parsed.user && parsed.isAuthenticated) {
-      useAuthStore.setState({
-        user: parsed.user,
-        isAuthenticated: true,
-        isLoading: false,
-        authMode: parsed.authMode ?? "demo",
-        lastActiveAt: parsed.lastActiveAt ?? new Date().toISOString(),
-      });
-      syncRepositoryContext(parsed.user);
+/* ---- Demo mode localStorage hydration ---- */
+if (typeof window !== "undefined") {
+  const stored = localStorage.getItem("apotek-auth");
+  if (stored) {
+    try {
+      const parsed = JSON.parse(stored);
+      if (parsed.user && parsed.isAuthenticated) {
+        useAuthStore.setState({
+          user: parsed.user,
+          isAuthenticated: true,
+          isLoading: false,
+          lastActiveAt: parsed.lastActiveAt ?? new Date().toISOString(),
+        });
+        syncRepositoryContext(parsed.user);
+      }
+    } catch {
+      /* ignore corrupt storage */
     }
-  } catch {
-    /* ignore corrupt storage */
   }
 }
 
+/* ---- localStorage persistence ---- */
+useAuthStore.subscribe((state) => {
+  if (typeof window !== "undefined") {
+    if (state.user && state.isAuthenticated) {
+      localStorage.setItem(
+        "apotek-auth",
+        JSON.stringify({
+          user: state.user,
+          isAuthenticated: state.isAuthenticated,
+          lastActiveAt: state.lastActiveAt,
+        }),
+      );
+    } else {
+      localStorage.removeItem("apotek-auth");
+    }
+  }
+});
+
 /* ------------------------------------------------------------------ */
-/*  Session staleness hook                                              */
+/*  Session staleness hook                                             */
 /* ------------------------------------------------------------------ */
 
-/**
- * Hook that returns session staleness information and a refresh action.
- * Returns isStale (boolean), lastActiveAt (ISO string or null when logged out),
- * and refreshSession (calls touchSession to reset the staleness timer).
- */
 export function useSessionStaleness(): {
   isStale: boolean;
   lastActiveAt: string | null;
@@ -368,22 +425,3 @@ export function useSessionStaleness(): {
     refreshSession: touchSession,
   };
 }
-
-/* ---- localStorage persistence ---- */
-useAuthStore.subscribe((state) => {
-  if (typeof window !== "undefined") {
-    if (state.user && state.isAuthenticated) {
-      localStorage.setItem(
-        AUTH_STORAGE_KEY,
-        JSON.stringify({
-          user: state.user,
-          isAuthenticated: state.isAuthenticated,
-          authMode: state.authMode,
-          lastActiveAt: state.lastActiveAt,
-        }),
-      );
-    } else {
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-    }
-  }
-});

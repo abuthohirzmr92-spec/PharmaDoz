@@ -58,6 +58,7 @@ function mkItem(overrides: Partial<PurchaseItem> = {}): PurchaseItem {
   seq++;
   return {
     id: `pi-${seq}`,
+    tenantId: "pharm-001",
     productId: "demo-999",
     productName: "Test Product",
     batchNumber: `BATCH-${seq}`,
@@ -75,6 +76,7 @@ function mkInvoice(overrides: Partial<PurchaseInvoice> = {}): PurchaseInvoice {
   const totalAmount = items.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   return {
     id: `inv-${seq}`,
+    tenantId: "pharm-001",
     invoiceNumber: `INV-TEST-${String(seq).padStart(3, "0")}`,
     supplierId: "sup-001",
     supplierName: "Test Supplier",
@@ -94,6 +96,7 @@ function mkOpnameItem(
   seq++;
   return {
     productId: "demo-001",
+    tenantId: "pharm-001",
     productName: "Paracetamol 500mg",
     batchId: "bat-001b",
     batchNumber: "PAR-2026-001",
@@ -109,6 +112,7 @@ function mkOpname(overrides: Partial<StockOpname> = {}): StockOpname {
   seq++;
   return {
     id: `opn-test-${seq}`,
+    tenantId: "pharm-001",
     date: "2026-05-19",
     status: "confirmed",
     conductedBy: "Test Admin",

@@ -35,9 +35,9 @@ const PACKAGE_DEFAULTS: Record<string, Omit<TenantQuota, "currentUsers" | "curre
 /* ------------------------------------------------------------------ */
 
 const PACKAGE_ROLE_SLOTS: Record<string, Partial<Record<AppRole, number>>> = {
-  basic:        { owner: 1, pharmacist: 1, admin: 1, cashier: 2 },
-  professional: { owner: 1, pharmacist: 3, admin: 2, cashier: 5 },
-  enterprise:   { owner: 2, pharmacist: 10, admin: 5, cashier: 20 },
+  basic:        { tenant_owner: 1, pharmacist: 1, admin: 1, cashier: 2, staff: 2 },
+  professional: { tenant_owner: 1, pharmacist: 3, admin: 2, cashier: 5, staff: 5 },
+  enterprise:   { tenant_owner: 2, pharmacist: 10, admin: 5, cashier: 20, staff: 20 },
 };
 
 /* ------------------------------------------------------------------ */

@@ -80,6 +80,7 @@ export class ProductRepository extends BaseRepository {
 
       return {
         id: r.id,
+        tenantId: this.pharmacyId ?? "",
         name: r.name,
         category: r.category?.name ?? "",
         barcode: r.barcode ?? null,
@@ -94,6 +95,7 @@ export class ProductRepository extends BaseRepository {
         batches: batches.map(
           (b: any): ProductBatch => ({
             id: b.id,
+            tenantId: this.pharmacyId ?? "",
             productId: b.product_id,
             productName: r.name,
             batchNumber: b.batch_number,
@@ -155,6 +157,7 @@ export class ProductRepository extends BaseRepository {
       batches: batches.map(
         (b: any): ProductBatch => ({
           id: b.id,
+          tenantId: this.pharmacyId ?? "",
           productId: b.product_id,
           productName: r.name,
           batchNumber: b.batch_number,
@@ -217,6 +220,7 @@ export class ProductRepository extends BaseRepository {
       batches: batches.map(
         (b: any): ProductBatch => ({
           id: b.id,
+          tenantId: this.pharmacyId ?? "",
           productId: b.product_id,
           productName: r.name,
           batchNumber: b.batch_number,

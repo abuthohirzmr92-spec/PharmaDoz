@@ -12,12 +12,14 @@ import {
   ChevronDown,
   ChevronUp,
   AlertCircle,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { isSupabaseConnected } from "@/lib/supabase/client";
-import { ROLE_LABELS, SYSTEM_ROLES, BUSINESS_ROLES } from "@/lib/auth/roles";
+import { isDemoMode as checkDemoMode } from "@/config/env";
+import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
 import type { AppRole } from "@/types";
 
 export default function LoginPage() {
@@ -36,6 +38,7 @@ export default function LoginPage() {
   const [showDemo, setShowDemo] = useState(false);
 
   const hasSupabase = isSupabaseConnected();
+  const isDemo = checkDemoMode();
 
   const handleDemoLogin = (role: AppRole) => {
     loginAs(role);
@@ -171,9 +174,7 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() =>
-                  toast.info(
-                    "Hubungi Super Admin untuk reset password.",
-                  )
+                  toast.info("Hubungi Super Admin untuk reset password.")
                 }
                 className="text-[11px] text-neutral-400 hover:text-brand-600"
               >
@@ -183,96 +184,100 @@ export default function LoginPage() {
           </form>
         )}
 
-        {/* Demo Mode Section */}
-        <div className="mt-4">
-          <button
-            type="button"
-            onClick={() => setShowDemo((v) => !v)}
-            className={cn(
-              "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-xs font-medium transition-colors",
-              showDemo
-                ? "border-brand-200 bg-brand-50 text-brand-700 dark:border-brand-800 dark:bg-brand-950/20 dark:text-brand-300"
-                : "border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800",
-            )}
-          >
-            <span>
-              Mode Demo (Development)
-              {!hasSupabase && (
-                <span className="ml-1 text-[10px] text-brand-500">
-                  — aktif
-                </span>
+        {/* Demo Mode Section — only visible when NEXT_PUBLIC_DEMO_MODE=true */}
+        {isDemo && (
+          <div className="mt-4">
+            <button
+              type="button"
+              onClick={() => setShowDemo((v) => !v)}
+              className={cn(
+                "flex w-full items-center justify-between rounded-xl border px-4 py-3 text-left text-xs font-medium transition-colors",
+                showDemo
+                  ? "border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-800 dark:bg-amber-950/20 dark:text-amber-300"
+                  : "border-neutral-200 bg-white text-neutral-500 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:hover:bg-neutral-800",
               )}
-            </span>
-            {showDemo ? (
-              <ChevronUp className="h-3.5 w-3.5" />
-            ) : (
-              <ChevronDown className="h-3.5 w-3.5" />
-            )}
-          </button>
-
-          {showDemo && (
-            <div className="mt-3 space-y-4">
-              {hasSupabase && (
-                <p className="text-[10px] text-neutral-400">
-                  Mode Demo tidak memerlukan koneksi Supabase. Gunakan untuk
-                  development dan testing.
-                </p>
-              )}
-
-              {/* System Roles */}
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <Shield className="h-4 w-4 text-neutral-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                    System Roles
+            >
+              <span className="flex items-center gap-2">
+                <AlertTriangle className="h-3.5 w-3.5" />
+                DEVELOPMENT ONLY
+                {!hasSupabase && (
+                  <span className="text-[10px] text-amber-600 dark:text-amber-400">
+                    — aktif
                   </span>
+                )}
+              </span>
+              {showDemo ? (
+                <ChevronUp className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronDown className="h-3.5 w-3.5" />
+              )}
+            </button>
+
+            {showDemo && (
+              <div className="mt-3 space-y-4">
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/20">
+                  <p className="text-[10px] leading-relaxed text-amber-700 dark:text-amber-300">
+                    Demo mode aktif. Semua data bersifat sementara dan tidak
+                    terhubung ke database. Gunakan hanya untuk development dan
+                    testing.
+                  </p>
                 </div>
-                <div className="grid grid-cols-3 gap-2">
-                  {SYSTEM_ROLES.map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => handleDemoLogin(role)}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-xl border border-neutral-200 bg-white p-4 text-center transition-all hover:border-brand-300 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-600",
-                      )}
-                    >
-                      <Shield className="h-5 w-5 text-neutral-400" />
-                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                        {ROLE_LABELS[role]}
-                      </span>
-                    </button>
-                  ))}
+
+                {/* System Roles */}
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <Shield className="h-4 w-4 text-neutral-400" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                      System Roles
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    {SYSTEM_ROLES.map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => handleDemoLogin(role)}
+                        className={cn(
+                          "flex flex-col items-center gap-1.5 rounded-xl border border-neutral-200 bg-white p-4 text-center transition-all hover:border-brand-300 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-600",
+                        )}
+                      >
+                        <Shield className="h-5 w-5 text-neutral-400" />
+                        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          {ROLE_LABELS[role]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Tenant Roles */}
+                <div>
+                  <div className="mb-2 flex items-center gap-2">
+                    <User className="h-4 w-4 text-neutral-400" />
+                    <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
+                      Business Roles
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {TENANT_ROLES.map((role) => (
+                      <button
+                        key={role}
+                        onClick={() => handleDemoLogin(role)}
+                        className={cn(
+                          "flex flex-col items-center gap-1.5 rounded-xl border border-neutral-200 bg-white p-4 text-center transition-all hover:border-brand-300 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-600",
+                        )}
+                      >
+                        <User className="h-5 w-5 text-neutral-400" />
+                        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
+                          {ROLE_LABELS[role]}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
-
-              {/* Business Roles */}
-              <div>
-                <div className="mb-2 flex items-center gap-2">
-                  <User className="h-4 w-4 text-neutral-400" />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-neutral-400">
-                    Business Roles
-                  </span>
-                </div>
-                <div className="grid grid-cols-4 gap-2">
-                  {BUSINESS_ROLES.map((role) => (
-                    <button
-                      key={role}
-                      onClick={() => handleDemoLogin(role)}
-                      className={cn(
-                        "flex flex-col items-center gap-1.5 rounded-xl border border-neutral-200 bg-white p-4 text-center transition-all hover:border-brand-300 hover:shadow-md dark:border-neutral-700 dark:bg-neutral-900 dark:hover:border-brand-600",
-                      )}
-                    >
-                      <User className="h-5 w-5 text-neutral-400" />
-                      <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">
-                        {ROLE_LABELS[role]}
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        )}
 
         <p className="mt-6 text-center text-[10px] text-neutral-400">
           Aplikasi Manajemen Apotek — Role-Based Access Control

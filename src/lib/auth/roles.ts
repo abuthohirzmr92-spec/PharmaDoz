@@ -1,4 +1,4 @@
-import type { AppRole, Permission, SystemRole, BusinessRole } from "@/types";
+import type { AppRole, Permission, SystemRole, TenantRole } from "@/types";
 
 // ---------------------------------------------------------------------------
 // SINGLE SOURCE OF TRUTH: Role-to-Permission mapping
@@ -21,11 +21,14 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "purchases.view",
     "users.view",
     "users.edit",
+    "tenant.users.invite",
     "settings.view",
     "settings.edit",
+    "tenant.settings.edit",
     "logs.view",
     "expired.view",
     "expired.edit",
+    "billing.view",
     "platform.view",
     "platform.tenants.manage",
     "platform.expansions.approve",
@@ -34,7 +37,8 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "platform.monitoring.view",
   ],
 
-  developer: [
+  // ====== Tenant roles (per-tenant operational) ======
+  tenant_owner: [
     "inventory.stock.view",
     "inventory.stock.edit",
     "cashier.transaction.create",
@@ -49,53 +53,28 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "purchases.view",
     "users.view",
     "users.edit",
+    "tenant.users.invite",
     "settings.view",
     "settings.edit",
+    "tenant.settings.edit",
     "logs.view",
     "expired.view",
     "expired.edit",
-    "platform.view",
-    "platform.tenants.manage",
-    "platform.expansions.approve",
-    "platform.quotas.manage",
-    "platform.maintenance.manage",
-    "platform.monitoring.view",
+    "billing.view",
   ],
 
-  support: [
+  admin: [
     "inventory.stock.view",
-    "reports.sales.view",
-    "reports.inventory.view",
-    "products.view",
-    "suppliers.view",
-    "purchases.view",
-    "users.view",
-    "settings.view",
-    "logs.view",
-    "expired.view",
-  ],
-
-  // ====== Business roles (apotek operational) ======
-  owner: [
-    "inventory.stock.view",
-    "inventory.stock.edit",
     "cashier.transaction.create",
     "cashier.transaction.void",
     "reports.sales.view",
     "reports.inventory.view",
     "products.view",
-    "products.edit",
     "suppliers.view",
-    "suppliers.edit",
-    "purchases.create",
     "purchases.view",
-    "users.view",
-    "users.edit",
-    "settings.view",
-    "settings.edit",
-    "logs.view",
     "expired.view",
-    "expired.edit",
+    "users.view",
+    "tenant.users.invite",
   ],
 
   pharmacist: [
@@ -114,23 +93,17 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "expired.edit",
   ],
 
-  admin: [
-    "inventory.stock.view",
-    "cashier.transaction.create",
-    "cashier.transaction.void",
-    "reports.sales.view",
-    "reports.inventory.view",
-    "products.view",
-    "suppliers.view",
-    "purchases.view",
-    "expired.view",
-  ],
-
   cashier: [
     "cashier.transaction.create",
     "inventory.stock.view",
     "expired.view",
     "products.view",
+  ],
+
+  staff: [
+    "inventory.stock.view",
+    "products.view",
+    "reports.sales.view",
   ],
 };
 
@@ -140,16 +113,18 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
 
 export const SYSTEM_ROLES: readonly SystemRole[] = [
   "super_admin",
-  "developer",
-  "support",
 ];
 
-export const BUSINESS_ROLES: readonly BusinessRole[] = [
-  "owner",
-  "pharmacist",
+export const TENANT_ROLES: readonly TenantRole[] = [
+  "tenant_owner",
   "admin",
+  "pharmacist",
   "cashier",
+  "staff",
 ];
+
+/** @deprecated Use TENANT_ROLES instead */
+export const BUSINESS_ROLES = TENANT_ROLES;
 
 // ---------------------------------------------------------------------------
 // Display labels
@@ -157,12 +132,11 @@ export const BUSINESS_ROLES: readonly BusinessRole[] = [
 
 export const ROLE_LABELS: Record<AppRole, string> = {
   super_admin: "Super Admin",
-  developer: "Developer",
-  support: "Support",
-  owner: "Pemilik",
-  pharmacist: "Apoteker",
+  tenant_owner: "Pemilik",
   admin: "Admin",
+  pharmacist: "Apoteker",
   cashier: "Kasir",
+  staff: "Staf",
 };
 
 // ---------------------------------------------------------------------------

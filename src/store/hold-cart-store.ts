@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 import { useCashierStore, type CartItem } from "./cashier-store";
 

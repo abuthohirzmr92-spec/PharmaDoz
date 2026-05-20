@@ -33,5 +33,12 @@ export function hasAllPermissions(
  * Check if a role is a system role (platform/internal).
  */
 export function isSystemRole(role: AppRole): boolean {
-  return ["super_admin", "developer", "support"].includes(role);
+  return ["super_admin"].includes(role);
+}
+
+/**
+ * Check if a role is the tenant owner.
+ */
+export function isTenantOwner(role: AppRole): boolean {
+  return role === "tenant_owner";
 }

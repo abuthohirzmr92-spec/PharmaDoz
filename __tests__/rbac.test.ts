@@ -54,12 +54,11 @@ const ACTION_PERMISSIONS: readonly Permission[] = [
 
 const ALL_ROLES: readonly AppRole[] = [
   "super_admin",
-  "developer",
-  "support",
-  "owner",
+  "tenant_owner",
   "pharmacist",
   "admin",
   "cashier",
+  "staff",
 ];
 
 /* ------------------------------------------------------------------ */
@@ -79,28 +78,27 @@ beforeEach(() => {
 /* ================================================================== */
 
 describe("Role-Permission Mapping", () => {
-  it("system roles (super_admin, developer) should have ALL permissions", () => {
+  it("system roles (super_admin) should have ALL permissions", () => {
     ALL_PERMISSIONS.forEach((perm) => {
       expect(hasPermission("super_admin", perm)).toBe(true);
-      expect(hasPermission("developer", perm)).toBe(true);
     });
   });
 
-  it("support role should have only view permissions (no .edit, .create, .void)", () => {
-    // Every permission granted to support must end with ".view"
-    ROLE_PERMISSIONS.support.forEach((perm) => {
+  it("staff role should have only view permissions (no .edit, .create, .void)", () => {
+    // Every permission granted to staff must end with ".view"
+    ROLE_PERMISSIONS.staff.forEach((perm) => {
       expect(perm.endsWith(".view")).toBe(true);
     });
 
-    // Support must not have any action permissions
+    // Staff must not have any action permissions
     ACTION_PERMISSIONS.forEach((perm) => {
-      expect(hasPermission("support", perm)).toBe(false);
+      expect(hasPermission("staff", perm)).toBe(false);
     });
   });
 
-  it("owner should have ALL business permissions", () => {
+  it("tenant_owner should have ALL business permissions", () => {
     ALL_PERMISSIONS.forEach((perm) => {
-      expect(hasPermission("owner", perm)).toBe(true);
+      expect(hasPermission("tenant_owner", perm)).toBe(true);
     });
   });
 
@@ -199,23 +197,23 @@ describe("Auth Store", () => {
     expect(isAuthenticated).toBe(false);
   });
 
-  it('loginAs("owner") should set user with correct role and isAuthenticated=true', () => {
-    useAuthStore.getState().loginAs("owner");
+  it('loginAs("tenant_owner") should set user with correct role and isAuthenticated=true', () => {
+    useAuthStore.getState().loginAs("tenant_owner");
     const { user, isAuthenticated } = useAuthStore.getState();
     expect(user).not.toBeNull();
-    expect(user?.role).toBe("owner");
+    expect(user?.role).toBe("tenant_owner");
     expect(isAuthenticated).toBe(true);
   });
 
   it("loginAs should create user with correct display name and email", () => {
-    useAuthStore.getState().loginAs("owner");
+    useAuthStore.getState().loginAs("tenant_owner");
     const { user } = useAuthStore.getState();
     expect(user?.displayName).toBe("Budi Santoso");
     expect(user?.email).toBe("owner@apotek-sehat.id");
   });
 
   it("logout should clear user and set isAuthenticated=false", () => {
-    useAuthStore.getState().loginAs("owner");
+    useAuthStore.getState().loginAs("tenant_owner");
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
 
     useAuthStore.getState().logout();
@@ -225,7 +223,7 @@ describe("Auth Store", () => {
   });
 
   it("switchRole should update user role without changing isAuthenticated", () => {
-    useAuthStore.getState().loginAs("owner");
+    useAuthStore.getState().loginAs("tenant_owner");
     expect(useAuthStore.getState().isAuthenticated).toBe(true);
 
     useAuthStore.getState().switchRole("cashier");
@@ -241,7 +239,7 @@ describe("Auth Store", () => {
   });
 
   it("can(permission) should return correct value after login", () => {
-    useAuthStore.getState().loginAs("owner");
+    useAuthStore.getState().loginAs("tenant_owner");
     const { can } = useAuthStore.getState();
     expect(can("inventory.stock.edit")).toBe(true);
     expect(can("users.edit")).toBe(true);
@@ -263,7 +261,7 @@ describe("Auth Store", () => {
 
 describe("Role Switching", () => {
   it("switching from owner to cashier should immediately change permissions", () => {
-    useAuthStore.getState().loginAs("owner");
+    useAuthStore.getState().loginAs("tenant_owner");
     expect(useAuthStore.getState().can("inventory.stock.edit")).toBe(true);
 
     useAuthStore.getState().switchRole("cashier");
@@ -332,8 +330,8 @@ describe("Unauthorized Access Prevention", () => {
     expect(useAuthStore.getState().can("expired.edit")).toBe(false);
   });
 
-  it("support should not have any .edit, .create, or .void permissions", () => {
-    useAuthStore.getState().loginAs("support");
+  it("staff should not have any .edit, .create, or .void permissions", () => {
+    useAuthStore.getState().loginAs("staff");
     const { can } = useAuthStore.getState();
 
     ACTION_PERMISSIONS.forEach((perm) => {
@@ -374,7 +372,7 @@ describe("Edge Cases", () => {
   });
 
   it("rapid role switching should maintain correct state (switch 3 times, check final state)", () => {
-    useAuthStore.getState().loginAs("owner");
+    useAuthStore.getState().loginAs("tenant_owner");
     useAuthStore.getState().switchRole("cashier");
     useAuthStore.getState().switchRole("admin");
     useAuthStore.getState().switchRole("pharmacist");

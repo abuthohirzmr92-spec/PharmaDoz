@@ -48,3 +48,18 @@ export const BACKUP_CHECKPOINT_COUNT = 5;
 
 /** Per-page limit for audit log tables */
 export const MAX_AUDIT_PAGE_SIZE = 50;
+
+/** Default page size for paginated queries */
+export const DEFAULT_PAGE_SIZE = 20;
+
+/** Regex pattern for valid tenant slugs */
+export const TENANT_SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/** All available roles in the system */
+export const ROLES = ["super_admin", "tenant_owner", "admin", "pharmacist", "cashier", "staff"] as const;
+
+/** Platform-level system roles */
+export const SYSTEM_ROLES = ["super_admin"] as const;
+
+/** Per-tenant operational roles */
+export const TENANT_ROLES = ["tenant_owner", "admin", "pharmacist", "cashier", "staff"] as const;

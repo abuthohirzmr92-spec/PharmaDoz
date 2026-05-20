@@ -146,6 +146,7 @@ export class SupplierRepository extends BaseRepository {
 
       result.push({
         id: inv.id,
+        tenantId: this.pharmacyId ?? "",
         invoiceNumber: inv.invoice_number,
         supplierId: inv.supplier_id,
         supplierName: ((inv as any).supplier?.name as string) ?? "",
@@ -158,6 +159,7 @@ export class SupplierRepository extends BaseRepository {
           (item: Record<string, unknown>) =>
             ({
               id: (item as any).id,
+              tenantId: this.pharmacyId ?? "",
               productId: (item as any).product_id,
               productName: ((item as any).product?.name as string) ?? "",
               batchNumber: (item as any).batch_number,
@@ -198,6 +200,7 @@ export class SupplierRepository extends BaseRepository {
 
     return {
       id: inv.id,
+      tenantId: this.pharmacyId ?? "",
       invoiceNumber: inv.invoice_number,
       supplierId: inv.supplier_id,
       supplierName: ((inv as any).supplier?.name as string) ?? "",
@@ -263,6 +266,7 @@ export class SupplierRepository extends BaseRepository {
     const inv = row as any;
     return {
       id: inv.id,
+      tenantId: this.pharmacyId ?? "",
       invoiceNumber: inv.invoice_number,
       supplierId: inv.supplier_id,
       supplierName: inv.supplier?.name ?? "",
@@ -341,6 +345,7 @@ export class SupplierRepository extends BaseRepository {
 
     return {
       id: inv.id,
+      tenantId: this.pharmacyId ?? "",
       invoiceNumber: inv.invoice_number,
       supplierId: inv.supplier_id,
       supplierName:

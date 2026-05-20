@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 export default function AppError({
@@ -10,6 +10,11 @@ export default function AppError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [errorTimestamp] = useState(() => new Date().toLocaleString("id-ID"));
+  const [errorCode] = useState(
+    () => `ERR-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+  );
+
   useEffect(() => {
     console.error("App error:", error);
   }, [error]);
@@ -25,6 +30,9 @@ export default function AppError({
         </h1>
         <p className="mt-2 text-sm text-neutral-500">
           Gagal memuat halaman ini. Silakan coba lagi atau kembali ke dashboard.
+        </p>
+        <p className="mt-4 text-xs text-neutral-400">
+          {errorCode} &middot; {errorTimestamp}
         </p>
         <div className="mt-6 flex items-center justify-center gap-3">
           <button

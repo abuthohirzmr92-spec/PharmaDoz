@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 import type { Transaction } from "@/types/transaction";
 import { useAuthStore } from "@/store/auth-store";
@@ -5,6 +7,8 @@ import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { transactionRepo } from "@/lib/repository-instances";
 import { isSupabaseConnected } from "@/lib/supabase/client";
+import { localPersistence } from "@/lib/local-persistence";
+import { getBusinessDayKey } from "@/lib/business-day";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -212,6 +216,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
 
     const transaction: Transaction = {
       id: transactionId,
+      tenantId: auth.user?.tenantId ?? auth.user?.pharmacyId ?? "",
       invoiceNumber: get().invoiceNumber ?? `INV-${Date.now()}`,
       items: cart.map((item) => ({
         productId: item.productId,
@@ -266,6 +271,15 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
 
       // Add to transaction store
       txnStore.addTransaction(transaction);
+
+      // If offline, enqueue to sync queue for later replay
+      if (!isSupabaseConnected()) {
+        localPersistence.enqueue({
+          businessDay: getBusinessDayKey(),
+          type: "transaction",
+          payload: transaction,
+        }).catch(() => { /* best-effort */ });
+      }
 
       set({ isSubmitting: false, submitError: null });
       return { success: true, transactionId };

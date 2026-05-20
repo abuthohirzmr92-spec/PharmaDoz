@@ -1,26 +1,29 @@
 // ---------------------------------------------------------------------------
-// System roles (platform/internal — future SaaS)
+// System roles (platform/internal — SaaS)
 // ---------------------------------------------------------------------------
-export type SystemRole = "super_admin" | "developer" | "support";
+export type SystemRole = "super_admin";
 
 // ---------------------------------------------------------------------------
-// Business roles (apotek operational)
+// Tenant roles (per-tenant operational)
 // ---------------------------------------------------------------------------
-export type BusinessRole = "owner" | "pharmacist" | "admin" | "cashier";
+export type TenantRole = "tenant_owner" | "admin" | "pharmacist" | "cashier" | "staff";
 
 // ---------------------------------------------------------------------------
 // Combined role for auth store
 // ---------------------------------------------------------------------------
-export type AppRole = SystemRole | BusinessRole;
+export type AppRole = SystemRole | TenantRole;
 
 // ---------------------------------------------------------------------------
-// Deprecated — use BusinessRole instead
+// Deprecated — use TenantRole instead
 // ---------------------------------------------------------------------------
+/** @deprecated Use TenantRole instead */
+export type BusinessRole = TenantRole;
+
 /** @deprecated Use BusinessRole instead */
 export type Role = BusinessRole;
 
 // ---------------------------------------------------------------------------
-// Permissions (18 granular permissions following "<domain>.<action>" pattern)
+// Permissions (25+ granular permissions following "<domain>.<action>" pattern)
 // ---------------------------------------------------------------------------
 export type Permission =
   | "inventory.stock.view"
@@ -37,11 +40,14 @@ export type Permission =
   | "purchases.view"
   | "users.view"
   | "users.edit"
+  | "tenant.users.invite"
   | "settings.view"
   | "settings.edit"
+  | "tenant.settings.edit"
   | "logs.view"
   | "expired.view"
   | "expired.edit"
+  | "billing.view"
   | "platform.view"
   | "platform.tenants.manage"
   | "platform.expansions.approve"
@@ -64,8 +70,161 @@ export interface UserProfile {
   role: AppRole;
   systemRole?: SystemRole;
   isActive: boolean;
+  // Legacy fields (pharmacy-scoped)
   pharmacyId?: string;
   pharmacyName?: string;
+  // New fields (tenant-scoped)
+  tenantId?: string;
+  tenantName?: string;
+  avatarUrl?: string | null;
+  phone?: string | null;
+  lastLoginAt?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Tenant — core SaaS entity
+// ---------------------------------------------------------------------------
+export interface Tenant {
+  id: string;
+  name: string;
+  slug: string;
+  domain?: string | null;
+  settings?: Record<string, unknown>;
+  isActive: boolean;
+  packageId?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Profile — links auth.users to tenant context
+// ---------------------------------------------------------------------------
+export interface Profile {
+  id: string; // = auth.users.id
+  tenantId?: string | null;
+  displayName: string;
+  avatarUrl?: string | null;
+  phone?: string | null;
+  isActive: boolean;
+  lastLoginAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// TenantUser — role assignment within a tenant
+// ---------------------------------------------------------------------------
+export interface TenantUser {
+  id: string;
+  tenantId: string;
+  userId: string;
+  role: AppRole;
+  isActive: boolean;
+  invitedAt?: string | null;
+  joinedAt?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Subscription — tenant billing & plan
+// ---------------------------------------------------------------------------
+export interface Subscription {
+  id: string;
+  tenantId: string;
+  packageId: string;
+  status: "active" | "trialing" | "past_due" | "canceled" | "expired";
+  currentPeriodStart: string;
+  currentPeriodEnd: string;
+  trialEnd?: string | null;
+  canceledAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Payment — subscription payment record
+// ---------------------------------------------------------------------------
+export interface Payment {
+  id: string;
+  subscriptionId?: string | null;
+  tenantId: string;
+  amount: number;
+  currency: string;
+  status: "pending" | "success" | "failed" | "refunded";
+  paymentMethod?: string | null;
+  paidAt?: string | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// ActivityLog — audit trail / activity events
+// ---------------------------------------------------------------------------
+export interface ActivityLog {
+  id: string;
+  tenantId?: string | null;
+  actorId: string;
+  action: string;
+  resourceType: string;
+  resourceId?: string | null;
+  metadata?: Record<string, unknown>;
+  ipAddress?: string | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// SyncQueueEntry — offline sync queue
+// ---------------------------------------------------------------------------
+export interface SyncQueueEntry {
+  id: string;
+  tenantId: string;
+  businessDay: string;
+  entryType: "transaction" | "stock_movement" | "stock_opname" | "purchase_invoice" | "product" | "batch";
+  payload: Record<string, unknown>;
+  idempotencyKey: string;
+  status: "pending" | "syncing" | "synced" | "failed";
+  attempts: number;
+  lastError?: string | null;
+  createdAt: string;
+  syncedAt?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// OfflineSession — tracks device offline periods
+// ---------------------------------------------------------------------------
+export interface OfflineSession {
+  id: string;
+  tenantId: string;
+  deviceId?: string | null;
+  startedAt: string;
+  lastHeartbeat: string;
+  endedAt?: string | null;
+  transactionCount: number;
+}
+
+// ---------------------------------------------------------------------------
+// Context Types
+// ---------------------------------------------------------------------------
+export interface TenantContext {
+  tenantId: string;
+  role: AppRole;
+  userId: string;
+}
+
+// ---------------------------------------------------------------------------
+// API Types
+// ---------------------------------------------------------------------------
+export interface ApiResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -90,7 +249,7 @@ export interface QuotaCheckResult {
 }
 
 // ---------------------------------------------------------------------------
-// Platform stats (preparatory — multi-tenancy dashboard)
+// Platform stats (multi-tenancy dashboard)
 // ---------------------------------------------------------------------------
 export interface PlatformStats {
   totalPharmacies: number;

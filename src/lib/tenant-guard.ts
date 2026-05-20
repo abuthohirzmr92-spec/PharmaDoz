@@ -1,37 +1,13 @@
 import type { AppRole } from "@/types";
 
-/**
- * Returns a pharmacy_id filter for repository queries.
- * Returns empty object (no filter) when pharmacyId is missing.
- */
-export function tenantFilter(pharmacyId?: string | null): Record<string, string> {
-  if (!pharmacyId) return {};
-  return { pharmacy_id: pharmacyId };
-}
+// ---------------------------------------------------------------------------
+// Role helpers
+// ---------------------------------------------------------------------------
 
-/**
- * Wraps a Supabase query builder with tenant scoping.
- */
-export function applyTenantScope(
-  query: any,
-  column: string,
-  pharmacyId?: string | null,
-): any {
-  if (!pharmacyId) return query;
-  return query.eq(column, pharmacyId);
-}
-
-/**
- * System roles can operate across all tenants.
- */
 export function isCrossTenantRole(role: string): boolean {
-  return ["super_admin", "developer", "support"].includes(role);
+  return ["super_admin"].includes(role);
 }
 
-/**
- * Throws if the given role is NOT a system role.
- * Use to guard platform-level operations.
- */
 export function assertSystemRole(role: string): void {
   if (!isCrossTenantRole(role)) {
     throw new Error(
@@ -40,49 +16,59 @@ export function assertSystemRole(role: string): void {
   }
 }
 
-/**
- * Returns the tenant ID for scoping queries.
- * System roles return undefined (cross-tenant access).
- * Business roles return their pharmacyId.
- */
+// ---------------------------------------------------------------------------
+// Tenant ID resolution
+// ---------------------------------------------------------------------------
+
 export function resolveTenantId(
-  pharmacyId: string | undefined,
+  tenantId: string | undefined,
   role: string | undefined,
 ): string | undefined {
   if (!role || isCrossTenantRole(role)) return undefined;
-  return pharmacyId || undefined;
+  return tenantId || undefined;
 }
 
 // ---------------------------------------------------------------------------
-// Tenant access validation helpers
+// Tenant access validation
 // ---------------------------------------------------------------------------
 
-/**
- * Validates that a user has access to a specific tenant scope.
- * System roles always pass (cross-tenant access).
- * Business roles pass only if their pharmacyId matches the requested tenant.
- */
 export function validateTenantAccess(
-  userPharmacyId: string | undefined,
-  requestedPharmacyId: string,
+  userTenantId: string | undefined,
+  requestedTenantId: string,
   userRole: AppRole,
 ): boolean {
   if (isCrossTenantRole(userRole)) return true;
-  return userPharmacyId === requestedPharmacyId;
+  return userTenantId === requestedTenantId;
 }
 
-/**
- * Validates tenant access and throws with an Indonesian error message
- * if the user does not have access to the requested tenant.
- */
 export function assertTenantAccess(
-  userPharmacyId: string | undefined,
-  requestedPharmacyId: string,
+  userTenantId: string | undefined,
+  requestedTenantId: string,
   userRole: AppRole,
 ): void {
-  if (!validateTenantAccess(userPharmacyId, requestedPharmacyId, userRole)) {
+  if (!validateTenantAccess(userTenantId, requestedTenantId, userRole)) {
     throw new Error(
       "Akses ditolak: Anda tidak memiliki akses ke tenant ini.",
     );
   }
+}
+
+// ---------------------------------------------------------------------------
+// Deprecated — retained for backward compatibility
+// ---------------------------------------------------------------------------
+
+/** @deprecated Use tenant_id directly in repository queries */
+export function tenantFilter(pharmacyId?: string | null): Record<string, string> {
+  if (!pharmacyId) return {};
+  return { tenant_id: pharmacyId };
+}
+
+/** @deprecated Use BaseRepository.withTenantScope() */
+export function applyTenantScope(
+  query: any,
+  column: string,
+  pharmacyId?: string | null,
+): any {
+  if (!pharmacyId) return query;
+  return query.eq(column, pharmacyId);
 }

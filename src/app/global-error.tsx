@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 export default function GlobalError({
   error,
   reset,
@@ -7,6 +9,11 @@ export default function GlobalError({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [errorTimestamp] = useState(() => new Date().toLocaleString("id-ID"));
+  const [errorCode] = useState(
+    () => `ERR-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+  );
+
   return (
     <html lang="id">
       <body className="bg-neutral-50 text-neutral-900 antialiased">
@@ -24,6 +31,9 @@ export default function GlobalError({
                 Silakan muat ulang halaman.
               </p>
             )}
+            <p className="mt-4 text-xs text-neutral-400">
+              {errorCode} &middot; {errorTimestamp}
+            </p>
             <button
               onClick={() => reset()}
               className="mt-6 inline-block rounded-lg bg-brand-600 px-6 py-2.5 text-sm font-medium text-white hover:bg-brand-700"

@@ -1,12 +1,17 @@
 import { createClient } from "@supabase/supabase-js";
 import type { Database } from "./database";
+import { isDemoMode } from "@/config/env";
 
 function createSupabaseClient() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // If env vars are placeholders or missing, return null (demo mode)
-  if (!url || !key || url.includes("your-project")) {
+  // Explicit demo mode: no Supabase client
+  if (isDemoMode()) return null;
+
+  // Missing or placeholder env vars: return null (effectively demo mode).
+  // The proxy and auth-provider handle this gracefully.
+  if (!url || !key || url.includes("your-project") || key.includes("your-")) {
     return null;
   }
 

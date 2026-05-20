@@ -1,5 +1,9 @@
+"use client";
+
 import { create } from "zustand";
 import type { NetworkStatus } from "@/types";
+import { syncEngine } from "@/lib/offline/sync-engine";
+import { localPersistence } from "@/lib/local-persistence";
 
 /* ------------------------------------------------------------------ */
 /*  Network State                                                       */
@@ -32,6 +36,7 @@ interface NetworkState {
     pendingCount: number;
     isHealthy: boolean;
   };
+  startSync: () => Promise<void>;
   reset: () => void;
 }
 
@@ -111,6 +116,37 @@ export const useNetworkStore = create<NetworkState>()((set, get) => ({
       isHealthy:
         state.queueBacklog === 0 && state.status === "online" && !state.isSyncing,
     };
+  },
+
+  startSync: async () => {
+    const { isSyncing } = get();
+    if (isSyncing) return;
+
+    set({ isSyncing: true });
+    try {
+      const pendingCount = await localPersistence.getPendingCount();
+      set({ pendingSyncCount: pendingCount, queueBacklog: pendingCount });
+
+      if (pendingCount > 0) {
+        set({ status: "syncing" });
+        get().recordSyncAttempt();
+
+        const result = await syncEngine.startSync();
+
+        if (result.succeeded > 0) {
+          get().recordSyncSuccess();
+        }
+        set({
+          pendingSyncCount: result.failed,
+          queueBacklog: result.failed,
+          status: result.failed === 0 ? "online" : "degraded",
+        });
+      }
+    } catch {
+      set({ status: "degraded" });
+    } finally {
+      set({ isSyncing: false });
+    }
   },
 
   reset: () => set({ ...INITIAL_STATE }),

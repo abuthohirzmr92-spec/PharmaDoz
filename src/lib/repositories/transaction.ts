@@ -88,6 +88,7 @@ export class TransactionRepository extends BaseRepository {
 
       transactions.push({
         id: txn.id,
+        tenantId: this.pharmacyId ?? "",
         invoiceNumber: txn.invoice_number,
         items: (itemsResult.data || []).map(
           (item: Record<string, unknown>) =>
@@ -153,6 +154,7 @@ export class TransactionRepository extends BaseRepository {
 
     return {
       id: txn.id,
+      tenantId: this.pharmacyId ?? "",
       invoiceNumber: txn.invoice_number,
       items: (itemsResult.data || []).map(
         (item: Record<string, unknown>) =>
@@ -258,6 +260,7 @@ export class TransactionRepository extends BaseRepository {
 
     return {
       id: txn.id,
+      tenantId: this.pharmacyId ?? "",
       invoiceNumber: txn.invoice_number,
       items: data.items.map(
         (item) =>

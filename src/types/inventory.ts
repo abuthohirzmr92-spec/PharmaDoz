@@ -5,6 +5,7 @@
 /** A single batch of a product — core FEFO unit */
 export interface ProductBatch {
   id: string;
+  tenantId: string;
   productId: string;
   productName: string;
   batchNumber: string;
@@ -21,6 +22,7 @@ export interface ProductBatch {
 
 export interface Supplier {
   id: string;
+  tenantId: string;
   name: string;
   contactPerson: string;
   phone: string;
@@ -37,6 +39,7 @@ export type PurchaseStatus = "paid" | "partial" | "unpaid";
 
 export interface PurchaseItem {
   id: string;
+  tenantId: string;
   productId: string;
   productName: string;
   batchNumber: string;
@@ -48,6 +51,7 @@ export interface PurchaseItem {
 
 export interface PurchaseInvoice {
   id: string;
+  tenantId: string;
   invoiceNumber: string;
   supplierId: string;
   supplierName: string;
@@ -73,6 +77,7 @@ export type MovementType =
 
 export interface StockMovement {
   id: string;
+  tenantId: string;
   timestamp: string;
   type: MovementType;
   productId: string;
@@ -96,6 +101,7 @@ export type OpnameStatus = "draft" | "confirmed" | "adjusted";
 
 export interface StockOpnameItem {
   productId: string;
+  tenantId: string;
   productName: string;
   batchId: string;
   batchNumber: string;
@@ -107,6 +113,7 @@ export interface StockOpnameItem {
 
 export interface StockOpname {
   id: string;
+  tenantId: string;
   date: string;
   status: OpnameStatus;
   conductedBy: string;
@@ -120,6 +127,7 @@ export interface StockOpname {
 
 export interface InventoryProduct {
   id: string;
+  tenantId: string;
   name: string;
   category: string;
   barcode: string | null;
@@ -138,6 +146,7 @@ export interface InventoryProduct {
 /* ------------------------------------------------------------------ */
 
 export interface DashboardSummary {
+  tenantId?: string;
   totalProducts: number;
   totalStockValue: number; // sum(qty * sellingPrice)
   lowStockCount: number; // totalStock <= minStock

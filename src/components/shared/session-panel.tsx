@@ -15,7 +15,7 @@ export function SessionPanel({ collapsed }: SessionPanelProps) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
-  const authMode = useAuthStore((s) => s.authMode);
+  const isDemo = useAuthStore((s) => s.isDemoMode());
   const logout = useAuthStore((s) => s.logout);
 
   if (!user) return null;
@@ -62,7 +62,7 @@ export function SessionPanel({ collapsed }: SessionPanelProps) {
           </div>
         )}
         <div className="flex items-center gap-1.5 pt-0.5">
-          {authMode === "demo" ? (
+          {isDemo ? (
             <>
               <WifiOff className="h-3 w-3 shrink-0 text-amber-500" />
               <span className="text-[11px] text-amber-600 dark:text-amber-500">Demo Mode</span>

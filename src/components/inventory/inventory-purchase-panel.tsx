@@ -83,13 +83,13 @@ export function InventoryPurchasePanel() {
   const [formSupplier, setFormSupplier] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
   const [formItems, setFormItems] = useState<PurchaseItem[]>([
-    { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
+    { id: "1", tenantId: "", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
   ]);
 
   const handleAddItem = () => {
     setFormItems((prev) => [
       ...prev,
-      { id: String(Date.now()), productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
+      { id: String(Date.now()), tenantId: "", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
     ]);
   };
 
@@ -135,6 +135,7 @@ export function InventoryPurchasePanel() {
 
     const invoice: PurchaseInvoice = {
       id: `inv-${Date.now()}`,
+      tenantId: "",
       invoiceNumber: invoiceNum,
       supplierId: supplier.id,
       supplierName: supplier.name,
@@ -151,7 +152,7 @@ export function InventoryPurchasePanel() {
     setShowForm(false);
     setFormSupplier("");
     setFormDueDate("");
-    setFormItems([{ id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 }]);
+    setFormItems([{ id: "1", tenantId: "", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 }]);
   };
 
   const filtered = useMemo(() => {

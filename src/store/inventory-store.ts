@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 import type {
   ProductBatch,
@@ -235,6 +237,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
         newMovements.push({
           id: `mov-${generateUUID()}`,
+          tenantId: "",
           timestamp: now,
           type: "purchase",
           productId: item.productId,
@@ -252,6 +255,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       } else {
         const newBatch: ProductBatch = {
           id: `bat-${generateUUID()}`,
+          tenantId: "",
           productId: item.productId,
           productName: item.productName,
           batchNumber: item.batchNumber,
@@ -265,6 +269,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
         newMovements.push({
           id: `mov-${generateUUID()}`,
+          tenantId: "",
           timestamp: now,
           type: "purchase",
           productId: item.productId,
@@ -364,6 +369,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
       newMovements.push({
         id: `mov-${generateUUID()}`,
+        tenantId: "",
         timestamp: now,
         type: "adjustment",
         productId: item.productId,
@@ -444,6 +450,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
       newMovements.push({
         id: `mov-${generateUUID()}`,
+        tenantId: "",
         timestamp: now,
         type: "expired",
         productId: batch.productId,
@@ -556,6 +563,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       for (const alloc of allocations) {
         newMovements.push({
           id: `mov-${generateUUID()}`,
+          tenantId: "",
           timestamp: now,
           type: "sale",
           productId,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useAuthStore } from "@/store/auth-store";
-import type { AppRole, AuthMode, Permission } from "@/types";
+import type { AppRole, Permission } from "@/types";
 
 export function useAuth() {
   const user = useAuthStore((s) => s.user);
@@ -31,10 +31,6 @@ export function usePharmacyName(): string | undefined {
   return useAuthStore((s) => s.user?.pharmacyName);
 }
 
-export function useAuthMode(): AuthMode {
-  return useAuthStore((s) => s.authMode);
-}
-
 export function useIsDemoMode(): boolean {
-  return useAuthStore((s) => s.authMode === "demo");
+  return useAuthStore((s) => s.isDemoMode());
 }

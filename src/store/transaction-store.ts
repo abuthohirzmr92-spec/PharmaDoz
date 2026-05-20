@@ -1,3 +1,5 @@
+"use client";
+
 import { create } from "zustand";
 import type { Transaction } from "@/types/transaction";
 import { generateDemoTransactions } from "@/lib/demo-transactions";

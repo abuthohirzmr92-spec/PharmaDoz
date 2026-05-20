@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
 export default function ErrorPage({
@@ -10,6 +10,11 @@ export default function ErrorPage({
   error: Error & { digest?: string };
   reset: () => void;
 }) {
+  const [errorTimestamp] = useState(() => new Date().toLocaleString("id-ID"));
+  const [errorCode] = useState(
+    () => `ERR-${crypto.randomUUID().slice(0, 6).toUpperCase()}`
+  );
+
   useEffect(() => {
     console.error("Error:", error);
   }, [error]);
@@ -25,6 +30,9 @@ export default function ErrorPage({
         </h1>
         <p className="mt-2 text-sm text-neutral-500">
           Maaf, sesuatu tidak berfungsi. Silakan coba lagi.
+        </p>
+        <p className="mt-4 text-xs text-neutral-400">
+          {errorCode} &middot; {errorTimestamp}
         </p>
         <button
           onClick={() => reset()}

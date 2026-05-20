@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { useCashierStore } from "@/store/cashier-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useHoldCartStore } from "@/store/hold-cart-store";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
+import { isDemoMode } from "@/config/env";
+
+const PUBLIC_PATHS = ["/login", "/forgot-password", "/unauthorized", "/offline"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHydrating, setIsHydrating] = useState(true);
   const loginAs = useAuthStore((s) => s.loginAs);
-  const initFromSupabaseSession = useAuthStore(
-    (s) => s.initFromSupabaseSession,
-  );
+  const initFromSupabaseSession = useAuthStore((s) => s.initFromSupabaseSession);
   const router = useRouter();
+  const pathname = usePathname();
 
   useEffect(() => {
     let cancelled = false;
@@ -30,8 +32,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 2. Check localStorage for demo session
-      if (!cancelled) {
+      // 2. Demo mode: check localStorage for persisted demo session
+      if (isDemoMode() && !cancelled) {
         const stored =
           typeof window !== "undefined"
             ? localStorage.getItem("apotek-auth")
@@ -40,7 +42,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           try {
             const parsed = JSON.parse(stored);
             if (parsed.user && parsed.isAuthenticated) {
-              // Already hydrated by the store's module-level init
               setIsHydrating(false);
               return;
             }
@@ -50,10 +51,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // 3. Fallback — login as owner
-      if (!cancelled) {
+      // 3. Demo mode: auto-login as tenant_owner for convenience
+      if (isDemoMode() && !cancelled) {
         if (!useAuthStore.getState().isAuthenticated) {
-          loginAs("owner");
+          loginAs("tenant_owner");
+        }
+        setIsHydrating(false);
+        return;
+      }
+
+      // 4. Production: no session → redirect to /login
+      if (!cancelled) {
+        const isPublic = PUBLIC_PATHS.some(
+          (p) => pathname === p || pathname.startsWith(p + "/"),
+        );
+        if (!isPublic) {
+          router.replace("/login");
         }
         setIsHydrating(false);
       }
@@ -64,7 +77,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loginAs, initFromSupabaseSession]);
+  }, [loginAs, initFromSupabaseSession, pathname, router]);
 
   // Listen for Supabase auth state changes
   useEffect(() => {
@@ -95,16 +108,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
 
-        // Clear auth state without calling signOut again (Supabase already signed out)
         useAuthStore.setState({
           user: null,
           isAuthenticated: false,
           isLoading: false,
-          authMode: "demo",
+          error: null,
         });
-        router.push("/login");
+        if (pathname !== "/login") {
+          router.push("/login");
+        }
       } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        // Session restored — refresh user profile
         await initFromSupabaseSession();
       }
     });
@@ -112,7 +125,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       subscription.unsubscribe();
     };
-  }, [initFromSupabaseSession, router]);
+  }, [initFromSupabaseSession, router, pathname]);
 
   if (isHydrating) {
     return (

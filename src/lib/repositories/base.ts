@@ -16,11 +16,12 @@ export function mapRows<T>(rows: Record<string, unknown>[]): T[] {
   return rows.map((row) => mapRow<T>(row));
 }
 
+export interface TenantContext {
+  tenantId: string;
+  role?: string;
+}
+
 export class BaseRepository {
-  /**
-   * Returns the raw Supabase client (typed loosely to work around
-   * Database type constraints). Subclasses interact via `from()`.
-   */
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected get client(): any {
     if (!supabase) {
@@ -36,14 +37,43 @@ export class BaseRepository {
   }
 
   protected pharmacyId: string | undefined;
+  protected tenantContext: TenantContext | undefined;
 
   setPharmacyContext(pharmacyId: string | undefined): void {
     this.pharmacyId = pharmacyId;
+    if (pharmacyId) {
+      this.tenantContext = { tenantId: pharmacyId };
+    } else {
+      this.tenantContext = undefined;
+    }
   }
 
-  protected withTenantScope(query: any, column: string = "pharmacy_id"): any {
-    if (!this.pharmacyId) return query;
-    return query.eq(column, this.pharmacyId);
+  setTenantContext(ctx: TenantContext | undefined): void {
+    this.tenantContext = ctx;
+    this.pharmacyId = ctx?.tenantId;
+  }
+
+  getTenantId(): string | undefined {
+    return this.tenantContext?.tenantId ?? this.pharmacyId;
+  }
+
+  protected requireTenant(): string {
+    const tid = this.getTenantId();
+    if (!tid) {
+      throw new Error("Tenant context required — no tenant set on repository.");
+    }
+    return tid;
+  }
+
+  protected withTenantScope(query: any, column: string = "tenant_id"): any {
+    const tid = this.getTenantId();
+    if (!tid) return query;
+    return query.eq(column, tid);
+  }
+
+  protected withCrossTenantScope(query: any, column: string = "tenant_id"): any {
+    // No-op: cross-tenant queries don't filter by tenant
+    return query;
   }
 
   protected handleError(error: unknown, context: string): never {

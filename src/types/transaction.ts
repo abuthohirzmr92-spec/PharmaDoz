@@ -5,12 +5,14 @@
 export type PaymentMethod = "cash" | "debit" | "credit" | "qris" | "transfer";
 
 export interface SalePayment {
+  tenantId?: string;
   amount: number;
   method: PaymentMethod;
   ref?: string;
 }
 
 export interface TransactionItem {
+  tenantId?: string;
   productId: string;
   productName: string;
   quantity: number;
@@ -26,6 +28,7 @@ export interface BatchAllocation {
 
 export interface Transaction {
   id: string;
+  tenantId: string;
   invoiceNumber: string;
   items: TransactionItem[];
   payments: SalePayment[];

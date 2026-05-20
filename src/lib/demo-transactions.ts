@@ -105,6 +105,7 @@ export function generateDemoTransactions(days = 90): Transaction[] {
 
       transactions.push({
         id: `txn-${dateStr}-${String(t).padStart(2, "0")}`,
+        tenantId: "demo-tenant",
         invoiceNumber,
         items,
         payments,

@@ -202,7 +202,35 @@ export class LocalStoragePersistence implements ILocalPersistence {
 }
 
 // ---------------------------------------------------------------------------
+// Auto-switch factory
+// ---------------------------------------------------------------------------
+
+let _persistence: ILocalPersistence | null = null;
+
+export function createPersistence(): ILocalPersistence {
+  if (_persistence) return _persistence as ILocalPersistence;
+
+  // Prefer IndexedDB (Dexie) when available, fall back to localStorage
+  if (
+    typeof window !== "undefined" &&
+    typeof indexedDB !== "undefined"
+  ) {
+    try {
+      // Lazy-import IndexedDB implementation to avoid bundling in SSR
+      const { IndexedDBPersistence } = require("./offline/indexeddb-persistence");
+      _persistence = new IndexedDBPersistence();
+      return _persistence!;
+    } catch {
+      // Fall through to localStorage
+    }
+  }
+
+  _persistence = new LocalStoragePersistence();
+  return _persistence!;
+}
+
+// ---------------------------------------------------------------------------
 // Singleton
 // ---------------------------------------------------------------------------
 
-export const localPersistence: ILocalPersistence = new LocalStoragePersistence();
+export const localPersistence: ILocalPersistence = createPersistence();

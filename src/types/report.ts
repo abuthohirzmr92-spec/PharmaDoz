@@ -27,6 +27,7 @@ export interface SortConfig {
 }
 
 export interface ReportFilters {
+  tenantId?: string;
   dateRange: DateRange;
   status?: string;
   paymentMethod?: string;

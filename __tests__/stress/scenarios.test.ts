@@ -627,13 +627,11 @@ describe("Enterprise Hardening — Stress & Edge Case Scenarios", () => {
       expect(validateTenantAccess(undefined, "pharm-2", "super_admin")).toBe(
         true,
       );
-      expect(validateTenantAccess(undefined, "pharm-2", "developer")).toBe(true);
-      expect(validateTenantAccess(undefined, "pharm-2", "support")).toBe(true);
     });
 
     it("validateTenantAccess blocks business role from other tenant", () => {
       expect(validateTenantAccess("pharm-1", "pharm-2", "cashier")).toBe(false);
-      expect(validateTenantAccess("pharm-1", "pharm-2", "owner")).toBe(false);
+      expect(validateTenantAccess("pharm-1", "pharm-2", "tenant_owner")).toBe(false);
     });
 
     it("validateTenantAccess allows business role for own tenant", () => {
