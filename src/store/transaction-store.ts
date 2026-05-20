@@ -48,6 +48,12 @@ export const useTransactionStore = create<TransactionState>()((set, get) => ({
   loadDemoTransactions: async () => {
     if (get().isLoaded) return;
 
+    // No tenant context — skip Supabase query (e.g. super admin with no tenant)
+    if (transactionRepo.isConnected && !transactionRepo.getTenantId()) {
+      set({ isLoaded: true, isDemoMode: false, isLoading: false });
+      return;
+    }
+
     if (transactionRepo.isConnected) {
       set({ isLoading: true });
       try {

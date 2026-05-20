@@ -636,6 +636,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     // Skip if already loaded demo data
     if (state.dataSource === "demo" && state.batches.length > 0) return;
 
+    // No tenant context — skip Supabase query (e.g. super admin with no tenant).
+    // Without tenant_id the query is unfiltered and may hit RLS blocks.
+    if (productRepo.isConnected && !productRepo.getTenantId()) {
+      set({ dataSource: "database", isLoading: false });
+      return;
+    }
+
     if (productRepo.isConnected) {
       set({ dataSource: "loading", isLoading: true });
       try {
