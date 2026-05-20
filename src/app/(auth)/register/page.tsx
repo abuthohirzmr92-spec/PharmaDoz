@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
@@ -12,10 +12,16 @@ import {
   ArrowRight,
   ArrowLeft,
   Loader2,
+  Eye,
+  EyeOff,
+  XCircle,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
-import { toast } from "sonner";
-import { registerTenant } from "@/lib/tenant/onboarding";
+import {
+  registerTenant,
+  preValidateRegistration,
+  generateSlug,
+} from "@/lib/tenant/onboarding";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 
 type Step = 1 | 2 | 3;
@@ -34,6 +40,15 @@ export default function RegisterPage() {
   const [step, setStep] = useState<Step>(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
+
+  /* Slug preview + availability */
+  const [slugPreview, setSlugPreview] = useState("");
+  const [slugAvailable, setSlugAvailable] = useState<boolean | null>(null);
+  const [isCheckingSlug, setIsCheckingSlug] = useState(false);
+  const slugTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const [form, setForm] = useState<FormData>({
     email: "",
     password: "",
@@ -44,6 +59,45 @@ export default function RegisterPage() {
   });
 
   const hasSupabase = isSupabaseConnected();
+
+  /* Debounced slug check when pharmacy name changes (step 2) */
+  useEffect(() => {
+    if (step !== 2 || form.pharmacyName.trim().length < 2) {
+      setSlugPreview("");
+      setSlugAvailable(null);
+      return;
+    }
+
+    const slug = generateSlug(form.pharmacyName.trim());
+    setSlugPreview(slug);
+
+    if (slug.length < 2) {
+      setSlugAvailable(null);
+      return;
+    }
+
+    if (slugTimerRef.current) clearTimeout(slugTimerRef.current);
+
+    slugTimerRef.current = setTimeout(async () => {
+      setIsCheckingSlug(true);
+      try {
+        const result = await preValidateRegistration({
+          pharmacyName: form.pharmacyName.trim(),
+        });
+        if (result.slug === slug) {
+          setSlugAvailable(result.slugAvailable ?? false);
+        }
+      } catch {
+        setSlugAvailable(null);
+      } finally {
+        setIsCheckingSlug(false);
+      }
+    }, 500);
+
+    return () => {
+      if (slugTimerRef.current) clearTimeout(slugTimerRef.current);
+    };
+  }, [form.pharmacyName, step]);
 
   if (!hasSupabase) {
     return (
@@ -80,6 +134,7 @@ export default function RegisterPage() {
 
   function validateStep1(): boolean {
     if (!form.email.trim()) { setError("Email wajib diisi."); return false; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email.trim())) { setError("Format email tidak valid."); return false; }
     if (!form.password) { setError("Password wajib diisi."); return false; }
     if (form.password.length < 8) { setError("Password minimal 8 karakter."); return false; }
     if (form.password !== form.confirmPassword) { setError("Password tidak cocok."); return false; }
@@ -90,6 +145,7 @@ export default function RegisterPage() {
   function validateStep2(): boolean {
     if (!form.pharmacyName.trim()) { setError("Nama apotek wajib diisi."); return false; }
     if (form.pharmacyName.trim().length < 2) { setError("Nama apotek terlalu pendek."); return false; }
+    if (slugAvailable === false) { setError("Nama apotek sudah digunakan. Coba nama lain."); return false; }
     return true;
   }
 
@@ -113,7 +169,7 @@ export default function RegisterPage() {
       password: form.password,
       displayName: form.displayName.trim(),
       pharmacyName: form.pharmacyName.trim(),
-      pharmacySlug: "",
+      pharmacySlug: slugPreview,
       location: form.location.trim() || undefined,
     });
 
@@ -225,25 +281,53 @@ export default function RegisterPage() {
                 <label className="mb-1 block text-[10px] font-medium text-neutral-500">
                   Password
                 </label>
-                <input
-                  type="password"
-                  value={form.password}
-                  onChange={(e) => update("password", e.target.value)}
-                  placeholder="Minimal 8 karakter"
-                  className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={form.password}
+                    onChange={(e) => update("password", e.target.value)}
+                    placeholder="Minimal 8 karakter"
+                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 pr-10 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowPassword((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                    tabIndex={-1}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
               <div>
                 <label className="mb-1 block text-[10px] font-medium text-neutral-500">
                   Konfirmasi Password
                 </label>
-                <input
-                  type="password"
-                  value={form.confirmPassword}
-                  onChange={(e) => update("confirmPassword", e.target.value)}
-                  placeholder="Ulangi password"
-                  className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-500"
-                />
+                <div className="relative">
+                  <input
+                    type={showConfirm ? "text" : "password"}
+                    value={form.confirmPassword}
+                    onChange={(e) => update("confirmPassword", e.target.value)}
+                    placeholder="Ulangi password"
+                    className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 pr-10 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-500"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirm((v) => !v)}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600"
+                    tabIndex={-1}
+                  >
+                    {showConfirm ? (
+                      <EyeOff className="h-4 w-4" />
+                    ) : (
+                      <Eye className="h-4 w-4" />
+                    )}
+                  </button>
+                </div>
               </div>
             </div>
           </div>
@@ -279,6 +363,38 @@ export default function RegisterPage() {
                   className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-900 placeholder:text-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder:text-neutral-500"
                 />
               </div>
+
+              {/* Slug preview */}
+              {slugPreview && (
+                <div className="rounded-lg border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
+                  <p className="text-[10px] font-medium text-neutral-400 uppercase mb-1">
+                    URL Apotek
+                  </p>
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-neutral-700 dark:text-neutral-300 font-mono">
+                      {slugPreview}.apotek-manage.id
+                    </span>
+                    {isCheckingSlug ? (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-neutral-400" />
+                    ) : slugAvailable === true ? (
+                      <CheckCircle className="h-3.5 w-3.5 text-green-500" />
+                    ) : slugAvailable === false ? (
+                      <XCircle className="h-3.5 w-3.5 text-red-500" />
+                    ) : null}
+                  </div>
+                  {slugAvailable === false && (
+                    <p className="mt-1 text-[10px] text-red-500">
+                      Nama ini sudah digunakan. Coba variasi lain.
+                    </p>
+                  )}
+                  {slugAvailable === true && (
+                    <p className="mt-1 text-[10px] text-green-600">
+                      URL tersedia untuk apotek Anda.
+                    </p>
+                  )}
+                </div>
+              )}
+
               <div>
                 <label className="mb-1 block text-[10px] font-medium text-neutral-500">
                   Alamat / Lokasi <span className="text-neutral-300">(opsional)</span>
@@ -350,7 +466,10 @@ export default function RegisterPage() {
             )}
             <button
               onClick={handleNext}
-              disabled={isSubmitting}
+              disabled={
+                isSubmitting ||
+                (step === 2 && (slugAvailable === false || isCheckingSlug))
+              }
               className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-5 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-60"
             >
               {isSubmitting ? (

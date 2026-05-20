@@ -1,14 +1,27 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuthStore } from "@/store/auth-store";
+import { useAuthStore, syncRepositoryContext, isLoginInProgress } from "@/store/auth-store";
 import { useCashierStore } from "@/store/cashier-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useHoldCartStore } from "@/store/hold-cart-store";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
+
+/* ------------------------------------------------------------------ */
+/*  Dev logging (stripped in production)                               */
+/* ------------------------------------------------------------------ */
+
+const DEV = process.env.NODE_ENV === "development";
+function devLog(...args: unknown[]) {
+  if (DEV) console.log("[auth-provider]", ...args);
+}
+
+/* ------------------------------------------------------------------ */
+/*  Constants                                                           */
+/* ------------------------------------------------------------------ */
 
 const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/unauthorized", "/offline"];
 
@@ -18,66 +31,185 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
+/** Total budget for the full session→profile→tenant hydration chain */
+const HYDRATION_TIMEOUT_MS = 12_000;
+
+/** Maximum time to wait for initFromSupabaseSession before giving up */
+const SESSION_CHECK_TIMEOUT_MS = 10_000;
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function clearAllDomainStores() {
+  useCashierStore.getState().resetCashier();
+  useTransactionStore.setState({
+    transactions: [],
+    isLoaded: false,
+    isLoading: false,
+    isDemoMode: isDemoMode(),
+  });
+  useInventoryStore.setState({
+    batches: [],
+    suppliers: [],
+    purchaseInvoices: [],
+    stockMovements: [],
+    stockOpnames: [],
+    dataSource: isDemoMode() ? "demo" : "loading",
+    isDemoMode: isDemoMode(),
+    isLoading: false,
+    isSubmitting: false,
+  });
+  useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
+}
+
+function clearAuthState() {
+  syncRepositoryContext(null);
+  useAuthStore.setState({
+    user: null,
+    isAuthenticated: false,
+    isLoading: false,
+    error: null,
+    impersonating: false,
+    originalUser: null,
+  });
+}
+
+/** Promise race with a timeout — rejects if timeout fires first */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Hydration timeout: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+}
+
+/* ------------------------------------------------------------------ */
+/*  AuthProvider                                                        */
+/* ------------------------------------------------------------------ */
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHydrating, setIsHydrating] = useState(true);
+  const [hydrationError, setHydrationError] = useState<string | null>(null);
   const initFromSupabaseSession = useAuthStore((s) => s.initFromSupabaseSession);
   const router = useRouter();
   const pathname = usePathname();
 
-  // If on a public path (login, register, etc.), skip hydration and show page immediately
+  /* Refs to survive React strict-mode double-mount */
+  const hydratingRef = useRef(false);
+  const hydrationTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   const isPublic = isPublicPath(pathname);
 
+  /* ---- Phase 1: Initial hydration (protected routes only) ---- */
   useEffect(() => {
-    // Public pages don't need auth check — show content right away
+    /* Public routes never block — render immediately */
     if (isPublic) {
+      devLog("public path, skip hydration:", pathname);
       setIsHydrating(false);
       return;
     }
 
+    /* Already authenticated (navigation between protected routes) */
+    const { isAuthenticated, user } = useAuthStore.getState();
+    if (isAuthenticated && user) {
+      devLog("already authenticated, skip hydration. role =", user.role);
+      setIsHydrating(false);
+      return;
+    }
+
+    /* Prevent duplicate concurrent hydrations (React strict mode) */
+    if (hydratingRef.current) {
+      devLog("hydration in progress, skip duplicate");
+      return;
+    }
+
     let cancelled = false;
+    hydratingRef.current = true;
+
+    /* Global timeout — if hydration hangs, show error instead of spinner forever */
+    hydrationTimerRef.current = setTimeout(() => {
+      if (cancelled) return;
+      devLog("hydration timeout — forcing fallback");
+      setHydrationError("Gagal memulihkan sesi: waktu tunggu habis. Periksa koneksi internet Anda.");
+      setIsHydrating(false);
+      hydratingRef.current = false;
+    }, HYDRATION_TIMEOUT_MS);
 
     async function hydrate() {
+      devLog("hydrate: start for", pathname);
+
       try {
-        // 1. Try Supabase session
+        /* 1. Supabase session (with sub-timeout) */
         if (isSupabaseConnected()) {
-          const restored = await initFromSupabaseSession();
-          if (restored && !cancelled) {
-            setIsHydrating(false);
-            return;
+          devLog("hydrate: checking supabase session");
+          try {
+            await withTimeout(
+              initFromSupabaseSession(),
+              SESSION_CHECK_TIMEOUT_MS,
+              "initFromSupabaseSession",
+            );
+            if (!cancelled && useAuthStore.getState().isAuthenticated) {
+              devLog("hydrate: session restored, role =", useAuthStore.getState().user?.role);
+              clearTimeout(hydrationTimerRef.current!);
+              setIsHydrating(false);
+              hydratingRef.current = false;
+              return;
+            }
+          } catch (err) {
+            devLog("hydrate: session check timed out or failed", err);
+            /* Continue — might be demo mode or redirect to login */
           }
+        } else {
+          devLog("hydrate: supabase not connected");
         }
 
-        // 2. Demo mode: check localStorage
-        if (isDemoMode() && !cancelled) {
+        if (cancelled) return;
+
+        /* 2. Demo mode fallback */
+        if (isDemoMode()) {
+          devLog("hydrate: demo mode active");
           try {
             const stored = localStorage.getItem("apotek-auth");
             if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.user && parsed.isAuthenticated) {
+                devLog("hydrate: demo session from localStorage");
+                clearTimeout(hydrationTimerRef.current!);
                 setIsHydrating(false);
+                hydratingRef.current = false;
                 return;
               }
             }
           } catch {
-            /* ignore */
+            /* corrupt storage — ignore */
           }
-          // Auto-login as tenant_owner
+
           if (!useAuthStore.getState().isAuthenticated) {
+            devLog("hydrate: auto-login as tenant_owner");
             useAuthStore.getState().loginAs("tenant_owner");
           }
+          clearTimeout(hydrationTimerRef.current!);
           setIsHydrating(false);
+          hydratingRef.current = false;
           return;
         }
 
-        // 3. Production: no session → redirect to /login
+        /* 3. Production with no session → redirect to /login */
         if (!cancelled) {
+          devLog("hydrate: no session, redirect /login");
           router.replace("/login");
+          clearTimeout(hydrationTimerRef.current!);
           setIsHydrating(false);
+          hydratingRef.current = false;
         }
       } catch (err) {
-        console.error("Auth hydration error:", err);
+        devLog("hydrate: unexpected error", err);
         if (!cancelled) {
+          setHydrationError("Gagal memulihkan sesi. Silakan muat ulang halaman.");
+          clearTimeout(hydrationTimerRef.current!);
           setIsHydrating(false);
+          hydratingRef.current = false;
         }
       }
     }
@@ -86,61 +218,63 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       cancelled = true;
+      if (hydrationTimerRef.current) {
+        clearTimeout(hydrationTimerRef.current);
+        hydrationTimerRef.current = null;
+      }
+      hydratingRef.current = false;
     };
-  }, [isPublic, initFromSupabaseSession, router]);
+    /* eslint-disable-next-line react-hooks/exhaustive-deps —
+     * router and pathname are needed for redirect + logging. initFromSupabaseSession
+     * is stable (zustand selector). isPublic changes on navigation between public
+     * and protected routes — that's intentional. */
+  }, [isPublic, initFromSupabaseSession, router, pathname]);
 
-  // Listen for Supabase auth state changes (only when connected)
+  /* ---- Phase 2: Live auth state listener (Supabase only) ---- */
   useEffect(() => {
-    if (!isSupabaseConnected()) return;
+    if (!isSupabaseConnected()) {
+      devLog("auth listener: supabase not connected, skipping");
+      return;
+    }
+
+    devLog("auth listener: subscribing to onAuthStateChange");
 
     const {
       data: { subscription },
     } = supabase!.auth.onAuthStateChange(async (event) => {
+      devLog("onAuthStateChange:", event);
+
       try {
         if (event === "SIGNED_OUT") {
-          useCashierStore.getState().resetCashier();
-          useTransactionStore.setState({
-            transactions: [],
-            isLoaded: false,
-            isLoading: false,
-            isDemoMode: isDemoMode(),
-          });
-          useInventoryStore.setState({
-            batches: [],
-            suppliers: [],
-            purchaseInvoices: [],
-            stockMovements: [],
-            stockOpnames: [],
-            dataSource: isDemoMode() ? "demo" : "loading",
-            isDemoMode: isDemoMode(),
-            isLoading: false,
-            isSubmitting: false,
-          });
-          useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
-          useAuthStore.setState({
-            user: null,
-            isAuthenticated: false,
-            isLoading: false,
-            error: null,
-            impersonating: false,
-            originalUser: null,
-          });
+          devLog("onAuthStateChange: SIGNED_OUT — clearing all state");
+          clearAllDomainStores();
+          clearAuthState();
           if (pathname !== "/login") {
             router.push("/login");
           }
         } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          /* If loginWithEmail is in progress, it handles the full profile chain.
+           * Calling initFromSupabaseSession here would race on the same queries. */
+          if (isLoginInProgress()) {
+            devLog("onAuthStateChange:", event, "— suppressed (login in progress)");
+            return;
+          }
+          devLog("onAuthStateChange:", event, "— re-initializing session");
           await initFromSupabaseSession();
         }
+        /* INITIAL_SESSION and USER_UPDATED are handled by the hydrate effect */
       } catch (err) {
-        console.error("Auth state change error:", err);
+        devLog("onAuthStateChange: error", err);
       }
     });
 
     return () => {
+      devLog("auth listener: unsubscribing");
       subscription.unsubscribe();
     };
   }, [initFromSupabaseSession, router, pathname]);
 
+  /* ---- Render: loading ---- */
   if (isHydrating) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950">
@@ -152,5 +286,58 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
   }
 
+  /* ---- Render: error fallback ---- */
+  if (hydrationError) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950">
+        <div className="flex flex-col items-center gap-4 max-w-sm text-center px-4">
+          <div className="rounded-full bg-red-100 p-3 dark:bg-red-900/20">
+            <svg
+              className="h-6 w-6 text-red-600"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+              strokeWidth={2}
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                d="M12 9v2m0 4h.01M21 12a9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+          </div>
+          <p className="text-sm text-neutral-600 dark:text-neutral-400">
+            {hydrationError}
+          </p>
+          <div className="flex gap-3">
+            <button
+              onClick={() => {
+                setHydrationError(null);
+                setIsHydrating(true);
+                window.location.reload();
+              }}
+              className="rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+            >
+              Muat Ulang
+            </button>
+            <button
+              onClick={() => {
+                clearAuthState();
+                clearAllDomainStores();
+                router.push("/login");
+                setHydrationError(null);
+                setIsHydrating(false);
+              }}
+              className="rounded-lg border border-neutral-200 bg-white px-4 py-2 text-sm font-medium text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors"
+            >
+              Ke Halaman Masuk
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  /* ---- Render: children ---- */
   return <>{children}</>;
 }

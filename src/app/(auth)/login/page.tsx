@@ -22,6 +22,8 @@ import { isDemoMode as checkDemoMode } from "@/config/env";
 import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
 import type { AppRole } from "@/types";
 
+const LOGIN_DEADLINE_MS = 30_000;
+
 export default function LoginPage() {
   const router = useRouter();
   const loginAs = useAuthStore((s) => s.loginAs);
@@ -55,13 +57,38 @@ export default function LoginPage() {
     }
 
     setIsSubmitting(true);
-    const result = await loginWithEmail(email.trim(), password);
-    setIsSubmitting(false);
 
-    if (result.success) {
-      router.push("/dashboard");
-    } else {
-      setError(result.error ?? "Gagal masuk. Coba lagi.");
+    /* Race loginWithEmail against a hard deadline.
+     * If loginWithEmail hangs (network drop, RLS stall, etc.),
+     * the deadline fires and the user gets a visible error + retry. */
+    let deadlineTimer: ReturnType<typeof setTimeout> | undefined;
+    const deadline = new Promise<never>((_, reject) => {
+      deadlineTimer = setTimeout(
+        () => reject(new Error("LOGIN_DEADLINE")),
+        LOGIN_DEADLINE_MS,
+      );
+    });
+
+    try {
+      const result = await Promise.race([
+        loginWithEmail(email.trim(), password),
+        deadline,
+      ]);
+      clearTimeout(deadlineTimer);
+      setIsSubmitting(false);
+
+      if (result.success) {
+        router.push("/dashboard");
+      } else {
+        setError(result.error ?? "Gagal masuk. Coba lagi.");
+      }
+    } catch {
+      /* Deadline fired — loginWithEmail hung/stalled */
+      clearTimeout(deadlineTimer);
+      setIsSubmitting(false);
+      setError(
+        "Login memakan waktu terlalu lama. Periksa koneksi internet Anda dan coba lagi.",
+      );
     }
   };
 

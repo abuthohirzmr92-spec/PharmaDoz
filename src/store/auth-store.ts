@@ -19,10 +19,29 @@ import { useInventoryStore } from "@/store/inventory-store";
 import { useHoldCartStore } from "@/store/hold-cart-store";
 
 /* ------------------------------------------------------------------ */
+/*  Dev logging (stripped in production)                               */
+/* ------------------------------------------------------------------ */
+
+const DEV = process.env.NODE_ENV === "development";
+function devLog(...args: unknown[]) {
+  if (DEV) console.log("[auth]", ...args);
+}
+
+/**
+ * Module-level flag to prevent the SIGNED_IN → initFromSupabaseSession
+ * race when loginWithEmail is already handling the full profile chain.
+ */
+let loginInProgress = false;
+
+export function isLoginInProgress(): boolean {
+  return loginInProgress;
+}
+
+/* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-function syncRepositoryContext(user: UserProfile | null) {
+export function syncRepositoryContext(user: UserProfile | null) {
   if (user && user.tenantId && user.role) {
     const ctx = { tenantId: user.tenantId, role: user.role, userId: user.id };
     productRepo.setTenantContext(ctx);
@@ -31,7 +50,6 @@ function syncRepositoryContext(user: UserProfile | null) {
     transactionRepo.setTenantContext(ctx);
     authRepo.setTenantContext(ctx);
   } else if (user && user.pharmacyId) {
-    // Legacy fallback: use pharmacyId as tenantId
     const ctx = { tenantId: user.pharmacyId, role: user.role, userId: user.id };
     productRepo.setTenantContext(ctx);
     supplierRepo.setTenantContext(ctx);
@@ -67,6 +85,15 @@ function clearDomainStores() {
     isSubmitting: false,
   });
   useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
+}
+
+/** Promise-based timeout guard for hydration operations */
+function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timer: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<never>((_, reject) => {
+    timer = setTimeout(() => reject(new Error(`Hydration timeout: ${label}`)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
 }
 
 /* ------------------------------------------------------------------ */
@@ -171,7 +198,7 @@ interface AuthState {
   getRole: () => AppRole | null;
   isSystemUser: () => boolean;
   getPharmacyId: () => string | undefined;
-  isDemoMode: () => boolean;
+  isStoreDemoMode: () => boolean;
   isSessionExpired: () => boolean;
 }
 
@@ -245,152 +272,285 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!isSupabaseConnected()) {
       return {
         success: false,
-        error: "Supabase tidak tersedia. Gunakan NEXT_PUBLIC_DEMO_MODE=true untuk development.",
+        error: "Layanan autentikasi tidak tersedia. Coba lagi nanti.",
       };
     }
 
+    if (loginInProgress) {
+      return { success: false, error: "Proses login sedang berjalan. Tunggu sebentar." };
+    }
+
+    loginInProgress = true;
     set({ isLoading: true, error: null });
+    devLog("loginWithEmail: starting for", email);
 
-    const { data, error } = await supabase!.auth.signInWithPassword({
-      email,
-      password,
-    });
+    try {
+      /* Step 1: Supabase auth (15s timeout) */
+      const { data, error } = await withTimeout(
+        supabase!.auth.signInWithPassword({ email, password }),
+        15000,
+        "signInWithPassword",
+      );
 
-    if (error) {
-      set({ isLoading: false });
-      return {
-        success: false,
-        error:
+      if (error) {
+        set({ isLoading: false });
+        devLog("loginWithEmail: auth error", error.message);
+        const msg =
           error.message === "Invalid login credentials"
             ? "Email atau password salah."
-            : error.message,
-      };
-    }
+            : error.message.includes("Email not confirmed")
+              ? "Email belum diverifikasi. Cek inbox Anda."
+              : error.message.includes("rate limit")
+                ? "Terlalu banyak percobaan. Coba lagi nanti."
+                : "Gagal masuk: " + error.message;
+        return { success: false, error: msg };
+      }
 
-    if (!data.user) {
-      set({ isLoading: false });
-      return { success: false, error: "Gagal mendapatkan data pengguna." };
-    }
+      if (!data.user) {
+        set({ isLoading: false });
+        return { success: false, error: "Gagal mendapatkan data pengguna." };
+      }
 
-    // Resolve user profile — create on first login if missing
-    const supabaseUser = data.user;
-    let profile = await authRepo.getUserBySupabaseUid(supabaseUser.id);
+      const supabaseUser = data.user;
 
-    if (!profile) {
-      // First login — auto-create profile from Supabase auth user
-      profile = await authRepo.ensureProfile({
-        id: supabaseUser.id,
-        email: supabaseUser.email ?? email,
-        displayName: supabaseUser.user_metadata?.display_name ?? email,
+      /* Step 2: Profile lookup (8s timeout — prevents RLS/network hang) */
+      let profile: UserProfile | null = null;
+      try {
+        profile = await withTimeout(
+          authRepo.getUserBySupabaseUid(supabaseUser.id),
+          8000,
+          "getUserBySupabaseUid",
+        );
+        devLog("loginWithEmail: profile lookup complete, found =", !!profile);
+      } catch (profileErr) {
+        devLog("loginWithEmail: profile lookup failed", profileErr);
+        set({ isLoading: false });
+        return {
+          success: false,
+          error: "Gagal mengambil profil. Periksa koneksi internet Anda.",
+        };
+      }
+
+      /* Step 3: Ensure profile exists (8s timeout — prevents RLS/network hang) */
+      if (!profile) {
+        devLog("loginWithEmail: profile missing, running ensureProfile");
+        try {
+          profile = await withTimeout(
+            authRepo.ensureProfile({
+              id: supabaseUser.id,
+              email: supabaseUser.email ?? email,
+              displayName: supabaseUser.user_metadata?.display_name ?? email,
+            }),
+            8000,
+            "ensureProfile",
+          );
+        } catch (ensureErr) {
+          devLog("loginWithEmail: ensureProfile failed", ensureErr);
+          set({ isLoading: false });
+          return {
+            success: false,
+            error: "Gagal membuat profil. Hubungi Super Admin.",
+          };
+        }
+      }
+
+      if (!profile) {
+        await supabase!.auth.signOut().catch(() => {});
+        set({ isLoading: false });
+        return {
+          success: false,
+          error: "Gagal membuat profil. Hubungi Super Admin.",
+        };
+      }
+
+      syncRepositoryContext(profile);
+      set({
+        user: profile,
+        isAuthenticated: true,
+        isLoading: false,
+        lastActiveAt: new Date().toISOString(),
+        error: null,
       });
-    }
 
-    if (!profile) {
-      await supabase!.auth.signOut();
+      devLog("loginWithEmail: success, role =", profile.role);
+      return { success: true };
+    } catch (err) {
+      devLog("loginWithEmail: exception", err);
       set({ isLoading: false });
       return {
         success: false,
-        error: "Gagal membuat profil pengguna. Hubungi Super Admin.",
+        error: "Jaringan bermasalah. Periksa koneksi internet Anda.",
       };
+    } finally {
+      loginInProgress = false;
     }
-
-    syncRepositoryContext(profile);
-    set({
-      user: profile,
-      isAuthenticated: true,
-      isLoading: false,
-      lastActiveAt: new Date().toISOString(),
-      error: null,
-    });
-
-    return { success: true };
   },
 
   /* ---- Supabase: signUp ---- */
   signUp: async (email, password, displayName) => {
     if (!isSupabaseConnected()) {
-      return { success: false, error: "Supabase tidak tersedia." };
+      return { success: false, error: "Layanan pendaftaran tidak tersedia." };
     }
 
     set({ isLoading: true, error: null });
+    devLog("signUp: starting for", email);
 
-    const { data, error } = await supabase!.auth.signUp({
-      email,
-      password,
-      options: {
-        data: { display_name: displayName },
-      },
-    });
+    try {
+      const { data, error } = await supabase!.auth.signUp({
+        email,
+        password,
+        options: { data: { display_name: displayName } },
+      });
 
-    if (error) {
+      if (error) {
+        set({ isLoading: false });
+        const msg =
+          error.message === "User already registered"
+            ? "Email sudah terdaftar. Silakan masuk."
+            : error.message.includes("rate limit")
+              ? "Terlalu banyak percobaan. Coba lagi nanti."
+              : "Gagal mendaftar: " + error.message;
+        return { success: false, error: msg };
+      }
+
       set({ isLoading: false });
-      const msg =
-        error.message === "User already registered"
-          ? "Email sudah terdaftar. Silakan masuk."
-          : error.message;
-      return { success: false, error: msg };
+      devLog("signUp: success, userId =", data.user?.id);
+      return { success: true, userId: data.user?.id };
+    } catch (err) {
+      devLog("signUp: exception", err);
+      set({ isLoading: false });
+      return { success: false, error: "Jaringan bermasalah. Periksa koneksi internet Anda." };
     }
-
-    set({ isLoading: false });
-    return { success: true, userId: data.user?.id };
   },
 
   /* ---- Supabase: initFromSupabaseSession ---- */
   initFromSupabaseSession: async () => {
-    if (!isSupabaseConnected()) return false;
-
-    const { data } = await supabase!.auth.getSession();
-    if (!data.session?.user) return false;
-
-    const supabaseUser = data.session.user;
-    let profile = await authRepo.getUserBySupabaseUid(supabaseUser.id);
-
-    if (!profile) {
-      profile = await authRepo.ensureProfile({
-        id: supabaseUser.id,
-        email: supabaseUser.email ?? "",
-        displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email ?? "",
-      });
+    if (!isSupabaseConnected()) {
+      devLog("initFromSupabaseSession: not connected");
+      return false;
     }
 
-    if (!profile) return false;
+    /* If loginWithEmail is in progress, don't race — it handles everything */
+    if (loginInProgress) {
+      devLog("initFromSupabaseSession: login in progress, deferring to loginWithEmail");
+      return false;
+    }
 
-    syncRepositoryContext(profile);
-    set({
-      user: profile,
-      isAuthenticated: true,
-      isLoading: false,
-      lastActiveAt: new Date().toISOString(),
-      error: null,
-    });
+    /* Prevent duplicate concurrent initializations */
+    const state = get();
+    if (state.isAuthenticated && state.user) {
+      devLog("initFromSupabaseSession: already authenticated, skipping");
+      return true;
+    }
 
-    return true;
+    devLog("initFromSupabaseSession: checking session...");
+
+    try {
+      const { data } = await withTimeout(
+        supabase!.auth.getSession(),
+        8000,
+        "getSession",
+      );
+
+      if (!data.session?.user) {
+        devLog("initFromSupabaseSession: no session");
+        return false;
+      }
+
+      const supabaseUser = data.session.user;
+
+      /* Profile lookup (8s timeout) */
+      let profile: UserProfile | null = null;
+      try {
+        profile = await withTimeout(
+          authRepo.getUserBySupabaseUid(supabaseUser.id),
+          8000,
+          "getUserBySupabaseUid",
+        );
+      } catch {
+        devLog("initFromSupabaseSession: profile lookup timed out");
+        set({ isLoading: false });
+        return false;
+      }
+
+      /* Ensure profile (8s timeout) */
+      if (!profile) {
+        devLog("initFromSupabaseSession: profile missing, running ensureProfile");
+        try {
+          profile = await withTimeout(
+            authRepo.ensureProfile({
+              id: supabaseUser.id,
+              email: supabaseUser.email ?? "",
+              displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email ?? "",
+            }),
+            8000,
+            "ensureProfile",
+          );
+        } catch {
+          devLog("initFromSupabaseSession: ensureProfile timed out");
+          set({ isLoading: false });
+          return false;
+        }
+      }
+
+      if (!profile) {
+        devLog("initFromSupabaseSession: profile creation failed");
+        set({ isLoading: false });
+        return false;
+      }
+
+      syncRepositoryContext(profile);
+      set({
+        user: profile,
+        isAuthenticated: true,
+        isLoading: false,
+        lastActiveAt: new Date().toISOString(),
+        error: null,
+      });
+
+      devLog("initFromSupabaseSession: success, role =", profile.role);
+      return true;
+    } catch (err) {
+      devLog("initFromSupabaseSession: exception", err);
+      set({ isLoading: false });
+      return false;
+    }
   },
 
   /* ---- refreshUserProfile ---- */
   refreshUserProfile: async () => {
     if (!isSupabaseConnected()) return false;
 
-    const { data } = await supabase!.auth.getSession();
-    if (!data.session?.user) return false;
+    try {
+      const { data } = await supabase!.auth.getSession();
+      if (!data.session?.user) return false;
 
-    const profile = await authRepo.getUserBySupabaseUid(data.session.user.id);
-    if (!profile) return false;
+      const profile = await authRepo.getUserBySupabaseUid(data.session.user.id);
+      if (!profile) return false;
 
-    syncRepositoryContext(profile);
-    set({
-      user: profile,
-      isAuthenticated: true,
-      isLoading: false,
-    });
+      syncRepositoryContext(profile);
+      set({
+        user: profile,
+        isAuthenticated: true,
+        isLoading: false,
+      });
 
-    return true;
+      return true;
+    } catch {
+      return false;
+    }
   },
 
   /* ---- logout (shared, async) ---- */
   logout: async () => {
-    if (isSupabaseConnected()) {
-      await supabase!.auth.signOut();
+    devLog("logout: signing out");
+
+    try {
+      if (isSupabaseConnected()) {
+        await supabase!.auth.signOut();
+      }
+    } catch {
+      // signOut failed — still clear local state
     }
 
     clearDomainStores();
@@ -408,6 +568,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       impersonating: false,
       originalUser: null,
     });
+
+    devLog("logout: complete");
   },
 
   /* ---- Session actions ---- */
@@ -446,7 +608,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   getPharmacyId: () => get().user?.pharmacyId,
 
-  isDemoMode: () => !isSupabaseConnected(),
+  /* Use the actual env check — NOT "supabase not connected" */
+  isStoreDemoMode: () => isDemoMode(),
 
   isSessionExpired: () => {
     const { user, lastActiveAt } = get();
@@ -455,8 +618,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   },
 }));
 
-/* ---- Demo mode localStorage hydration ---- */
-if (typeof window !== "undefined") {
+/* ------------------------------------------------------------------ */
+/*  Demo-only: localStorage hydration (does NOT run in production)      */
+/* ------------------------------------------------------------------ */
+
+if (typeof window !== "undefined" && isDemoMode()) {
   const stored = localStorage.getItem("apotek-auth");
   if (stored) {
     try {
@@ -476,9 +642,12 @@ if (typeof window !== "undefined") {
   }
 }
 
-/* ---- localStorage persistence ---- */
-useAuthStore.subscribe((state) => {
-  if (typeof window !== "undefined") {
+/* ------------------------------------------------------------------ */
+/*  Demo-only: localStorage persistence (does NOT run in production)    */
+/* ------------------------------------------------------------------ */
+
+if (typeof window !== "undefined" && isDemoMode()) {
+  useAuthStore.subscribe((state) => {
     if (state.user && state.isAuthenticated) {
       localStorage.setItem(
         "apotek-auth",
@@ -491,8 +660,8 @@ useAuthStore.subscribe((state) => {
     } else {
       localStorage.removeItem("apotek-auth");
     }
-  }
-});
+  });
+}
 
 /* ------------------------------------------------------------------ */
 /*  Session staleness hook                                             */

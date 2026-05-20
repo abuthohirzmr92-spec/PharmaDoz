@@ -6,6 +6,7 @@ import { LogOut, Building2, Wifi, WifiOff } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 
 interface SessionPanelProps {
@@ -17,7 +18,7 @@ export function SessionPanel({ collapsed }: SessionPanelProps) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isDemo = checkDemoMode();
-  const isConnected = useAuthStore((s) => !s.isDemoMode());
+  const isConnected = isSupabaseConnected();
   const logout = useAuthStore((s) => s.logout);
 
   if (!user) return null;

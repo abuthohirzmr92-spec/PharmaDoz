@@ -1,5 +1,8 @@
 import { supabase } from "@/lib/supabase/client";
 
+/** Maximum time for the full registration flow */
+export const REGISTRATION_TIMEOUT_MS = 30_000;
+
 export interface RegisterInput {
   email: string;
   password: string;
@@ -16,12 +19,40 @@ export interface RegisterResult {
   tenantId?: string;
 }
 
-function generateSlug(name: string): string {
+export function generateSlug(name: string): string {
   return name
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/^-|-$/g, "")
     .slice(0, 60);
+}
+
+export interface PreValidateResult {
+  valid: boolean;
+  error?: string;
+  slug: string;
+  slugAvailable?: boolean;
+}
+
+/**
+ * Quick pre-validation before the full registration flow.
+ * Checks slug availability without creating any resources.
+ */
+export async function preValidateRegistration(input: {
+  pharmacyName: string;
+}): Promise<PreValidateResult> {
+  const slug = generateSlug(input.pharmacyName);
+
+  if (slug.length < 2) {
+    return { valid: false, error: "Nama apotek terlalu pendek.", slug };
+  }
+
+  const available = await checkSlugAvailability(slug);
+  if (!available) {
+    return { valid: false, error: "Nama apotek sudah digunakan. Coba nama lain.", slug, slugAvailable: false };
+  }
+
+  return { valid: true, slug, slugAvailable: true };
 }
 
 /**

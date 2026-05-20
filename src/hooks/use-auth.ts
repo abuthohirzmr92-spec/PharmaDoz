@@ -32,5 +32,5 @@ export function usePharmacyName(): string | undefined {
 }
 
 export function useIsDemoMode(): boolean {
-  return useAuthStore((s) => s.isDemoMode());
+  return useAuthStore((s) => s.isStoreDemoMode());
 }

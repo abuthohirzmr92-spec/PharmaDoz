@@ -10,6 +10,8 @@ const PUBLIC_PATHS = new Set([
   "/offline",
 ]);
 
+const ADMIN_PREFIX = "/admin";
+
 const ASSET_PREFIXES = ["/_next", "/api", "/favicon.ico"];
 
 function isPublicPath(pathname: string): boolean {
@@ -18,6 +20,10 @@ function isPublicPath(pathname: string): boolean {
     ASSET_PREFIXES.some((p) => pathname.startsWith(p)) ||
     pathname.includes(".")
   );
+}
+
+function isAdminPath(pathname: string): boolean {
+  return pathname.startsWith(ADMIN_PREFIX);
 }
 
 export async function proxy(request: NextRequest) {
@@ -71,6 +77,19 @@ export async function proxy(request: NextRequest) {
   if (!session) {
     const loginUrl = new URL("/login", request.url);
     return NextResponse.redirect(loginUrl);
+  }
+
+  /* ---- Admin routes: require super_admin role ---- */
+  if (isAdminPath(request.nextUrl.pathname)) {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single();
+
+    if (profileError || !profile || profile.role !== "super_admin") {
+      return NextResponse.redirect(new URL("/unauthorized", request.url));
+    }
   }
 
   return response;
