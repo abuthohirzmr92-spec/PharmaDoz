@@ -1,16 +1,21 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { useTransactionStore } from "@/store/transaction-store";
 import { computeSalesTrend } from "@/lib/report-aggregate";
 import { resolveDateRange } from "@/lib/date-utils";
 
 export function SalesChartCard() {
+  const [mounted, setMounted] = useState(false);
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isLoaded = useTransactionStore((s) => s.isLoaded);
   const isLoading = useTransactionStore((s) => s.isLoading);
   const transactions = useTransactionStore((s) => s.transactions);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   useEffect(() => {
     if (!isLoaded) loadTxns();
@@ -20,7 +25,7 @@ export function SalesChartCard() {
   const trend = useMemo(() => computeSalesTrend(transactions, range), [transactions, range]);
   const hasData = useMemo(() => trend.some((d) => d.total > 0), [trend]);
 
-  if (isLoading) {
+  if (!mounted || isLoading) {
     return (
       <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
         <div className="flex items-center justify-center py-12">

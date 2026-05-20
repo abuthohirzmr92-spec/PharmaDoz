@@ -629,6 +629,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   loadDemoData: async () => {
     const state = get();
+    // Prevent concurrent parallel loads from multiple components
+    if (state.isLoading) return;
     // Skip if already loaded from database
     if (state.dataSource === "database" && state.batches.length > 0) return;
     // Skip if already loaded demo data
@@ -690,7 +692,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         isLoading: false,
       });
     } else {
-      set({ isLoading: false });
+      set({ dataSource: "database", isLoading: false });
     }
   },
 }));

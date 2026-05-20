@@ -6,6 +6,7 @@ import { LowStockCard } from "@/components/dashboard/low-stock-card";
 import { NearExpiryCard } from "@/components/dashboard/near-expiry-card";
 import { SupplierDebtCard } from "@/components/dashboard/supplier-debt-card";
 import { RecentTransactionsCard } from "@/components/dashboard/recent-transactions-card";
+import { WidgetErrorBoundary } from "@/components/shared/widget-error-boundary";
 
 export default function DashboardPage() {
   return (
@@ -20,28 +21,42 @@ export default function DashboardPage() {
       </div>
 
       {/* Row 1: Stat cards */}
-      <DashboardStatsGrid />
+      <WidgetErrorBoundary title="Ringkasan">
+        <DashboardStatsGrid />
+      </WidgetErrorBoundary>
 
       {/* Row 2: Sales chart + Top products */}
       <div className="mt-6 grid gap-6 lg:grid-cols-3">
         <div className="lg:col-span-2">
-          <SalesChartCard />
+          <WidgetErrorBoundary title="Tren Penjualan">
+            <SalesChartCard />
+          </WidgetErrorBoundary>
         </div>
         <div>
-          <TopProductsCard />
+          <WidgetErrorBoundary title="Produk Terlaris">
+            <TopProductsCard />
+          </WidgetErrorBoundary>
         </div>
       </div>
 
       {/* Row 3: Low stock + Near expiry */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <LowStockCard />
-        <NearExpiryCard />
+        <WidgetErrorBoundary title="Stok Menipis">
+          <LowStockCard />
+        </WidgetErrorBoundary>
+        <WidgetErrorBoundary title="Kadaluarsa">
+          <NearExpiryCard />
+        </WidgetErrorBoundary>
       </div>
 
       {/* Row 4: Supplier debt + Recent transactions */}
       <div className="mt-6 grid gap-6 lg:grid-cols-2">
-        <SupplierDebtCard />
-        <RecentTransactionsCard />
+        <WidgetErrorBoundary title="Hutang Supplier">
+          <SupplierDebtCard />
+        </WidgetErrorBoundary>
+        <WidgetErrorBoundary title="Transaksi Terbaru">
+          <RecentTransactionsCard />
+        </WidgetErrorBoundary>
       </div>
     </Container>
   );
