@@ -12,19 +12,33 @@ import { isDemoMode } from "@/config/env";
 
 const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/unauthorized", "/offline"];
 
+function isPublicPath(pathname: string): boolean {
+  return PUBLIC_PATHS.some(
+    (p) => pathname === p || pathname.startsWith(p + "/"),
+  );
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHydrating, setIsHydrating] = useState(true);
-  const loginAs = useAuthStore((s) => s.loginAs);
   const initFromSupabaseSession = useAuthStore((s) => s.initFromSupabaseSession);
   const router = useRouter();
   const pathname = usePathname();
 
+  // If on a public path (login, register, etc.), skip hydration and show page immediately
+  const isPublic = isPublicPath(pathname);
+
   useEffect(() => {
+    // Public pages don't need auth check — show content right away
+    if (isPublic) {
+      setIsHydrating(false);
+      return;
+    }
+
     let cancelled = false;
 
     async function hydrate() {
       try {
-        // 1. Try Supabase session first
+        // 1. Try Supabase session
         if (isSupabaseConnected()) {
           const restored = await initFromSupabaseSession();
           if (restored && !cancelled) {
@@ -33,42 +47,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
         }
 
-        // 2. Demo mode: check localStorage for persisted demo session
+        // 2. Demo mode: check localStorage
         if (isDemoMode() && !cancelled) {
-          const stored =
-            typeof window !== "undefined"
-              ? localStorage.getItem("apotek-auth")
-              : null;
-          if (stored) {
-            try {
+          try {
+            const stored = localStorage.getItem("apotek-auth");
+            if (stored) {
               const parsed = JSON.parse(stored);
               if (parsed.user && parsed.isAuthenticated) {
                 setIsHydrating(false);
                 return;
               }
-            } catch {
-              /* ignore corrupt storage */
             }
+          } catch {
+            /* ignore */
           }
-        }
-
-        // 3. Demo mode: auto-login as tenant_owner for convenience
-        if (isDemoMode() && !cancelled) {
+          // Auto-login as tenant_owner
           if (!useAuthStore.getState().isAuthenticated) {
-            loginAs("tenant_owner");
+            useAuthStore.getState().loginAs("tenant_owner");
           }
           setIsHydrating(false);
           return;
         }
 
-        // 4. Production: no session → redirect to /login
+        // 3. Production: no session → redirect to /login
         if (!cancelled) {
-          const isPublic = PUBLIC_PATHS.some(
-            (p) => pathname === p || pathname.startsWith(p + "/"),
-          );
-          if (!isPublic) {
-            router.replace("/login");
-          }
+          router.replace("/login");
           setIsHydrating(false);
         }
       } catch (err) {
@@ -84,9 +87,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [loginAs, initFromSupabaseSession, pathname, router]);
+  }, [isPublic, initFromSupabaseSession, router]);
 
-  // Listen for Supabase auth state changes
+  // Listen for Supabase auth state changes (only when connected)
   useEffect(() => {
     if (!isSupabaseConnected()) return;
 
@@ -95,7 +98,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } = supabase!.auth.onAuthStateChange(async (event) => {
       try {
         if (event === "SIGNED_OUT") {
-          // Clear domain stores to prevent tenant/session leakage
           useCashierStore.getState().resetCashier();
           useTransactionStore.setState({
             transactions: [],
@@ -115,12 +117,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             isSubmitting: false,
           });
           useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
-
           useAuthStore.setState({
             user: null,
             isAuthenticated: false,
             isLoading: false,
             error: null,
+            impersonating: false,
+            originalUser: null,
           });
           if (pathname !== "/login") {
             router.push("/login");
@@ -141,7 +144,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   if (isHydrating) {
     return (
       <div className="flex h-screen items-center justify-center bg-neutral-50 dark:bg-neutral-950">
-        <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+        <div className="flex flex-col items-center gap-3">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+          <p className="text-xs text-neutral-400">Memuat sesi...</p>
+        </div>
       </div>
     );
   }
