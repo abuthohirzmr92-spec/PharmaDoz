@@ -1,0 +1,278 @@
+import { BaseRepository } from "./base";
+import type { Tenant, TenantSummary, TenantPackage, PlatformStats, PlatformHealth, ActivityLog } from "@/types";
+
+export class SuperAdminRepository extends BaseRepository {
+  /* ------------------------------------------------------------------ */
+  /*  Tenant listing (cross-tenant — no tenant_id filter)                 */
+  /* ------------------------------------------------------------------ */
+
+  async getAllTenants(): Promise<TenantSummary[]> {
+    if (!this.isConnected) return [];
+
+    const { data, error } = await this.client
+      .from("tenants")
+      .select("*, profiles:tenant_users(count), expansions:store_expansion_requests(count)")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) return this.handleError(error, "getAllTenants");
+
+    return ((data as any[]) || []).map((t: any) => ({
+      pharmacyId: t.id,
+      pharmacyName: t.name,
+      packageName: (t.package_id ? this.resolvePackageName(t.package_id) : "basic") as TenantPackage,
+      ownerName: t.settings?.owner_name ?? "—",
+      userCount: t.profiles?.[0]?.count ?? 0,
+      branchCount: t.expansions?.[0]?.count ?? 0,
+      isActive: t.is_active ?? true,
+      lastActiveAt: t.settings?.last_active_at ?? null,
+      lastSyncAt: t.settings?.last_sync_at ?? null,
+      transactionVolume: t.settings?.transaction_volume ?? 0,
+      createdAt: t.created_at,
+    }));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Single tenant detail                                                */
+  /* ------------------------------------------------------------------ */
+
+  async getTenantDetail(tenantId: string): Promise<Tenant | null> {
+    if (!this.isConnected) return null;
+
+    const { data, error } = await this.client
+      .from("tenants")
+      .select("*")
+      .eq("id", tenantId)
+      .is("deleted_at", null)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      return this.handleError(error, "getTenantDetail");
+    }
+
+    const t = data as any;
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug,
+      domain: t.domain ?? null,
+      settings: t.settings ?? {},
+      isActive: t.is_active,
+      packageId: t.package_id ?? null,
+      createdAt: t.created_at ?? new Date().toISOString(),
+      updatedAt: t.updated_at ?? new Date().toISOString(),
+      deletedAt: t.deleted_at ?? null,
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Tenant status management                                            */
+  /* ------------------------------------------------------------------ */
+
+  async suspendTenant(tenantId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const { error } = await this.client
+      .from("tenants")
+      .update({ is_active: false, updated_at: new Date().toISOString() })
+      .eq("id", tenantId);
+
+    if (error) return this.handleError(error, "suspendTenant");
+    return true;
+  }
+
+  async activateTenant(tenantId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const { error } = await this.client
+      .from("tenants")
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq("id", tenantId);
+
+    if (error) return this.handleError(error, "activateTenant");
+    return true;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Platform stats (aggregate across all tenants)                       */
+  /* ------------------------------------------------------------------ */
+
+  async getPlatformStats(): Promise<PlatformStats> {
+    if (!this.isConnected) {
+      return {
+        totalPharmacies: 0,
+        totalUsers: 0,
+        pendingExpansions: 0,
+        activePackages: { basic: 0, professional: 0, enterprise: 0 },
+      };
+    }
+
+    const [tenantsRes, profilesRes, expansionsRes] = await Promise.all([
+      this.client.from("tenants").select("id, package_id, is_active").is("deleted_at", null),
+      this.client.from("profiles").select("id", { count: "exact" }).is("deleted_at", null),
+      this.client.from("store_expansion_requests").select("id", { count: "exact" }).eq("status", "pending"),
+    ]);
+
+    const tenants = (tenantsRes.data as any[]) || [];
+    const totalPharmacies = tenants.length;
+    const totalUsers = profilesRes.count ?? 0;
+    const pendingExpansions = expansionsRes.count ?? 0;
+
+    const packages = { basic: 0, professional: 0, enterprise: 0 };
+    for (const t of tenants) {
+      const pkg = this.resolvePackageName(t.package_id);
+      if (pkg in packages) packages[pkg as keyof typeof packages]++;
+    }
+
+    return { totalPharmacies, totalUsers, pendingExpansions, activePackages: packages };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Platform health snapshot                                            */
+  /* ------------------------------------------------------------------ */
+
+  async getPlatformHealth(): Promise<PlatformHealth> {
+    if (!this.isConnected) {
+      return {
+        activeTenants: 0,
+        totalTenants: 0,
+        failedTransactions24h: 0,
+        offlineTenants: 0,
+        syncFailures24h: 0,
+        activeMaintenances: 0,
+        quotaAlerts: 0,
+        updatedAt: new Date().toISOString(),
+      };
+    }
+
+    const [tenantsRes, syncFailuresRes] = await Promise.all([
+      this.client.from("tenants").select("id, is_active, settings").is("deleted_at", null),
+      this.client
+        .from("sync_queue")
+        .select("id", { count: "exact" })
+        .eq("status", "failed")
+        .gte("created_at", new Date(Date.now() - 86400000).toISOString()),
+    ]);
+
+    const tenants = (tenantsRes.data as any[]) || [];
+    const total = tenants.length;
+    const active = tenants.filter((t: any) => t.is_active).length;
+    const offline = tenants.filter(
+      (t: any) => t.settings?.last_heartbeat && (Date.now() - new Date(t.settings.last_heartbeat).getTime()) > 900000
+    ).length;
+
+    return {
+      activeTenants: active,
+      totalTenants: total,
+      failedTransactions24h: 0,
+      offlineTenants: offline,
+      syncFailures24h: syncFailuresRes.count ?? 0,
+      activeMaintenances: 0,
+      quotaAlerts: tenants.filter((t: any) => {
+        const max = 3; // basic default
+        const current = t.settings?.user_count ?? 0;
+        return current >= max;
+      }).length,
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Activity logs (cross-tenant view for super admin)                   */
+  /* ------------------------------------------------------------------ */
+
+  async getActivityLogs(limit = 50): Promise<ActivityLog[]> {
+    if (!this.isConnected) return [];
+
+    const { data, error } = await this.client
+      .from("activity_logs")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(limit);
+
+    if (error) return this.handleError(error, "getActivityLogs");
+
+    return ((data as any[]) || []).map((a: any) => ({
+      id: a.id,
+      tenantId: a.tenant_id ?? null,
+      actorId: a.actor_id,
+      action: a.action,
+      resourceType: a.resource_type,
+      resourceId: a.resource_id ?? null,
+      metadata: a.metadata ?? null,
+      ipAddress: a.ip_address ?? null,
+      createdAt: a.created_at,
+    }));
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  All users across tenants (super admin view)                         */
+  /* ------------------------------------------------------------------ */
+
+  async getAllUsers(): Promise<any[]> {
+    if (!this.isConnected) return [];
+
+    const { data, error } = await this.client
+      .from("profiles")
+      .select("*, tenant:tenant_id(id, name)")
+      .is("deleted_at", null)
+      .order("created_at", { ascending: false });
+
+    if (error) return this.handleError(error, "getAllUsers");
+
+    return (data as any[]) || [];
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Impersonation — resolve a user's full context                       */
+  /* ------------------------------------------------------------------ */
+
+  async resolveUserContext(userId: string): Promise<{
+    profile: any;
+    tenant: any | null;
+    tenantRole: string | null;
+  } | null> {
+    if (!this.isConnected) return null;
+
+    const { data: profile, error } = await this.client
+      .from("profiles")
+      .select("*, tenant:tenant_id(id, name, slug, settings)")
+      .eq("id", userId)
+      .is("deleted_at", null)
+      .single();
+
+    if (error) return null;
+
+    const p = profile as any;
+    const tenant = p.tenant ?? null;
+
+    let tenantRole: string | null = null;
+    if (tenant) {
+      const { data: tu } = await this.client
+        .from("tenant_users")
+        .select("role")
+        .eq("user_id", userId)
+        .eq("tenant_id", tenant.id)
+        .eq("is_active", true)
+        .single();
+      tenantRole = (tu as any)?.role ?? null;
+    }
+
+    return { profile: p, tenant, tenantRole };
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  Helpers                                                             */
+  /* ------------------------------------------------------------------ */
+
+  private resolvePackageName(packageId: string | null | undefined): string {
+    if (!packageId) return "basic";
+    const map: Record<string, string> = {
+      "pkg_basic": "basic",
+      "pkg_professional": "professional",
+      "pkg_enterprise": "enterprise",
+    };
+    return map[packageId] ?? "basic";
+  }
+}

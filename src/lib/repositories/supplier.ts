@@ -14,11 +14,14 @@ export class SupplierRepository extends BaseRepository {
   async getSuppliers(): Promise<Supplier[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("suppliers")
       .select("*")
       .is("deleted_at", null)
       .eq("is_active", true);
+    query = this.withTenantScope(query);
+
+    const { data, error } = await query;
 
     if (error) return this.handleError(error, "getSuppliers");
 
@@ -123,6 +126,8 @@ export class SupplierRepository extends BaseRepository {
       .select(`*, supplier:supplier_id(name)`)
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
+
+    query = this.withTenantScope(query);
 
     if (filters?.supplierId)
       query = query.eq("supplier_id", filters.supplierId);

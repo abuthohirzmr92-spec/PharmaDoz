@@ -73,7 +73,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         if (t) {
           setTenant(t);
           setTenantRole(user.role);
-          const ctx = { tenantId: t.id, role: user.role };
+          const ctx = { tenantId: t.id, role: user.role, userId: user.id };
           productRepo.setTenantContext(ctx);
           supplierRepo.setTenantContext(ctx);
           inventoryRepo.setTenantContext(ctx);

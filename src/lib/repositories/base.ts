@@ -1,4 +1,5 @@
 import { supabase } from "@/lib/supabase/client";
+import type { AppRole } from "@/types";
 
 export function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -18,7 +19,8 @@ export function mapRows<T>(rows: Record<string, unknown>[]): T[] {
 
 export interface TenantContext {
   tenantId: string;
-  role?: string;
+  role: AppRole;
+  userId: string;
 }
 
 export class BaseRepository {
@@ -39,10 +41,11 @@ export class BaseRepository {
   protected pharmacyId: string | undefined;
   protected tenantContext: TenantContext | undefined;
 
+  /** @deprecated Use setTenantContext with a full TenantContext object instead */
   setPharmacyContext(pharmacyId: string | undefined): void {
     this.pharmacyId = pharmacyId;
     if (pharmacyId) {
-      this.tenantContext = { tenantId: pharmacyId };
+      this.tenantContext = { tenantId: pharmacyId, role: "staff", userId: "" };
     } else {
       this.tenantContext = undefined;
     }

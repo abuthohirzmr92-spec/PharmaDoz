@@ -207,6 +207,19 @@ export interface TenantContext {
 }
 
 // ---------------------------------------------------------------------------
+// Tenant Branding — white-label theming per tenant
+// ---------------------------------------------------------------------------
+export interface TenantBranding {
+  logoUrl?: string | null;
+  primaryColor?: string | null;
+  secondaryColor?: string | null;
+  themeMode?: "light" | "dark" | "system";
+  customDomain?: string | null;
+  faviconUrl?: string | null;
+  companyName?: string | null;
+}
+
+// ---------------------------------------------------------------------------
 // API Types
 // ---------------------------------------------------------------------------
 export interface ApiResponse<T> {

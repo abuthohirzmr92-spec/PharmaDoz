@@ -23,12 +23,28 @@ import { useHoldCartStore } from "@/store/hold-cart-store";
 /* ------------------------------------------------------------------ */
 
 function syncRepositoryContext(user: UserProfile | null) {
-  const pharmacyId = user?.pharmacyId;
-  productRepo.setPharmacyContext(pharmacyId);
-  supplierRepo.setPharmacyContext(pharmacyId);
-  inventoryRepo.setPharmacyContext(pharmacyId);
-  transactionRepo.setPharmacyContext(pharmacyId);
-  authRepo.setPharmacyContext(pharmacyId);
+  if (user && user.tenantId && user.role) {
+    const ctx = { tenantId: user.tenantId, role: user.role, userId: user.id };
+    productRepo.setTenantContext(ctx);
+    supplierRepo.setTenantContext(ctx);
+    inventoryRepo.setTenantContext(ctx);
+    transactionRepo.setTenantContext(ctx);
+    authRepo.setTenantContext(ctx);
+  } else if (user && user.pharmacyId) {
+    // Legacy fallback: use pharmacyId as tenantId
+    const ctx = { tenantId: user.pharmacyId, role: user.role, userId: user.id };
+    productRepo.setTenantContext(ctx);
+    supplierRepo.setTenantContext(ctx);
+    inventoryRepo.setTenantContext(ctx);
+    transactionRepo.setTenantContext(ctx);
+    authRepo.setTenantContext(ctx);
+  } else {
+    productRepo.setTenantContext(undefined);
+    supplierRepo.setTenantContext(undefined);
+    inventoryRepo.setTenantContext(undefined);
+    transactionRepo.setTenantContext(undefined);
+    authRepo.setTenantContext(undefined);
+  }
 }
 
 function clearDomainStores() {
@@ -124,11 +140,22 @@ interface AuthState {
   loginAs: (role: AppRole) => void;
   switchRole: (role: AppRole) => void;
 
+  /* Impersonation (super admin only) */
+  impersonating: boolean;
+  originalUser: UserProfile | null;
+  impersonateUser: (targetProfile: UserProfile) => void;
+  endImpersonation: () => void;
+
   /* Supabase actions */
   loginWithEmail: (
     email: string,
     password: string,
   ) => Promise<{ success: boolean; error?: string }>;
+  signUp: (
+    email: string,
+    password: string,
+    displayName: string,
+  ) => Promise<{ success: boolean; error?: string; userId?: string }>;
   initFromSupabaseSession: () => Promise<boolean>;
   refreshUserProfile: () => Promise<boolean>;
 
@@ -154,6 +181,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isLoading: false,
   lastActiveAt: new Date().toISOString(),
   error: null,
+  impersonating: false,
+  originalUser: null,
 
   /* ---- Demo: loginAs ---- */
   loginAs: (role) => {
@@ -181,6 +210,34 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     const user = buildDemoUser(role);
     syncRepositoryContext(user);
     set({ user, error: null });
+  },
+
+  /* ---- Impersonation ---- */
+  impersonateUser: (targetProfile) => {
+    const current = get().user;
+    if (!current || !["super_admin"].includes(current.role)) {
+      set({ error: "Hanya Super Admin yang dapat melakukan impersonasi." });
+      return;
+    }
+    syncRepositoryContext(targetProfile);
+    set({
+      originalUser: current,
+      user: targetProfile,
+      impersonating: true,
+      error: null,
+    });
+  },
+
+  endImpersonation: () => {
+    const original = get().originalUser;
+    if (!original) return;
+    syncRepositoryContext(original);
+    set({
+      user: original,
+      originalUser: null,
+      impersonating: false,
+      error: null,
+    });
   },
 
   /* ---- Supabase: loginWithEmail ---- */
@@ -247,6 +304,35 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     });
 
     return { success: true };
+  },
+
+  /* ---- Supabase: signUp ---- */
+  signUp: async (email, password, displayName) => {
+    if (!isSupabaseConnected()) {
+      return { success: false, error: "Supabase tidak tersedia." };
+    }
+
+    set({ isLoading: true, error: null });
+
+    const { data, error } = await supabase!.auth.signUp({
+      email,
+      password,
+      options: {
+        data: { display_name: displayName },
+      },
+    });
+
+    if (error) {
+      set({ isLoading: false });
+      const msg =
+        error.message === "User already registered"
+          ? "Email sudah terdaftar. Silakan masuk."
+          : error.message;
+      return { success: false, error: msg };
+    }
+
+    set({ isLoading: false });
+    return { success: true, userId: data.user?.id };
   },
 
   /* ---- Supabase: initFromSupabaseSession ---- */
@@ -319,6 +405,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      impersonating: false,
+      originalUser: null,
     });
   },
 

@@ -15,10 +15,13 @@ export class InventoryRepository extends BaseRepository {
   async getBatches(): Promise<ProductBatch[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("product_batches")
       .select(`*, product:product_id(name)`)
       .is("deleted_at", null);
+    query = this.withTenantScope(query);
+
+    const { data, error } = await query;
 
     if (error) return this.handleError(error, "getBatches");
 
@@ -103,6 +106,7 @@ export class InventoryRepository extends BaseRepository {
         quantity: data.quantity,
         unit_price: data.unitPrice,
         selling_price: data.sellingPrice,
+        tenant_id: this.getTenantId(),
       })
       .select(`*, product:product_id(name)`)
       .single();
@@ -167,6 +171,8 @@ export class InventoryRepository extends BaseRepository {
       )
       .order("timestamp", { ascending: false });
 
+    query = this.withTenantScope(query);
+
     if (filters?.productId) query = query.eq("product_id", filters.productId);
     if (filters?.batchId) query = query.eq("batch_id", filters.batchId);
     if (filters?.movementType) query = query.eq("movement_type", filters.movementType);
@@ -228,6 +234,7 @@ export class InventoryRepository extends BaseRepository {
         reference_number: data.referenceNumber ?? null,
         note: data.note ?? null,
         user_id: data.userId ?? null,
+        tenant_id: this.getTenantId(),
       })
       .select(
         `
@@ -286,6 +293,7 @@ export class InventoryRepository extends BaseRepository {
         status: data.status ?? "confirmed",
         conducted_by: data.conductedBy ?? null,
         notes: data.notes ?? null,
+        tenant_id: this.getTenantId(),
       })
       .select("id")
       .single();
@@ -318,7 +326,7 @@ export class InventoryRepository extends BaseRepository {
   async getStockOpnames(): Promise<StockOpname[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let opnameQuery = this.client
       .from("stock_opname")
       .select(
         `*,
@@ -326,6 +334,9 @@ export class InventoryRepository extends BaseRepository {
         user:conducted_by(display_name)`,
       )
       .order("opname_date", { ascending: false });
+    opnameQuery = this.withTenantScope(opnameQuery);
+
+    const { data, error } = await opnameQuery;
 
     if (error) return this.handleError(error, "getStockOpnames");
 

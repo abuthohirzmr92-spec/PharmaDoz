@@ -1,5 +1,6 @@
 "use client";
 
+import { useEffect, useMemo } from "react";
 import {
   Shield,
   Store,
@@ -15,8 +16,10 @@ import {
 } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { useMaintenanceStore } from "@/store/maintenance-store";
+import { useSuperAdminStore } from "@/store/super-admin-store";
 import { HealthMetricsCard } from "@/components/admin/health-metrics-card";
 import AuditLogTable from "@/components/admin/audit-log-table";
+import { isDemoMode as checkDemoMode } from "@/config/env";
 import { cn } from "@/lib/cn";
 
 /* ------------------------------------------------------------------ */
@@ -105,69 +108,6 @@ const DEMO_ACTIVITIES: ActivityEntry[] = [
 ];
 
 /* ------------------------------------------------------------------ */
-/*  Card definitions                                                   */
-/* ------------------------------------------------------------------ */
-
-const HEALTH_CARDS: HealthCard[] = [
-  {
-    key: "activeTenants",
-    label: "Active Tenants",
-    icon: Store,
-    value: DEMO_HEALTH.activeTenants,
-    color: "green",
-  },
-  {
-    key: "totalTenants",
-    label: "Total Tenants",
-    icon: Building,
-    value: DEMO_HEALTH.totalTenants,
-    color: "blue",
-  },
-  {
-    key: "failedTransactions24h",
-    label: "Failed Transactions 24h",
-    icon: AlertCircle,
-    value: DEMO_HEALTH.failedTransactions24h,
-    color: "red",
-  },
-  {
-    key: "offlineTenants",
-    label: "Offline Tenants",
-    icon: WifiOff,
-    value: DEMO_HEALTH.offlineTenants,
-    color: "amber",
-  },
-  {
-    key: "syncFailures24h",
-    label: "Sync Failures 24h",
-    icon: RefreshCw,
-    value: DEMO_HEALTH.syncFailures24h,
-    color: "red",
-  },
-  {
-    key: "activeMaintenances",
-    label: "Active Maintenances",
-    icon: Wrench,
-    value: DEMO_HEALTH.activeMaintenances,
-    color: "blue",
-  },
-  {
-    key: "quotaAlerts",
-    label: "Quota Alerts",
-    icon: AlertTriangle,
-    value: DEMO_HEALTH.quotaAlerts,
-    color: "amber",
-  },
-  {
-    key: "updatedAt",
-    label: "Last Updated",
-    icon: Clock,
-    value: DEMO_HEALTH.updatedAt,
-    color: "neutral",
-  },
-];
-
-/* ------------------------------------------------------------------ */
 /*  Color map                                                          */
 /* ------------------------------------------------------------------ */
 
@@ -207,10 +147,6 @@ const COLOR_STYLES: Record<
   },
 };
 
-/* ------------------------------------------------------------------ */
-/*  Activity color                                                     */
-/* ------------------------------------------------------------------ */
-
 const ACTIVITY_STYLES: Record<
   ActivityEntry["type"],
   { dot: string; bg: string }
@@ -228,6 +164,65 @@ const ACTIVITY_STYLES: Record<
 export default function MonitoringPage() {
   const isSystemUser = useAuthStore((s) => s.isSystemUser());
   const maintenanceConfig = useMaintenanceStore((s) => s.config);
+  const { health, activities, loadHealth, loadActivities } = useSuperAdminStore();
+
+  const isDemo = checkDemoMode();
+
+  useEffect(() => {
+    if (!isDemo && isSystemUser) {
+      loadHealth();
+      loadActivities();
+    }
+  }, [isDemo, isSystemUser, loadHealth, loadActivities]);
+
+  const healthCards: HealthCard[] = useMemo(() => {
+    const h = isDemo ? DEMO_HEALTH : (health ?? {
+      activeTenants: 0,
+      totalTenants: 0,
+      failedTransactions24h: 0,
+      offlineTenants: 0,
+      syncFailures24h: 0,
+      activeMaintenances: 0,
+      quotaAlerts: 0,
+      updatedAt: new Date().toLocaleString("id-ID", {
+        day: "numeric",
+        month: "long",
+        year: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+      }),
+    });
+
+    const fmtDate = typeof h.updatedAt === "string" && h.updatedAt.includes("T")
+      ? new Date(h.updatedAt).toLocaleString("id-ID", {
+          day: "numeric",
+          month: "long",
+          year: "numeric",
+          hour: "2-digit",
+          minute: "2-digit",
+        })
+      : h.updatedAt;
+
+    return [
+      { key: "activeTenants", label: "Active Tenants", icon: Store, value: h.activeTenants, color: "green" as const },
+      { key: "totalTenants", label: "Total Tenants", icon: Building, value: h.totalTenants, color: "blue" as const },
+      { key: "failedTransactions24h", label: "Failed Tx 24h", icon: AlertCircle, value: h.failedTransactions24h, color: "red" as const },
+      { key: "offlineTenants", label: "Offline Tenants", icon: WifiOff, value: h.offlineTenants, color: "amber" as const },
+      { key: "syncFailures24h", label: "Sync Failures 24h", icon: RefreshCw, value: h.syncFailures24h, color: "red" as const },
+      { key: "activeMaintenances", label: "Maintenances", icon: Wrench, value: h.activeMaintenances, color: "blue" as const },
+      { key: "quotaAlerts", label: "Quota Alerts", icon: AlertTriangle, value: h.quotaAlerts, color: "amber" as const },
+      { key: "updatedAt", label: "Last Updated", icon: Clock, value: fmtDate, color: "neutral" as const },
+    ];
+  }, [isDemo, health]);
+
+  const displayActivities: ActivityEntry[] = isDemo
+    ? DEMO_ACTIVITIES
+    : activities.slice(0, 10).map((a) => ({
+        id: a.id,
+        description: a.action,
+        timestamp: formatRelative(a.createdAt),
+        type: "info" as const,
+      }));
 
   /* ---- Maintenance gate ---- */
   if (maintenanceConfig.mode === "full") {
@@ -270,7 +265,7 @@ export default function MonitoringPage() {
           Monitoring Platform
         </h1>
         <p className="mt-1 text-sm text-neutral-500">
-          Status kesehatan platform, aktivitas tenant, dan alert secara real-time.
+          Status kesehatan platform, aktivitas tenant, dan alert secara {isDemo ? "demo" : "real-time"}.
         </p>
       </div>
 
@@ -279,18 +274,19 @@ export default function MonitoringPage() {
         <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-blue-500" />
         <div>
           <p className="text-xs font-medium text-blue-700 dark:text-blue-300">
-            Data demo — belum terhubung ke database
+            {isDemo ? "Data demo — belum terhubung ke database" : "Live data — terhubung ke Supabase"}
           </p>
           <p className="mt-0.5 text-xs text-blue-600 dark:text-blue-400">
-            Angka-angka di bawah adalah data placeholder. Integrasi database akan
-            menggantikannya dengan data real-time.
+            {isDemo
+              ? "Angka-angka di bawah adalah data placeholder. Integrasi database akan menggantikannya dengan data real-time."
+              : "Data berasal dari database Supabase production."}
           </p>
         </div>
       </div>
 
       {/* Health cards grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        {HEALTH_CARDS.map((card) => {
+        {healthCards.map((card) => {
           const Icon = card.icon;
           const cs = COLOR_STYLES[card.color];
 
@@ -338,32 +334,41 @@ export default function MonitoringPage() {
           </h2>
         </div>
         <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-          <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {DEMO_ACTIVITIES.map((entry) => {
-              const as = ACTIVITY_STYLES[entry.type];
-              return (
-                <div
-                  key={entry.id}
-                  className="flex items-start gap-3 px-4 py-3"
-                >
-                  <div className="mt-1.5 flex shrink-0">
-                    <div className={cn("h-2 w-2 rounded-full", as.dot)} />
+          {displayActivities.length === 0 ? (
+            <div className="flex flex-col items-center gap-2 py-10 text-center">
+              <Activity className="h-6 w-6 text-neutral-300" />
+              <p className="text-xs text-neutral-400">Belum ada aktivitas tercatat</p>
+            </div>
+          ) : (
+            <div className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {displayActivities.map((entry) => {
+                const as = ACTIVITY_STYLES[entry.type];
+                return (
+                  <div
+                    key={entry.id}
+                    className="flex items-start gap-3 px-4 py-3"
+                  >
+                    <div className="mt-1.5 flex shrink-0">
+                      <div className={cn("h-2 w-2 rounded-full", as.dot)} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-neutral-700 dark:text-neutral-300">
+                        {entry.description}
+                      </p>
+                      <p className="mt-0.5 text-[10px] text-neutral-400">
+                        {entry.timestamp}
+                      </p>
+                    </div>
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-xs text-neutral-700 dark:text-neutral-300">
-                      {entry.description}
-                    </p>
-                    <p className="mt-0.5 text-[10px] text-neutral-400">
-                      {entry.timestamp}
-                    </p>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
         </div>
         <p className="mt-3 text-[10px] text-neutral-400">
-          Activity log real-time akan tersedia setelah integrasi database.
+          {isDemo
+            ? "Activity log real-time akan tersedia setelah integrasi database."
+            : `${displayActivities.length} aktivitas terbaru dari database.`}
         </p>
       </div>
 
@@ -379,4 +384,30 @@ export default function MonitoringPage() {
       </div>
     </div>
   );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
+
+function formatRelative(iso: string): string {
+  try {
+    const date = new Date(iso);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffMins = Math.floor(diffMs / 60000);
+
+    if (diffMins < 1) return "Baru saja";
+    if (diffMins < 60) return `${diffMins} menit yang lalu`;
+    if (diffHours < 24) return `${diffHours} jam yang lalu`;
+
+    return date.toLocaleDateString("id-ID", {
+      year: "numeric",
+      month: "short",
+      day: "numeric",
+    });
+  } catch {
+    return "—";
+  }
 }
