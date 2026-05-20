@@ -27,13 +27,6 @@ function devLog(...args: unknown[]) {
   if (DEV) console.log("[auth]", ...args);
 }
 
-/* ═══════════════════════════════════════════════════════════════════════════
-   TEMPORARY — Deep debug tracing for silent redirect-to-login bug
-   Prefix: [MEDISYNC-TRACE] — REMOVE AFTER FIX CONFIRMED
-   ═══════════════════════════════════════════════════════════════════════════ */
-function trace(tag: string, ...args: unknown[]) {
-  console.log(`[MEDISYNC-TRACE] [${tag}]`, ...args);
-}
 
 /**
  * Module-level flag to prevent the SIGNED_IN → initFromSupabaseSession
@@ -50,7 +43,6 @@ export function isLoginInProgress(): boolean {
 /* ------------------------------------------------------------------ */
 
 export function syncRepositoryContext(user: UserProfile | null) {
-  console.log("[MEDISYNC-TRACE] [SYNC_REPO_CTX]", "user =", user ? JSON.stringify({ id: user.id, role: user.role, tenantId: user.tenantId, pharmacyId: user.pharmacyId }) : null);
   if (user && user.tenantId && user.role) {
     const ctx = { tenantId: user.tenantId, role: user.role, userId: user.id };
     productRepo.setTenantContext(ctx);
@@ -292,17 +284,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     loginInProgress = true;
     set({ isLoading: true, error: null });
     devLog("loginWithEmail: starting for", email);
-    trace("LOGIN_START", "email =", email, "loginInProgress =", loginInProgress);
 
     try {
       /* Step 1: Supabase auth (15s timeout) */
-      trace("LOGIN_STEP1", "calling signInWithPassword...");
       const { data, error } = await withTimeout(
         supabase!.auth.signInWithPassword({ email, password }),
         15000,
         "signInWithPassword",
       );
-      trace("LOGIN_STEP1_DONE", "error =", error?.message ?? null, "hasUser =", !!data.user, "userId =", data.user?.id);
 
       if (error) {
         set({ isLoading: false });
@@ -324,21 +313,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       const supabaseUser = data.user;
-      trace("LOGIN_STEP2", "supabaseUser id =", supabaseUser.id, "email =", supabaseUser.email);
 
       /* Step 2: Profile lookup (8s timeout — prevents RLS/network hang) */
       let profile: UserProfile | null = null;
       try {
-        trace("LOGIN_STEP2_LOOKUP", "calling getUserBySupabaseUid...");
         profile = await withTimeout(
           authRepo.getUserBySupabaseUid(supabaseUser.id),
           8000,
           "getUserBySupabaseUid",
         );
-        trace("LOGIN_STEP2_DONE", "profile found =", !!profile, "profile =", profile ? JSON.stringify({ id: profile.id, email: profile.email, role: profile.role, tenantId: profile.tenantId, isActive: profile.isActive }) : null);
         devLog("loginWithEmail: profile lookup complete, found =", !!profile);
       } catch (profileErr) {
-        trace("LOGIN_STEP2_FAILED", String(profileErr));
         set({ isLoading: false });
         return {
           success: false,
@@ -349,7 +334,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       /* Step 3: Ensure profile exists (8s timeout — prevents RLS/network hang) */
       if (!profile) {
         devLog("loginWithEmail: profile missing, running ensureProfile");
-        trace("LOGIN_STEP3_ENSURE", "profile null, running ensureProfile...");
         try {
           profile = await withTimeout(
             authRepo.ensureProfile({
@@ -360,9 +344,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             8000,
             "ensureProfile",
           );
-          trace("LOGIN_STEP3_DONE", "ensureProfile result =", profile ? JSON.stringify({ id: profile.id, email: profile.email, role: profile.role, tenantId: profile.tenantId }) : null);
         } catch (ensureErr) {
-          trace("LOGIN_STEP3_FAILED", String(ensureErr));
           set({ isLoading: false });
           return {
             success: false,
@@ -380,7 +362,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         };
       }
 
-      trace("LOGIN_STEP4_SYNC", "calling syncRepositoryContext with tenantId =", profile.tenantId, "role =", profile.role);
       syncRepositoryContext(profile);
       set({
         user: profile,
@@ -389,12 +370,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         lastActiveAt: new Date().toISOString(),
         error: null,
       });
-      trace("LOGIN_STEP4_DONE", "auth store set. isAuthenticated = true, user.role =", profile.role);
 
       devLog("loginWithEmail: success, role =", profile.role);
       return { success: true };
     } catch (err) {
-      trace("LOGIN_EXCEPTION", String(err));
       devLog("loginWithEmail: exception", err);
       set({ isLoading: false });
       return {
@@ -402,7 +381,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         error: "Jaringan bermasalah. Periksa koneksi internet Anda.",
       };
     } finally {
-      trace("LOGIN_FINALLY", "setting loginInProgress = false");
       loginInProgress = false;
     }
   },
@@ -447,14 +425,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   /* ---- Supabase: initFromSupabaseSession ---- */
   initFromSupabaseSession: async () => {
     if (!isSupabaseConnected()) {
-      trace("INIT_SESSION", "not connected");
       devLog("initFromSupabaseSession: not connected");
       return false;
     }
 
     /* If loginWithEmail is in progress, don't race — it handles everything */
     if (loginInProgress) {
-      trace("INIT_SESSION", "login in progress, deferring");
       devLog("initFromSupabaseSession: login in progress, deferring to loginWithEmail");
       return false;
     }
@@ -462,25 +438,20 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     /* Prevent duplicate concurrent initializations */
     const state = get();
     if (state.isAuthenticated && state.user) {
-      trace("INIT_SESSION", "already authenticated, role =", state.user.role);
       devLog("initFromSupabaseSession: already authenticated, skipping");
       return true;
     }
 
-    trace("INIT_SESSION", "checking session... isAuthenticated =", state.isAuthenticated);
     devLog("initFromSupabaseSession: checking session...");
 
     try {
-      trace("INIT_SESSION", "calling getSession...");
       const { data } = await withTimeout(
         supabase!.auth.getSession(),
         8000,
         "getSession",
       );
-      trace("INIT_SESSION", "getSession done. hasSession =", !!data.session?.user, "userId =", data.session?.user?.id);
 
       if (!data.session?.user) {
-        trace("INIT_SESSION", "no session — returning false");
         devLog("initFromSupabaseSession: no session");
         return false;
       }
@@ -490,15 +461,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       /* Profile lookup (8s timeout) */
       let profile: UserProfile | null = null;
       try {
-        trace("INIT_SESSION", "looking up profile for", supabaseUser.id);
         profile = await withTimeout(
           authRepo.getUserBySupabaseUid(supabaseUser.id),
           8000,
           "getUserBySupabaseUid",
         );
-        trace("INIT_SESSION", "profile found =", !!profile);
       } catch {
-        trace("INIT_SESSION", "profile lookup timed out!");
         devLog("initFromSupabaseSession: profile lookup timed out");
         set({ isLoading: false });
         return false;
@@ -506,7 +474,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
       /* Ensure profile (8s timeout) */
       if (!profile) {
-        trace("INIT_SESSION", "profile missing, running ensureProfile");
         devLog("initFromSupabaseSession: profile missing, running ensureProfile");
         try {
           profile = await withTimeout(
@@ -518,9 +485,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             8000,
             "ensureProfile",
           );
-          trace("INIT_SESSION", "ensureProfile result =", !!profile);
         } catch {
-          trace("INIT_SESSION", "ensureProfile timed out!");
           devLog("initFromSupabaseSession: ensureProfile timed out");
           set({ isLoading: false });
           return false;
@@ -528,13 +493,11 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       }
 
       if (!profile) {
-        trace("INIT_SESSION", "profile creation failed completely");
         devLog("initFromSupabaseSession: profile creation failed");
         set({ isLoading: false });
         return false;
       }
 
-      trace("INIT_SESSION", "success! syncing context and setting store. role =", profile.role);
       syncRepositoryContext(profile);
       set({
         user: profile,
@@ -547,7 +510,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       devLog("initFromSupabaseSession: success, role =", profile.role);
       return true;
     } catch (err) {
-      trace("INIT_SESSION", "exception!", String(err));
       devLog("initFromSupabaseSession: exception", err);
       set({ isLoading: false });
       return false;
@@ -580,18 +542,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   /* ---- logout (shared, async) ---- */
   logout: async () => {
-    trace("LOGOUT", "signing out. Stack:", new Error().stack?.split("\n").slice(1, 4).join(" → "));
     devLog("logout: signing out");
 
     try {
       if (isSupabaseConnected()) {
-        trace("LOGOUT", "calling supabase.auth.signOut()");
         await supabase!.auth.signOut();
-        trace("LOGOUT", "signOut completed");
       }
     } catch {
       // signOut failed — still clear local state
-      trace("LOGOUT", "signOut threw (non-fatal)");
     }
 
     clearDomainStores();
@@ -610,7 +568,6 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       originalUser: null,
     });
 
-    trace("LOGOUT", "complete");
     devLog("logout: complete");
   },
 

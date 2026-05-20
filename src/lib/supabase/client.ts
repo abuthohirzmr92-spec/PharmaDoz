@@ -7,19 +7,14 @@ function createSupabaseClient() {
   const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   // Explicit demo mode: no Supabase client
-  if (isDemoMode()) {
-    console.log("[MEDISYNC-TRACE] [SUPABASE_CLIENT] demo mode — no client");
-    return null;
-  }
+  if (isDemoMode()) return null;
 
   // Missing or placeholder env vars: return null (effectively demo mode).
   // The proxy and auth-provider handle this gracefully.
   if (!url || !key || url.includes("your-project") || key.includes("your-")) {
-    console.log("[MEDISYNC-TRACE] [SUPABASE_CLIENT] missing/placeholder env — no client");
     return null;
   }
 
-  console.log("[MEDISYNC-TRACE] [SUPABASE_CLIENT] creating createBrowserClient from @supabase/ssr (cookie-based storage)");
   return createBrowserClient<Database>(url, key);
 }
 
