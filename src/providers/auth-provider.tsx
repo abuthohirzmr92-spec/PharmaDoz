@@ -10,7 +10,7 @@ import { useHoldCartStore } from "@/store/hold-cart-store";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 
-const PUBLIC_PATHS = ["/login", "/forgot-password", "/unauthorized", "/offline"];
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/unauthorized", "/offline"];
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHydrating, setIsHydrating] = useState(true);
@@ -23,52 +23,59 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     let cancelled = false;
 
     async function hydrate() {
-      // 1. Try Supabase session first
-      if (isSupabaseConnected()) {
-        const restored = await initFromSupabaseSession();
-        if (restored && !cancelled) {
+      try {
+        // 1. Try Supabase session first
+        if (isSupabaseConnected()) {
+          const restored = await initFromSupabaseSession();
+          if (restored && !cancelled) {
+            setIsHydrating(false);
+            return;
+          }
+        }
+
+        // 2. Demo mode: check localStorage for persisted demo session
+        if (isDemoMode() && !cancelled) {
+          const stored =
+            typeof window !== "undefined"
+              ? localStorage.getItem("apotek-auth")
+              : null;
+          if (stored) {
+            try {
+              const parsed = JSON.parse(stored);
+              if (parsed.user && parsed.isAuthenticated) {
+                setIsHydrating(false);
+                return;
+              }
+            } catch {
+              /* ignore corrupt storage */
+            }
+          }
+        }
+
+        // 3. Demo mode: auto-login as tenant_owner for convenience
+        if (isDemoMode() && !cancelled) {
+          if (!useAuthStore.getState().isAuthenticated) {
+            loginAs("tenant_owner");
+          }
           setIsHydrating(false);
           return;
         }
-      }
 
-      // 2. Demo mode: check localStorage for persisted demo session
-      if (isDemoMode() && !cancelled) {
-        const stored =
-          typeof window !== "undefined"
-            ? localStorage.getItem("apotek-auth")
-            : null;
-        if (stored) {
-          try {
-            const parsed = JSON.parse(stored);
-            if (parsed.user && parsed.isAuthenticated) {
-              setIsHydrating(false);
-              return;
-            }
-          } catch {
-            /* ignore corrupt storage */
+        // 4. Production: no session → redirect to /login
+        if (!cancelled) {
+          const isPublic = PUBLIC_PATHS.some(
+            (p) => pathname === p || pathname.startsWith(p + "/"),
+          );
+          if (!isPublic) {
+            router.replace("/login");
           }
+          setIsHydrating(false);
         }
-      }
-
-      // 3. Demo mode: auto-login as tenant_owner for convenience
-      if (isDemoMode() && !cancelled) {
-        if (!useAuthStore.getState().isAuthenticated) {
-          loginAs("tenant_owner");
+      } catch (err) {
+        console.error("Auth hydration error:", err);
+        if (!cancelled) {
+          setIsHydrating(false);
         }
-        setIsHydrating(false);
-        return;
-      }
-
-      // 4. Production: no session → redirect to /login
-      if (!cancelled) {
-        const isPublic = PUBLIC_PATHS.some(
-          (p) => pathname === p || pathname.startsWith(p + "/"),
-        );
-        if (!isPublic) {
-          router.replace("/login");
-        }
-        setIsHydrating(false);
       }
     }
 
@@ -86,39 +93,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const {
       data: { subscription },
     } = supabase!.auth.onAuthStateChange(async (event) => {
-      if (event === "SIGNED_OUT") {
-        // Clear domain stores to prevent tenant/session leakage
-        useCashierStore.getState().resetCashier();
-        useTransactionStore.setState({
-          transactions: [],
-          isLoaded: false,
-          isLoading: false,
-          isDemoMode: isDemoMode(),
-        });
-        useInventoryStore.setState({
-          batches: [],
-          suppliers: [],
-          purchaseInvoices: [],
-          stockMovements: [],
-          stockOpnames: [],
-          dataSource: isDemoMode() ? "demo" : "loading",
-          isDemoMode: isDemoMode(),
-          isLoading: false,
-          isSubmitting: false,
-        });
-        useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
+      try {
+        if (event === "SIGNED_OUT") {
+          // Clear domain stores to prevent tenant/session leakage
+          useCashierStore.getState().resetCashier();
+          useTransactionStore.setState({
+            transactions: [],
+            isLoaded: false,
+            isLoading: false,
+            isDemoMode: isDemoMode(),
+          });
+          useInventoryStore.setState({
+            batches: [],
+            suppliers: [],
+            purchaseInvoices: [],
+            stockMovements: [],
+            stockOpnames: [],
+            dataSource: isDemoMode() ? "demo" : "loading",
+            isDemoMode: isDemoMode(),
+            isLoading: false,
+            isSubmitting: false,
+          });
+          useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
 
-        useAuthStore.setState({
-          user: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        });
-        if (pathname !== "/login") {
-          router.push("/login");
+          useAuthStore.setState({
+            user: null,
+            isAuthenticated: false,
+            isLoading: false,
+            error: null,
+          });
+          if (pathname !== "/login") {
+            router.push("/login");
+          }
+        } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+          await initFromSupabaseSession();
         }
-      } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
-        await initFromSupabaseSession();
+      } catch (err) {
+        console.error("Auth state change error:", err);
       }
     });
 
