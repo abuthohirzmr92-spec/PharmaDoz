@@ -1,15 +1,13 @@
 "use client";
 
-import { Shield, ExternalLink } from "lucide-react";
-import { useRouter, usePathname } from "next/navigation";
+import { Shield } from "lucide-react";
+import { usePathname } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
-import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { PLATFORM_NAV_GROUPS } from "@/config/platform-navigation";
 import { PlatformNavItem } from "./platform-nav-item";
 
 export function PlatformSidebar() {
-  const router = useRouter();
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
 
@@ -47,18 +45,6 @@ export function PlatformSidebar() {
           </div>
         ))}
       </nav>
-
-      {isSuperAdmin(user?.role) && (
-        <div className="border-t border-neutral-200 p-3 dark:border-neutral-800">
-          <button
-            onClick={() => router.push("/dashboard")}
-            className="flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-600 transition-colors hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800"
-          >
-            <ExternalLink className="h-3.5 w-3.5" />
-            Kembali ke Aplikasi
-          </button>
-        </div>
-      )}
     </aside>
   );
 }

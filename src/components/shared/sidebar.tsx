@@ -17,11 +17,8 @@ export function Sidebar() {
   const { expanded, toggle } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
-  // Platform users should never see the tenant sidebar.
-  // Defense-in-depth: middleware redirects platform users away from tenant routes first.
-  if (isPlatformUser(user?.role)) {
-    return null;
-  }
+  // Defense-in-depth: proxy + (tenant) layout prevent platform users from reaching this.
+  if (isPlatformUser(user?.role)) return null;
 
   const filteredNav = TENANT_NAVIGATION.filter(
     (item) =>

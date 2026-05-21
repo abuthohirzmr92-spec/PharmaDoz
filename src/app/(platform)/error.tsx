@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
-export default function AppError({
+export default function PlatformError({
   error,
   reset,
 }: {
@@ -16,7 +16,7 @@ export default function AppError({
   );
 
   useEffect(() => {
-    console.error("App error:", error);
+    console.error("Platform error:", error);
   }, [error]);
 
   return (

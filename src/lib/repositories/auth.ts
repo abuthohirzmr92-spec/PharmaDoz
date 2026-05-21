@@ -30,13 +30,13 @@ export class AuthRepository extends BaseRepository {
     }
 
     const profile = data as any;
-    const resolved = resolveUserRole(profile.role, undefined);
+    const resolved = resolveUserRole(profile.system_role, undefined);
     return {
       id: profile.id,
       email: profile.email ?? "",
       displayName: profile.display_name ?? "",
       role: resolved as AppRole,
-      systemRole: isSystemRoleType(profile.role) ? (profile.role as SystemRole) : undefined,
+      systemRole: isSystemRoleType(profile.system_role) ? (profile.system_role as SystemRole) : undefined,
       isActive: profile.is_active ?? true,
       tenantId: profile.tenant_id ?? undefined,
       avatarUrl: profile.avatar_url ?? null,
@@ -76,7 +76,7 @@ export class AuthRepository extends BaseRepository {
     if (!profileData) return null;
 
     const p = profileData as any;
-    const profileRoleRaw: string | null = p.role ?? null;
+    const profileRoleRaw: string | null = p.system_role ?? null;
 
     /* 2. System roles (super_admin, etc.) bypass tenant resolution entirely.
      *    They have no tenant_users row and must never fall back to "staff". */
@@ -174,7 +174,7 @@ export class AuthRepository extends BaseRepository {
 
     if (!profileError && profileData) {
       const p = profileData as any;
-      const profileRoleRaw: string | null = p.role ?? null;
+      const profileRoleRaw: string | null = p.system_role ?? null;
       const resolved = resolveUserRole(profileRoleRaw, undefined);
       return {
         id: p.id,

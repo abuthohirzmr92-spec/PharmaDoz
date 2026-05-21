@@ -76,12 +76,12 @@ export async function proxy(request: NextRequest) {
     if (session) {
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("system_role")
         .eq("id", session.user.id)
         .single();
 
       const target =
-        profile && isSystemRole(profile.role) ? "/platform" : "/dashboard";
+        profile && isSystemRole(profile.system_role) ? "/platform" : "/dashboard";
       return NextResponse.redirect(new URL(target, request.url));
     }
     return response;
@@ -101,11 +101,11 @@ export async function proxy(request: NextRequest) {
   /* ---- Fetch profile once for role-based routing ---- */
   const { data: profile, error: profileError } = await supabase
     .from("profiles")
-    .select("role")
+    .select("system_role")
     .eq("id", session.user.id)
     .single();
 
-  const userRole = profile?.role ?? null;
+  const userRole = profile?.system_role ?? null;
 
   /* ---- Role-based routing ---- */
   if (isAdminPath(request.nextUrl.pathname)) {

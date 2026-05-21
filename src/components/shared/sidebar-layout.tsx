@@ -13,11 +13,8 @@ export function SidebarLayout({ children }: { children: ReactNode }) {
   const { mobileOpen, setMobileOpen } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
-  // Platform users must not be wrapped in tenant chrome (sidebar, bottom nav, padding).
-  // Defense-in-depth: middleware redirects platform users away from tenant routes first.
-  if (isPlatformUser(user?.role)) {
-    return <>{children}</>;
-  }
+  // Defense-in-depth: proxy + (tenant) layout prevent platform users from reaching this.
+  if (isPlatformUser(user?.role)) return <>{children}</>;
 
   return (
     <div className="flex min-h-screen">

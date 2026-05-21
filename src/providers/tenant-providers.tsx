@@ -11,11 +11,11 @@ import { QueryProvider } from "./query-provider";
 import { ThemeProvider } from "./theme-provider";
 import { ToastProvider } from "./toast-provider";
 
-export { PlatformProviders } from "./platform-providers";
-export { TenantProviders } from "./tenant-providers";
-
-/** Legacy shared provider tree. Prefer PlatformProviders or TenantProviders. */
-export function AppProviders({ children }: { children: ReactNode }) {
+/**
+ * Tenant-only provider tree.
+ * Includes full tenant/branch scope providers needed for business operations.
+ */
+export function TenantProviders({ children }: { children: ReactNode }) {
   return (
     <ThemeProvider>
       <NetworkProvider>

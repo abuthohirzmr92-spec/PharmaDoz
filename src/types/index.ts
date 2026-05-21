@@ -100,7 +100,7 @@ export interface Profile {
   id: string; // = auth.users.id
   tenantId?: string | null;
   displayName: string;
-  role?: string | null; // system_role — "super_admin" | "developer" | "support_ai" | null
+  system_role?: string | null; // "super_admin" | "developer" | "support_ai" | null
   avatarUrl?: string | null;
   phone?: string | null;
   isActive: boolean;

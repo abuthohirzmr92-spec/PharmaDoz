@@ -12,6 +12,21 @@ const nextConfig: NextConfig = {
     ],
   },
 
+  async redirects() {
+    return [
+      {
+        source: "/admin",
+        destination: "/platform",
+        permanent: true,
+      },
+      {
+        source: "/admin/:path*",
+        destination: "/platform/:path*",
+        permanent: true,
+      },
+    ];
+  },
+
   async headers() {
     return [
       {
