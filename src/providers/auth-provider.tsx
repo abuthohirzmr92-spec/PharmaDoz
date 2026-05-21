@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuthStore, syncRepositoryContext, isLoginInProgress, clearDomainStores } from "@/store/auth-store";
+import { logAuthHydration } from "@/lib/observability/route-debug";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     /* Global timeout — if hydration hangs, show error instead of spinner forever */
     hydrationTimerRef.current = setTimeout(() => {
       if (cancelled) return;
+      logAuthHydration("timeout");
       devLog("hydration timeout — forcing fallback");
       setHydrationError("Gagal memulihkan sesi: waktu tunggu habis. Periksa koneksi internet Anda.");
       setIsHydrating(false);
@@ -113,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, HYDRATION_TIMEOUT_MS);
 
     async function hydrate() {
+      logAuthHydration("start");
       devLog("hydrate: start for", pathname);
 
       try {
@@ -126,7 +129,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               "initFromSupabaseSession",
             );
             if (!cancelled && useAuthStore.getState().isAuthenticated) {
-              devLog("hydrate: session restored, role =", useAuthStore.getState().user?.role);
+              const restoredRole = useAuthStore.getState().user?.role;
+              logAuthHydration("success", restoredRole);
+              devLog("hydrate: session restored, role =", restoredRole);
               clearTimeout(hydrationTimerRef.current!);
               setIsHydrating(false);
               hydratingRef.current = false;
@@ -180,6 +185,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hydratingRef.current = false;
         }
       } catch (err) {
+        logAuthHydration("fail");
         devLog("hydrate: unexpected error", err);
         if (!cancelled) {
           setHydrationError("Gagal memulihkan sesi. Silakan muat ulang halaman.");

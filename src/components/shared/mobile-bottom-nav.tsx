@@ -15,7 +15,8 @@ export function MobileBottomNav() {
   const { setMobileOpen } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
-  // Platform users get their own navigation — never show tenant bottom nav
+  // Platform users get their own navigation — never show tenant bottom nav.
+  // Defense-in-depth: middleware redirects platform users away from tenant routes first.
   if (isPlatformUser(user?.role)) return null;
 
   const displayItems = TENANT_NAVIGATION

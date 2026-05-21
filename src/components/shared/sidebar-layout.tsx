@@ -2,13 +2,22 @@
 
 import type { ReactNode } from "react";
 import { useSidebarStore } from "@/store/sidebar-store";
+import { useAuthStore } from "@/store/auth-store";
 import { MOBILE_BOTTOM_NAV_HEIGHT } from "@/config/constants";
+import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { Sidebar } from "./sidebar";
 import { MobileBottomNav } from "./mobile-bottom-nav";
 import { X } from "lucide-react";
 
 export function SidebarLayout({ children }: { children: ReactNode }) {
   const { mobileOpen, setMobileOpen } = useSidebarStore();
+  const user = useAuthStore((s) => s.user);
+
+  // Platform users must not be wrapped in tenant chrome (sidebar, bottom nav, padding).
+  // Defense-in-depth: middleware redirects platform users away from tenant routes first.
+  if (isPlatformUser(user?.role)) {
+    return <>{children}</>;
+  }
 
   return (
     <div className="flex min-h-screen">

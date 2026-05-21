@@ -98,17 +98,30 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
+  /* ---- Fetch profile once for role-based routing ---- */
+  const { data: profile, error: profileError } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("id", session.user.id)
+    .single();
+
+  const userRole = profile?.role ?? null;
+
   /* ---- Admin routes: require system role ---- */
   if (isAdminPath(request.nextUrl.pathname)) {
-    const { data: profile, error: profileError } = await supabase
-      .from("profiles")
-      .select("role")
-      .eq("id", session.user.id)
-      .single();
-
-    if (profileError || !profile || !isSystemRole(profile.role)) {
+    if (profileError || !profile || !isSystemRole(userRole)) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
+  }
+
+  /* ---- Tenant routes: redirect platform users to /platform ---- */
+  if (isSystemRole(userRole) && !isAdminPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL("/platform", request.url));
+  }
+
+  /* ---- Platform routes: redirect tenant users to /dashboard ---- */
+  if (userRole && !isSystemRole(userRole) && isAdminPath(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL("/dashboard", request.url));
   }
 
   return response;

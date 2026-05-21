@@ -6,6 +6,7 @@ import { RecoveryBanner } from "@/components/shared/recovery-banner";
 import { SidebarLayout } from "@/components/shared/sidebar-layout";
 import { useAuthStore } from "@/store/auth-store";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
+import { logLayoutResolution } from "@/lib/observability/route-debug";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
@@ -18,6 +19,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const [stagingDismissed, setStagingDismissed] = useState(false);
+  const [isRedirecting, setIsRedirecting] = useState(false);
   const pathname = usePathname();
 
   const isStaging =
@@ -30,23 +32,28 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Redirect platform users away from tenant-scoped pages
+  // Redirect platform users away from tenant-scoped pages.
+  // The middleware handles this server-side; this is defense-in-depth.
   useEffect(() => {
     if (!isAuthenticated) return;
     if (!isPlatformUser(user?.role)) return;
     const isPlatformRoute = PLATFORM_PREFIXES.some((p) => pathname?.startsWith(p));
     if (!isPlatformRoute) {
-      router.replace("/admin");
+      logLayoutResolution(pathname, user?.role ?? "none", "redirecting");
+      setIsRedirecting(true);
+      router.replace("/platform");
     }
   }, [isAuthenticated, user?.role, pathname, router]);
 
   const isPlatformRoute = PLATFORM_PREFIXES.some((p) => pathname?.startsWith(p));
   const platformUser = isPlatformUser(user?.role);
 
-  // Show skeleton while checking auth (prevents flash of login redirect
-  // during the brief moment Supabase session is being restored).
-  if (isLoading) return <PageSkeleton />;
+  // Show skeleton while checking auth or redirecting
+  if (isLoading || isRedirecting) return <PageSkeleton />;
   if (!isAuthenticated) return null;
+
+  // Platform users on tenant routes — show nothing while redirecting
+  if (platformUser && !isPlatformRoute) return <PageSkeleton />;
 
   return (
     <>
@@ -64,7 +71,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       <OfflineBanner />
       <RecoveryBanner />
-      {isPlatformRoute || platformUser ? children : <SidebarLayout>{children}</SidebarLayout>}
+      {(isPlatformRoute || platformUser)
+        ? (logLayoutResolution(pathname, user?.role ?? "none", "platform"), children)
+        : (logLayoutResolution(pathname, user?.role ?? "none", "tenant"),
+           <SidebarLayout>{children}</SidebarLayout>)}
     </>
   );
 }
