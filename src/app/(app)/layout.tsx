@@ -5,15 +5,18 @@ import { OfflineBanner } from "@/components/shared/offline-banner";
 import { RecoveryBanner } from "@/components/shared/recovery-banner";
 import { SidebarLayout } from "@/components/shared/sidebar-layout";
 import { useAuthStore } from "@/store/auth-store";
-import { useRouter } from "next/navigation";
+import { isSuperAdmin } from "@/lib/auth/super-admin";
+import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const isLoading = useAuthStore((s) => s.isLoading);
+  const user = useAuthStore((s) => s.user);
   const router = useRouter();
   const [stagingDismissed, setStagingDismissed] = useState(false);
+  const pathname = usePathname();
 
   const isStaging =
     process.env.NEXT_PUBLIC_APP_URL &&
@@ -24,6 +27,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       router.replace("/login");
     }
   }, [isAuthenticated, isLoading, router]);
+
+  // Redirect super admins away from tenant-scoped pages
+  useEffect(() => {
+    if (
+      isAuthenticated &&
+      isSuperAdmin(user?.role) &&
+      pathname === "/dashboard"
+    ) {
+      router.replace("/admin");
+    }
+  }, [isAuthenticated, user?.role, pathname, router]);
 
   // Show skeleton while checking auth (prevents flash of login redirect
   // during the brief moment Supabase session is being restored).

@@ -4,6 +4,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { useAuthStore } from "@/store/auth-store";
 import { authRepo } from "@/lib/repository-instances";
 import { productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
+import { isSuperAdmin } from "@/lib/auth/super-admin";
 import type { Tenant, AppRole, TenantContext } from "@/types";
 
 interface TenantContextValue {
@@ -35,7 +36,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const isSuperAdmin = user?.role === "super_admin";
+  const isSuperAdminUser = isSuperAdmin(user?.role);
 
   useEffect(() => {
     if (!isAuthenticated || !user) {
@@ -46,7 +47,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     }
 
     // Super admin has no tenant scope
-    if (user.role === "super_admin") {
+    if (isSuperAdmin(user.role)) {
       setTenant(null);
       setTenantRole("super_admin");
       productRepo.setTenantContext(undefined);
@@ -103,7 +104,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
 
   return (
     <TenantCtx.Provider
-      value={{ tenant, tenantRole, isSuperAdmin, isLoading, error }}
+      value={{ tenant, tenantRole, isSuperAdmin: isSuperAdminUser, isLoading, error }}
     >
       {children}
     </TenantCtx.Provider>

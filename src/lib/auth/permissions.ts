@@ -1,5 +1,6 @@
 import type { AppRole, Permission } from "@/types";
 import { ROLE_PERMISSIONS } from "./roles";
+import { isSuperAdmin } from "./super-admin";
 
 /**
  * Check if a role has a specific permission.
@@ -31,9 +32,10 @@ export function hasAllPermissions(
 
 /**
  * Check if a role is a system role (platform/internal).
+ * Delegates to the canonical isSuperAdmin helper.
  */
 export function isSystemRole(role: AppRole): boolean {
-  return ["super_admin"].includes(role);
+  return isSuperAdmin(role);
 }
 
 /**

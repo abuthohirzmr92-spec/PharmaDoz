@@ -60,10 +60,18 @@ export async function proxy(request: NextRequest) {
   const { data } = await supabase.auth.getSession();
   const session = data.session;
 
-  /* ---- /login page: redirect to dashboard if signed in ---- */
+  /* ---- /login page: redirect to role-appropriate page if signed in ---- */
   if (request.nextUrl.pathname.startsWith("/login")) {
     if (session) {
-      return NextResponse.redirect(new URL("/dashboard", request.url));
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("role")
+        .eq("id", session.user.id)
+        .single();
+
+      const target =
+        profile && profile.role === "super_admin" ? "/admin" : "/dashboard";
+      return NextResponse.redirect(new URL(target, request.url));
     }
     return response;
   }

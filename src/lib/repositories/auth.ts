@@ -1,4 +1,5 @@
 import { BaseRepository } from "./base";
+import { isSuperAdmin } from "@/lib/auth/super-admin";
 import type { UserProfile, AppRole, SystemRole, TenantRole, Permission, Role, Tenant } from "@/types";
 
 const DEV = process.env.NODE_ENV === "development";
@@ -79,7 +80,7 @@ export class AuthRepository extends BaseRepository {
       email: p.email ?? "",
       displayName: p.display_name ?? "",
       role: (p.role as AppRole) ?? "staff",
-      systemRole: p.role === "super_admin" ? (p.role as SystemRole) : undefined,
+      systemRole: isSuperAdmin(p.role as AppRole) ? (p.role as SystemRole) : undefined,
       isActive: p.is_active ?? true,
       tenantId: p.tenant_id ?? undefined,
       pharmacyId: p.tenant_id ?? undefined,
@@ -138,7 +139,7 @@ export class AuthRepository extends BaseRepository {
         email: p.email ?? "",
         displayName: p.display_name ?? "",
         role: (p.role as AppRole) ?? "staff",
-        systemRole: p.role === "super_admin" ? (p.role as SystemRole) : undefined,
+        systemRole: isSuperAdmin(p.role as AppRole) ? (p.role as SystemRole) : undefined,
         isActive: p.is_active ?? true,
         tenantId: p.tenant_id ?? undefined,
         pharmacyId: p.tenant_id ?? undefined,

@@ -44,7 +44,7 @@ export default function LoginPage() {
 
   const handleDemoLogin = (role: AppRole) => {
     loginAs(role);
-    router.push("/dashboard");
+    router.push(role === "super_admin" ? "/admin" : "/dashboard");
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -78,7 +78,8 @@ export default function LoginPage() {
       setIsSubmitting(false);
 
       if (result.success) {
-        router.push("/dashboard");
+        const role = useAuthStore.getState().user?.role;
+        router.push(role === "super_admin" ? "/admin" : "/dashboard");
       } else {
         setError(result.error ?? "Gagal masuk. Coba lagi.");
       }

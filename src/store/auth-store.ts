@@ -4,6 +4,7 @@ import { create } from "zustand";
 import type { AppRole, Permission, UserProfile } from "@/types";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isSessionStale } from "@/lib/auth/roles";
+import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 import {
@@ -66,7 +67,7 @@ export function syncRepositoryContext(user: UserProfile | null) {
   }
 }
 
-function clearDomainStores() {
+export function clearDomainStores() {
   useCashierStore.getState().resetCashier();
   useTransactionStore.setState({
     transactions: [],
@@ -243,7 +244,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   /* ---- Impersonation ---- */
   impersonateUser: (targetProfile) => {
     const current = get().user;
-    if (!current || !["super_admin"].includes(current.role)) {
+    if (!current || !isSuperAdmin(current.role)) {
       set({ error: "Hanya Super Admin yang dapat melakukan impersonasi." });
       return;
     }
@@ -521,10 +522,18 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     if (!isSupabaseConnected()) return false;
 
     try {
-      const { data } = await supabase!.auth.getSession();
+      const { data } = await withTimeout(
+        supabase!.auth.getSession(),
+        8000,
+        "getSession",
+      );
       if (!data.session?.user) return false;
 
-      const profile = await authRepo.getUserBySupabaseUid(data.session.user.id);
+      const profile = await withTimeout(
+        authRepo.getUserBySupabaseUid(data.session.user.id),
+        8000,
+        "refreshUserProfile",
+      );
       if (!profile) return false;
 
       syncRepositoryContext(profile);
@@ -546,10 +555,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     try {
       if (isSupabaseConnected()) {
-        await supabase!.auth.signOut();
+        await withTimeout(
+          supabase!.auth.signOut(),
+          10000,
+          "signOut",
+        );
       }
     } catch {
-      // signOut failed — still clear local state
+      // signOut timed out or failed — still clear local state
     }
 
     clearDomainStores();
@@ -602,7 +615,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isSystemUser: () => {
     const { user } = get();
     if (!user) return false;
-    return ["super_admin"].includes(user.role);
+    return isSuperAdmin(user.role);
   },
 
   getPharmacyId: () => get().user?.pharmacyId,

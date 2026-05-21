@@ -2,11 +2,7 @@
 
 import { useEffect, useState, useRef } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { useAuthStore, syncRepositoryContext, isLoginInProgress } from "@/store/auth-store";
-import { useCashierStore } from "@/store/cashier-store";
-import { useTransactionStore } from "@/store/transaction-store";
-import { useInventoryStore } from "@/store/inventory-store";
-import { useHoldCartStore } from "@/store/hold-cart-store";
+import { useAuthStore, syncRepositoryContext, isLoginInProgress, clearDomainStores } from "@/store/auth-store";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 
@@ -42,28 +38,6 @@ const SESSION_CHECK_TIMEOUT_MS = 10_000;
 /*  Helpers                                                             */
 /* ------------------------------------------------------------------ */
 
-function clearAllDomainStores() {
-  useCashierStore.getState().resetCashier();
-  useTransactionStore.setState({
-    transactions: [],
-    isLoaded: false,
-    isLoading: false,
-    isDemoMode: isDemoMode(),
-  });
-  useInventoryStore.setState({
-    batches: [],
-    suppliers: [],
-    purchaseInvoices: [],
-    stockMovements: [],
-    stockOpnames: [],
-    dataSource: isDemoMode() ? "demo" : "loading",
-    isDemoMode: isDemoMode(),
-    isLoading: false,
-    isSubmitting: false,
-  });
-  useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
-}
-
 function clearAuthState() {
   syncRepositoryContext(null);
   useAuthStore.setState({
@@ -93,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isHydrating, setIsHydrating] = useState(true);
   const [hydrationError, setHydrationError] = useState<string | null>(null);
   const initFromSupabaseSession = useAuthStore((s) => s.initFromSupabaseSession);
+  const refreshUserProfile = useAuthStore((s) => s.refreshUserProfile);
   const router = useRouter();
   const pathname = usePathname();
 
@@ -248,20 +223,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       try {
         if (event === "SIGNED_OUT") {
           devLog("onAuthStateChange: SIGNED_OUT — clearing all state");
-          clearAllDomainStores();
+          clearDomainStores();
           clearAuthState();
           if (pathname !== "/login") {
             router.push("/login");
           }
-        } else if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED") {
+        } else if (event === "SIGNED_IN") {
           /* If loginWithEmail is in progress, it handles the full profile chain.
            * Calling initFromSupabaseSession here would race on the same queries. */
           if (isLoginInProgress()) {
-            devLog("onAuthStateChange:", event, "— suppressed (login in progress)");
+            devLog("onAuthStateChange: SIGNED_IN — suppressed (login in progress)");
             return;
           }
-          devLog("onAuthStateChange:", event, "— re-initializing session");
+          devLog("onAuthStateChange: SIGNED_IN — re-initializing session");
           await initFromSupabaseSession();
+        } else if (event === "TOKEN_REFRESHED") {
+          /* Token refresh — lightweight profile refresh, no full re-hydration needed */
+          if (isLoginInProgress()) {
+            devLog("onAuthStateChange: TOKEN_REFRESHED — suppressed (login in progress)");
+            return;
+          }
+          devLog("onAuthStateChange: TOKEN_REFRESHED — refreshing profile only");
+          await refreshUserProfile();
         }
         /* INITIAL_SESSION and USER_UPDATED are handled by the hydrate effect */
       } catch (err) {
@@ -273,7 +256,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       devLog("auth listener: unsubscribing");
       subscription.unsubscribe();
     };
-  }, [initFromSupabaseSession, router, pathname]);
+  }, [initFromSupabaseSession, refreshUserProfile, router, pathname]);
 
   /* ---- Render: loading ---- */
   if (isHydrating) {
@@ -324,7 +307,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             <button
               onClick={() => {
                 clearAuthState();
-                clearAllDomainStores();
+                clearDomainStores();
                 router.push("/login");
                 setHydrationError(null);
                 setIsHydrating(false);

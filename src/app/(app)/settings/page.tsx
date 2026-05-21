@@ -5,6 +5,7 @@ import { Lock, Settings, Shield, ShieldAlert, ExternalLink } from "lucide-react"
 import { toast } from "sonner";
 import { usePermission } from "@/hooks/use-auth";
 import { useAuthStore } from "@/store/auth-store";
+import { isTenantOwner } from "@/lib/auth/permissions";
 import { ModulePlaceholder } from "@/components/shared/module-placeholder";
 
 export default function SettingsPage() {
@@ -66,7 +67,7 @@ export default function SettingsPage() {
       )}
 
       {/* Business owner: locked "Buka Toko Baru" card */}
-      {!isSystemUser && user?.role === "tenant_owner" && (
+      {!isSystemUser && isTenantOwner(user?.role as any) && (
         <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-800 dark:bg-amber-950">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-100 dark:bg-amber-900">

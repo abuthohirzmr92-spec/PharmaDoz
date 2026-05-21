@@ -1,11 +1,12 @@
 import type { AppRole } from "@/types";
+import { isSuperAdmin } from "@/lib/auth/super-admin";
 
 // ---------------------------------------------------------------------------
 // Role helpers
 // ---------------------------------------------------------------------------
 
 export function isCrossTenantRole(role: string): boolean {
-  return ["super_admin"].includes(role);
+  return isSuperAdmin(role as AppRole);
 }
 
 export function assertSystemRole(role: string): void {

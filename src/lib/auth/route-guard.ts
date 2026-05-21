@@ -1,17 +1,10 @@
-import { validateRouteAccess } from "@/lib/auth/roles";
+import { validateRouteAccess, getRequiredPermissionForPath } from "@/lib/auth/roles";
 import type { AppRole, Permission } from "@/types";
 
 /**
  * Server-side route access validation.
- * Returns the required permission for a path, or null if no permission is needed.
+ * Uses the single source of truth in roles.ts for permission mapping.
  */
-
-const PROTECTED_PATHS: Record<string, Permission> = {
-  "/admin/tenants": "platform.tenants.manage",
-  "/admin/expansions": "platform.expansions.approve",
-  "/admin/monitoring": "platform.monitoring.view",
-  "/admin": "platform.view",
-};
 
 const PUBLIC_PATHS = new Set([
   "/login",
@@ -21,17 +14,7 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 export function getRequiredPermission(path: string): Permission | null {
-  // Check exact match first
-  if (PROTECTED_PATHS[path]) return PROTECTED_PATHS[path];
-
-  // Check prefix matches
-  for (const [prefix, permission] of Object.entries(PROTECTED_PATHS)) {
-    if (path.startsWith(prefix + "/") || path.startsWith(prefix + "?")) {
-      return permission;
-    }
-  }
-
-  return null;
+  return getRequiredPermissionForPath(path);
 }
 
 export function isPublicPath(path: string): boolean {
