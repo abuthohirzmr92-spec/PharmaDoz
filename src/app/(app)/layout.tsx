@@ -5,11 +5,12 @@ import { OfflineBanner } from "@/components/shared/offline-banner";
 import { RecoveryBanner } from "@/components/shared/recovery-banner";
 import { SidebarLayout } from "@/components/shared/sidebar-layout";
 import { useAuthStore } from "@/store/auth-store";
-import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
+
+const PLATFORM_PREFIXES = ["/admin", "/platform"];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -29,18 +30,17 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, isLoading, router]);
 
-  // Redirect super admins away from tenant-scoped pages
+  // Redirect platform users away from tenant-scoped pages
   useEffect(() => {
-    if (
-      isAuthenticated &&
-      isSuperAdmin(user?.role) &&
-      pathname === "/dashboard"
-    ) {
+    if (!isAuthenticated) return;
+    if (!isPlatformUser(user?.role)) return;
+    const isPlatformRoute = PLATFORM_PREFIXES.some((p) => pathname?.startsWith(p));
+    if (!isPlatformRoute) {
       router.replace("/admin");
     }
   }, [isAuthenticated, user?.role, pathname, router]);
 
-  const isAdminRoute = pathname?.startsWith("/admin");
+  const isPlatformRoute = PLATFORM_PREFIXES.some((p) => pathname?.startsWith(p));
   const platformUser = isPlatformUser(user?.role);
 
   // Show skeleton while checking auth (prevents flash of login redirect
@@ -64,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       <OfflineBanner />
       <RecoveryBanner />
-      {isAdminRoute || platformUser ? children : <SidebarLayout>{children}</SidebarLayout>}
+      {isPlatformRoute || platformUser ? children : <SidebarLayout>{children}</SidebarLayout>}
     </>
   );
 }

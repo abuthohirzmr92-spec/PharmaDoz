@@ -3,6 +3,16 @@ import type { AppRole, Permission, SystemRole, TenantRole } from "@/types";
 // ---------------------------------------------------------------------------
 // SINGLE SOURCE OF TRUTH: Role-to-Permission mapping
 // ---------------------------------------------------------------------------
+//
+// Branch-scoped permissions (see @/lib/branch-access/branch-permissions):
+//   inventory.stock.view, inventory.stock.adjust, products.view,
+//   products.create, products.edit, cashier.transaction.create,
+//   cashier.transaction.view, reports.sales.view, reports.financial.view
+//
+// These permissions require an active branch context.  Multi-branch admins
+// (tenant_owner, admin) can use them across all branches.  Restricted users
+// (pharmacist, cashier, staff) can only use them for their assigned branch.
+//
 
 export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
   // ====== System roles (platform/internal) ======

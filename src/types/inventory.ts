@@ -73,7 +73,8 @@ export type MovementType =
   | "refund"
   | "expired"
   | "opname"
-  | "adjustment";
+  | "adjustment"
+  | "transfer";
 
 export interface StockMovement {
   id: string;

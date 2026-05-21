@@ -50,6 +50,7 @@ export class TransactionRepository extends BaseRepository {
       countQuery = countQuery.ilike("invoice_number", `%${searchQuery}%`);
 
     countQuery = this.withTenantScope(countQuery);
+    countQuery = this.withBranchScope(countQuery);
 
     const { count: total, error: countError } = await countQuery;
     if (countError) return this.handleError(countError, "getTransactions");
@@ -68,6 +69,7 @@ export class TransactionRepository extends BaseRepository {
       dataQuery = dataQuery.ilike("invoice_number", `%${searchQuery}%`);
 
     dataQuery = this.withTenantScope(dataQuery);
+    dataQuery = this.withBranchScope(dataQuery);
 
     const { data: txnRows, error: dataError } = await dataQuery;
     if (dataError) return this.handleError(dataError, "getTransactions");
@@ -133,6 +135,7 @@ export class TransactionRepository extends BaseRepository {
       .eq("id", id);
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data: txn, error } = await query.single();
 
@@ -208,7 +211,7 @@ export class TransactionRepository extends BaseRepository {
 
     // Insert transaction header
     const txnInsert: Record<string, unknown> = {
-      pharmacy_id: data.pharmacyId ?? this.pharmacyId,
+      pharmacy_id: data.pharmacyId ?? this.branchId,
       invoice_number: data.invoiceNumber,
       cashier_name: data.cashierName,
       subtotal: data.subtotal,

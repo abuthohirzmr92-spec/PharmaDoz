@@ -20,7 +20,11 @@ interface TransactionState {
   isLoading: boolean;
   isDemoMode: boolean;
 
+  /* Branch context */
+  branchId: string | null;
+
   /* Actions */
+  setBranchContext: (branchId: string | null) => void;
   loadDemoTransactions: () => Promise<void>;
   addTransaction: (tx: Transaction) => void;
   addTransactions: (txs: Transaction[]) => void;
@@ -44,9 +48,21 @@ export const useTransactionStore = create<TransactionState>()((set, get) => ({
   isLoaded: false,
   isLoading: false,
   isDemoMode: checkDemoMode(),
+  branchId: null,
+
+  setBranchContext: (branchId) => {
+    set({ branchId });
+    transactionRepo.setBranchContext(branchId ?? undefined);
+  },
 
   loadDemoTransactions: async () => {
     if (get().isLoaded) return;
+
+    // Sync branch context before query
+    const { branchId } = get();
+    if (branchId) {
+      transactionRepo.setBranchContext(branchId);
+    }
 
     // No tenant context — skip Supabase query (e.g. super admin with no tenant)
     if (transactionRepo.isConnected && !transactionRepo.getTenantId()) {

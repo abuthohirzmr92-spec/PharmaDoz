@@ -62,6 +62,7 @@ export class ProductRepository extends BaseRepository {
       .is("deleted_at", null);
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     if (filters?.categoryId)
       query = query.eq("category_id", filters.categoryId);
@@ -128,6 +129,7 @@ export class ProductRepository extends BaseRepository {
       .eq("id", id);
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data, error } = await query.single();
 
@@ -193,6 +195,7 @@ export class ProductRepository extends BaseRepository {
       .eq("barcode", barcode);
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data, error } = await query.maybeSingle();
 
@@ -269,8 +272,8 @@ export class ProductRepository extends BaseRepository {
       is_active: data.isActive ?? true,
     };
 
-    if (this.pharmacyId) {
-      insertData["pharmacy_id"] = this.pharmacyId;
+    if (this.branchId) {
+      insertData["pharmacy_id"] = this.branchId;
     }
     if (this.getTenantId()) {
       insertData["tenant_id"] = this.getTenantId();
@@ -358,6 +361,7 @@ export class ProductRepository extends BaseRepository {
       .is("deleted_at", null);
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     if (filters?.categoryId)
       query = query.eq("category_id", filters.categoryId);

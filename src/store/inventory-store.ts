@@ -26,7 +26,7 @@ import {
   buildDashboardSummary,
 } from "@/lib/inventory-demo";
 import { isDemoMode as checkDemoMode } from "@/config/env";
-import { productRepo, supplierRepo, inventoryRepo } from "@/lib/repository-instances";
+import { productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
 
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
@@ -131,7 +131,10 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   /* ---- branch context ---- */
   setBranchContext: (branchId) => {
     set({ branchId });
-    inventoryRepo.setBranchContext(branchId ?? undefined);
+    const bid = branchId ?? undefined;
+    inventoryRepo.setBranchContext(bid);
+    productRepo.setBranchContext(bid);
+    transactionRepo.setBranchContext(bid);
   },
 
   /* ---- UI ---- */
@@ -150,6 +153,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const { branchId } = get();
       if (branchId) {
         inventoryRepo.setBranchContext(branchId);
+        productRepo.setBranchContext(branchId);
+        transactionRepo.setBranchContext(branchId);
       }
 
       try {
@@ -339,6 +344,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const { branchId } = get();
       if (branchId) {
         inventoryRepo.setBranchContext(branchId);
+        productRepo.setBranchContext(branchId);
+        transactionRepo.setBranchContext(branchId);
       }
 
       try {
@@ -443,6 +450,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const { branchId } = get();
       if (branchId) {
         inventoryRepo.setBranchContext(branchId);
+        productRepo.setBranchContext(branchId);
+        transactionRepo.setBranchContext(branchId);
       }
 
       try {
@@ -521,6 +530,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const { branchId } = get();
       if (branchId) {
         inventoryRepo.setBranchContext(branchId);
+        productRepo.setBranchContext(branchId);
+        transactionRepo.setBranchContext(branchId);
       }
 
       const invoice = state.purchaseInvoices.find(inv => inv.id === invoiceId);
@@ -629,6 +640,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const { branchId } = get();
       if (branchId) {
         inventoryRepo.setBranchContext(branchId);
+        productRepo.setBranchContext(branchId);
+        transactionRepo.setBranchContext(branchId);
       }
 
       try {
@@ -696,6 +709,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       const { branchId } = get();
       if (branchId) {
         inventoryRepo.setBranchContext(branchId);
+        productRepo.setBranchContext(branchId);
+        transactionRepo.setBranchContext(branchId);
       }
 
       try {

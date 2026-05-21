@@ -5,6 +5,7 @@ import type { AppRole, Permission, UserProfile } from "@/types";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isSessionStale } from "@/lib/auth/roles";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
+import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 import {
@@ -617,7 +618,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isSystemUser: () => {
     const { user } = get();
     if (!user) return false;
-    return isSuperAdmin(user.role);
+    return isPlatformUser(user.role);
   },
 
   getPharmacyId: () => get().user?.pharmacyId,

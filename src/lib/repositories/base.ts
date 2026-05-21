@@ -66,6 +66,10 @@ export class BaseRepository {
     return this.tenantContext?.tenantId ?? this.pharmacyId;
   }
 
+  getTenantUserId(): string | undefined {
+    return this.tenantContext?.userId;
+  }
+
   protected requireTenant(): string {
     const tid = this.getTenantId();
     if (!tid) {

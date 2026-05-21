@@ -6,7 +6,7 @@ import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { PlatformSidebar } from "@/components/platform/platform-sidebar";
 import { useEffect } from "react";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);

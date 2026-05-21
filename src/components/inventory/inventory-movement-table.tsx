@@ -13,6 +13,7 @@ const TYPE_CONFIG: Record<MovementType, { icon: typeof TrendingUp; cls: string; 
   expired: { icon: AlertTriangle, cls: "text-red-600 bg-red-50 dark:bg-red-950/30", label: "Expired" },
   opname: { icon: Clipboard, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Opname" },
   adjustment: { icon: Settings, cls: "text-neutral-600 bg-neutral-100 dark:bg-neutral-800", label: "Adjust" },
+  transfer: { icon: TrendingUp, cls: "text-purple-600 bg-purple-50 dark:bg-purple-950/30", label: "Transfer" },
 };
 
 const TYPE_FILTERS: { label: string; value: MovementType | "all" }[] = [
@@ -22,6 +23,7 @@ const TYPE_FILTERS: { label: string; value: MovementType | "all" }[] = [
   { label: "Retur", value: "refund" },
   { label: "Expired", value: "expired" },
   { label: "Opname", value: "opname" },
+  { label: "Transfer", value: "transfer" },
   { label: "Adjust", value: "adjustment" },
 ];
 

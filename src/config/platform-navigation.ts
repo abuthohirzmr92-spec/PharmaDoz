@@ -26,19 +26,19 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
     label: "Platform",
     items: [
       {
-        href: "/admin",
+        href: "/platform",
         label: "Dashboard Platform",
         icon: LayoutDashboard,
         permission: "platform.view",
       },
       {
-        href: "/admin/tenants",
+        href: "/platform/tenants",
         label: "Manajemen Tenant",
         icon: Users,
         permission: "platform.tenants.manage",
       },
       {
-        href: "/admin/expansions",
+        href: "/platform/expansions",
         label: "Ekspansi Cabang",
         icon: Store,
         permission: "platform.expansions.approve",
@@ -49,15 +49,21 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
     label: "Sistem",
     items: [
       {
-        href: "/admin/monitoring",
+        href: "/platform/monitoring",
         label: "Monitoring",
         icon: Activity,
         permission: "platform.monitoring.view",
       },
       {
-        href: "/admin/diagnostics",
+        href: "/platform/diagnostics",
         label: "Diagnostics AI",
         icon: Brain,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/maintenance",
+        label: "Maintenance",
+        icon: Activity,
         permission: "platform.view",
       },
     ],

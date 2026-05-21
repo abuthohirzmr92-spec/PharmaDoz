@@ -11,8 +11,15 @@ const PUBLIC_PATHS = new Set([
 ]);
 
 const ADMIN_PREFIX = "/admin";
+const PLATFORM_PREFIX = "/platform";
 
 const ASSET_PREFIXES = ["/_next", "/api", "/favicon.ico"];
+
+const SYSTEM_ROLES: ReadonlySet<string> = new Set([
+  "super_admin",
+  "developer",
+  "support_ai",
+]);
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
@@ -23,7 +30,11 @@ function isPublicPath(pathname: string): boolean {
 }
 
 function isAdminPath(pathname: string): boolean {
-  return pathname.startsWith(ADMIN_PREFIX);
+  return pathname.startsWith(ADMIN_PREFIX) || pathname.startsWith(PLATFORM_PREFIX);
+}
+
+function isSystemRole(role: string | null | undefined): boolean {
+  return typeof role === "string" && SYSTEM_ROLES.has(role);
 }
 
 export async function proxy(request: NextRequest) {
@@ -70,7 +81,7 @@ export async function proxy(request: NextRequest) {
         .single();
 
       const target =
-        profile && profile.role === "super_admin" ? "/admin" : "/dashboard";
+        profile && isSystemRole(profile.role) ? "/platform" : "/dashboard";
       return NextResponse.redirect(new URL(target, request.url));
     }
     return response;
@@ -87,7 +98,7 @@ export async function proxy(request: NextRequest) {
     return NextResponse.redirect(loginUrl);
   }
 
-  /* ---- Admin routes: require super_admin role ---- */
+  /* ---- Admin routes: require system role ---- */
   if (isAdminPath(request.nextUrl.pathname)) {
     const { data: profile, error: profileError } = await supabase
       .from("profiles")
@@ -95,7 +106,7 @@ export async function proxy(request: NextRequest) {
       .eq("id", session.user.id)
       .single();
 
-    if (profileError || !profile || profile.role !== "super_admin") {
+    if (profileError || !profile || !isSystemRole(profile.role)) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
   }
