@@ -5,16 +5,20 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
 import { Menu } from "lucide-react";
 import { MOBILE_BOTTOM_NAV_HEIGHT } from "@/config/constants";
-import { mainNavigation } from "@/config/navigation";
+import { TENANT_NAVIGATION } from "@/config/navigation";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
+import { isPlatformUser } from "@/lib/auth/role-resolver";
 
 export function MobileBottomNav() {
   const pathname = usePathname();
   const { setMobileOpen } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
-  const displayItems = mainNavigation
+  // Platform users get their own navigation — never show tenant bottom nav
+  if (isPlatformUser(user?.role)) return null;
+
+  const displayItems = TENANT_NAVIGATION
     .filter(
       (item) =>
         !item.permission ||

@@ -5,7 +5,8 @@ import { cn } from "@/lib/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
 import { ChevronLeft } from "lucide-react";
-import { mainNavigation } from "@/config/navigation";
+import { isPlatformUser } from "@/lib/auth/role-resolver";
+import { TENANT_NAVIGATION } from "@/config/navigation";
 import { NavItem } from "./nav-item";
 import { OfflineIndicator } from "./offline-indicator";
 import { SyncStatus } from "./sync-status";
@@ -16,7 +17,12 @@ export function Sidebar() {
   const { expanded, toggle } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
-  const filteredNav = mainNavigation.filter(
+  // Platform users should never see the tenant sidebar
+  if (isPlatformUser(user?.role)) {
+    return null;
+  }
+
+  const filteredNav = TENANT_NAVIGATION.filter(
     (item) =>
       !item.permission ||
       useAuthStore.getState().can(item.permission),

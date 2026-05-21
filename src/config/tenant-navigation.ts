@@ -6,18 +6,10 @@ import {
   FileText,
   Users,
   Settings,
-  type LucideIcon,
 } from "lucide-react";
-import type { Permission } from "@/types";
+import type { NavItem } from "./navigation";
 
-export interface NavItem {
-  label: string;
-  href: string;
-  icon: LucideIcon;
-  permission?: Permission;
-}
-
-export const mainNavigation: NavItem[] = [
+export const TENANT_NAVIGATION: NavItem[] = [
   {
     label: "Dashboard",
     href: "/dashboard",
@@ -61,5 +53,3 @@ export const mainNavigation: NavItem[] = [
     permission: "settings.view",
   },
 ];
-
-export { TENANT_NAVIGATION } from "./tenant-navigation";
