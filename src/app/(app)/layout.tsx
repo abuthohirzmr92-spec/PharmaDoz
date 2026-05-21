@@ -6,6 +6,7 @@ import { RecoveryBanner } from "@/components/shared/recovery-banner";
 import { SidebarLayout } from "@/components/shared/sidebar-layout";
 import { useAuthStore } from "@/store/auth-store";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
+import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { useRouter, usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
@@ -39,6 +40,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   }, [isAuthenticated, user?.role, pathname, router]);
 
+  const isAdminRoute = pathname?.startsWith("/admin");
+  const platformUser = isPlatformUser(user?.role);
+
   // Show skeleton while checking auth (prevents flash of login redirect
   // during the brief moment Supabase session is being restored).
   if (isLoading) return <PageSkeleton />;
@@ -60,7 +64,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       )}
       <OfflineBanner />
       <RecoveryBanner />
-      <SidebarLayout>{children}</SidebarLayout>
+      {isAdminRoute || platformUser ? children : <SidebarLayout>{children}</SidebarLayout>}
     </>
   );
 }

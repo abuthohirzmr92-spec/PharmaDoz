@@ -37,6 +37,22 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "platform.monitoring.view",
   ],
 
+  developer: [
+    "platform.view",
+    "platform.tenants.manage",
+    "platform.monitoring.view",
+    "platform.maintenance.manage",
+    "logs.view",
+    "settings.view",
+  ],
+
+  support_ai: [
+    "platform.view",
+    "platform.monitoring.view",
+    "platform.maintenance.manage",
+    "logs.view",
+  ],
+
   // ====== Tenant roles (per-tenant operational) ======
   tenant_owner: [
     "inventory.stock.view",
@@ -113,6 +129,8 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
 
 export const SYSTEM_ROLES: readonly SystemRole[] = [
   "super_admin",
+  "developer",
+  "support_ai",
 ];
 
 export const TENANT_ROLES: readonly TenantRole[] = [
@@ -132,6 +150,8 @@ export const BUSINESS_ROLES = TENANT_ROLES;
 
 export const ROLE_LABELS: Record<AppRole, string> = {
   super_admin: "Super Admin",
+  developer: "Developer",
+  support_ai: "Support AI",
   tenant_owner: "Pemilik",
   admin: "Admin",
   pharmacist: "Apoteker",

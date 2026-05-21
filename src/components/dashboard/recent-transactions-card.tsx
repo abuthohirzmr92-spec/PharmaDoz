@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { ReceiptText } from "lucide-react";
 import { useTransactionStore } from "@/store/transaction-store";
 import { formatCurrencyID } from "@/lib/date-utils";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 
 const METHOD_LABELS: Record<string, string> = {
   cash: "Tunai",
@@ -26,13 +27,7 @@ export function RecentTransactionsCard() {
   const recent = useMemo(() => transactions.slice(0, 5), [transactions]);
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
-      </div>
-    );
+    return <TableSkeleton rows={5} />;
   }
 
   return (

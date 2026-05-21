@@ -5,6 +5,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { useTransactionStore } from "@/store/transaction-store";
 import { computeSalesTrend } from "@/lib/report-aggregate";
 import { resolveDateRange } from "@/lib/date-utils";
+import { CardSkeleton } from "@/components/shared/card-skeleton";
 
 export function SalesChartCard() {
   const [mounted, setMounted] = useState(false);
@@ -26,13 +27,7 @@ export function SalesChartCard() {
   const hasData = useMemo(() => trend.some((d) => d.total > 0), [trend]);
 
   if (!mounted || isLoading) {
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
-      </div>
-    );
+    return <CardSkeleton className="h-[280px]" />;
   }
 
   return (

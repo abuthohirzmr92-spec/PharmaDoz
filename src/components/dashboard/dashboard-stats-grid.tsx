@@ -6,6 +6,7 @@ import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { cn } from "@/lib/cn";
 import { formatCurrencyID } from "@/lib/date-utils";
+import { CardSkeleton } from "@/components/shared/card-skeleton";
 
 interface StatCard {
   key: string;
@@ -88,11 +89,7 @@ export function DashboardStatsGrid() {
     return (
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         {Array.from({ length: 4 }).map((_, i) => (
-          <div key={i} className="rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-800 dark:bg-neutral-900">
-            <div className="flex items-center justify-center py-6">
-              <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-            </div>
-          </div>
+          <CardSkeleton key={i} />
         ))}
       </div>
     );

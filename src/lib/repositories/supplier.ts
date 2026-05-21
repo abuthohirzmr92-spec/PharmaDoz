@@ -31,12 +31,14 @@ export class SupplierRepository extends BaseRepository {
   async getSupplierById(id: string): Promise<Supplier | null> {
     if (!this.isConnected) return null;
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("suppliers")
       .select("*")
       .is("deleted_at", null)
-      .eq("id", id)
-      .single();
+      .eq("id", id);
+    query = this.withTenantScope(query);
+
+    const { data, error } = await query.single();
 
     if (error) {
       if (error.code === "PGRST116") return null;
@@ -55,15 +57,20 @@ export class SupplierRepository extends BaseRepository {
   }): Promise<Supplier> {
     if (!this.isConnected) throw new Error("Not connected");
 
+    const insertData: Record<string, unknown> = {
+      name: data.name,
+      contact_person: data.contactPerson ?? null,
+      phone: data.phone ?? null,
+      email: data.email ?? null,
+      address: data.address ?? null,
+    };
+    if (this.getTenantId()) {
+      insertData["tenant_id"] = this.getTenantId();
+    }
+
     const { data: row, error } = await this.client
       .from("suppliers")
-      .insert({
-        name: data.name,
-        contact_person: data.contactPerson ?? null,
-        phone: data.phone ?? null,
-        email: data.email ?? null,
-        address: data.address ?? null,
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -97,12 +104,14 @@ export class SupplierRepository extends BaseRepository {
     if (data.address !== undefined) updateData["address"] = data.address;
     if (data.isActive !== undefined) updateData["is_active"] = data.isActive;
 
-    const { data: row, error } = await this.client
+    let query = this.client
       .from("suppliers")
       .update(updateData)
       .eq("id", id)
-      .select()
-      .single();
+      .select();
+    query = this.withTenantScope(query);
+
+    const { data: row, error } = await query.single();
 
     if (error) return this.handleError(error, "updateSupplier");
 
@@ -183,12 +192,14 @@ export class SupplierRepository extends BaseRepository {
   async getPurchaseInvoiceById(id: string): Promise<PurchaseInvoice | null> {
     if (!this.isConnected) return null;
 
-    const { data: inv, error } = await this.client
+    let query = this.client
       .from("purchase_invoices")
       .select(`*, supplier:supplier_id(name)`)
       .is("deleted_at", null)
-      .eq("id", id)
-      .single();
+      .eq("id", id);
+    query = this.withTenantScope(query);
+
+    const { data: inv, error } = await query.single();
 
     if (error) {
       if (error.code === "PGRST116") return null;
@@ -241,11 +252,13 @@ export class SupplierRepository extends BaseRepository {
     if (!this.isConnected) throw new Error("Not connected");
 
     // Fetch current invoice to determine new status
-    const { data: current, error: fetchError } = await this.client
+    let fetchQuery = this.client
       .from("purchase_invoices")
       .select("total_amount")
-      .eq("id", id)
-      .single();
+      .eq("id", id);
+    fetchQuery = this.withTenantScope(fetchQuery);
+
+    const { data: current, error: fetchError } = await fetchQuery.single();
 
     if (fetchError) return this.handleError(fetchError, "updatePayment");
 
@@ -255,7 +268,7 @@ export class SupplierRepository extends BaseRepository {
     else if (paidAmount > 0) newStatus = "partial";
     else newStatus = "unpaid";
 
-    const { data: row, error } = await this.client
+    let updateQuery = this.client
       .from("purchase_invoices")
       .update({
         paid_amount: paidAmount,
@@ -263,8 +276,10 @@ export class SupplierRepository extends BaseRepository {
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)
-      .select(`*, supplier:supplier_id(name)`)
-      .single();
+      .select(`*, supplier:supplier_id(name)`);
+    updateQuery = this.withTenantScope(updateQuery);
+
+    const { data: row, error } = await updateQuery.single();
 
     if (error) return this.handleError(error, "updatePayment");
 
@@ -306,18 +321,23 @@ export class SupplierRepository extends BaseRepository {
     if (!this.isConnected) throw new Error("Not connected");
 
     // Insert invoice
+    const invoiceInsert: Record<string, unknown> = {
+      invoice_number: data.invoiceNumber,
+      supplier_id: data.supplierId,
+      purchase_date:
+        data.purchaseDate ?? new Date().toISOString().split("T")[0] ?? "",
+      due_date: data.dueDate ?? null,
+      status: data.status ?? "unpaid",
+      total_amount: data.totalAmount ?? 0,
+      paid_amount: data.paidAmount ?? 0,
+    };
+    if (this.getTenantId()) {
+      invoiceInsert["tenant_id"] = this.getTenantId();
+    }
+
     const { data: inv, error: invError } = await this.client
       .from("purchase_invoices")
-      .insert({
-        invoice_number: data.invoiceNumber,
-        supplier_id: data.supplierId,
-        purchase_date:
-          data.purchaseDate ?? new Date().toISOString().split("T")[0] ?? "",
-        due_date: data.dueDate ?? null,
-        status: data.status ?? "unpaid",
-        total_amount: data.totalAmount ?? 0,
-        paid_amount: data.paidAmount ?? 0,
-      })
+      .insert(invoiceInsert)
       .select(`*, supplier:supplier_id(name)`)
       .single();
 
@@ -329,16 +349,22 @@ export class SupplierRepository extends BaseRepository {
       const { data: items, error: itemError } = await this.client
         .from("purchase_items")
         .insert(
-          data.items.map((item) => ({
-            invoice_id: inv.id,
-            product_id: item.productId,
-            batch_number: item.batchNumber,
-            expired_date: item.expiredDate,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            selling_price: item.sellingPrice,
-            subtotal: item.quantity * item.unitPrice,
-          })),
+          data.items.map((item) => {
+            const row: Record<string, unknown> = {
+              invoice_id: inv.id,
+              product_id: item.productId,
+              batch_number: item.batchNumber,
+              expired_date: item.expiredDate,
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+              selling_price: item.sellingPrice,
+              subtotal: item.quantity * item.unitPrice,
+            };
+            if (this.getTenantId()) {
+              row["tenant_id"] = this.getTenantId();
+            }
+            return row;
+          }),
         )
         .select(`*, product:product_id(name)`);
 

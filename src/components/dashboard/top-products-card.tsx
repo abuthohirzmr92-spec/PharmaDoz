@@ -4,6 +4,7 @@ import { useEffect, useMemo } from "react";
 import { useTransactionStore } from "@/store/transaction-store";
 import { formatCurrencyID } from "@/lib/date-utils";
 import { cn } from "@/lib/cn";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 
 export function TopProductsCard() {
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
@@ -17,13 +18,7 @@ export function TopProductsCard() {
   }, [isLoaded, loadTxns]);
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
-      </div>
-    );
+    return <TableSkeleton rows={5} />;
   }
 
   const top = useMemo(() => getTopProducts(5), [getTopProducts, transactions]);

@@ -40,20 +40,26 @@ export class BaseRepository {
 
   protected pharmacyId: string | undefined;
   protected tenantContext: TenantContext | undefined;
+  protected branchId: string | undefined;
 
   /** @deprecated Use setTenantContext with a full TenantContext object instead */
   setPharmacyContext(pharmacyId: string | undefined): void {
     this.pharmacyId = pharmacyId;
     if (pharmacyId) {
-      this.tenantContext = { tenantId: pharmacyId, role: "staff", userId: "" };
+      this.tenantContext = { tenantId: pharmacyId, role: "staff" as any, userId: "" };
     } else {
       this.tenantContext = undefined;
     }
   }
 
-  setTenantContext(ctx: TenantContext | undefined): void {
+  setTenantContext(ctx: TenantContext | undefined, branchId?: string): void {
     this.tenantContext = ctx;
     this.pharmacyId = ctx?.tenantId;
+    this.branchId = branchId;
+  }
+
+  setBranchContext(branchId: string | undefined): void {
+    this.branchId = branchId;
   }
 
   getTenantId(): string | undefined {
@@ -77,6 +83,11 @@ export class BaseRepository {
   protected withCrossTenantScope(query: any, column: string = "tenant_id"): any {
     // No-op: cross-tenant queries don't filter by tenant
     return query;
+  }
+
+  protected withBranchScope(query: any, column: string = "pharmacy_id"): any {
+    if (!this.branchId) return query;
+    return query.eq(column, this.branchId);
   }
 
   protected handleError(error: unknown, context: string): never {

@@ -272,6 +272,9 @@ export class ProductRepository extends BaseRepository {
     if (this.pharmacyId) {
       insertData["pharmacy_id"] = this.pharmacyId;
     }
+    if (this.getTenantId()) {
+      insertData["tenant_id"] = this.getTenantId();
+    }
 
     const { data: row, error } = await this.client
       .from("products")
@@ -324,12 +327,14 @@ export class ProductRepository extends BaseRepository {
     if (data.minStock !== undefined) updateData["min_stock"] = data.minStock;
     if (data.isActive !== undefined) updateData["is_active"] = data.isActive;
 
-    const { data: row, error } = await this.client
+    let query = this.client
       .from("products")
       .update(updateData)
       .eq("id", id)
-      .select()
-      .single();
+      .select();
+    query = this.withTenantScope(query);
+
+    const { data: row, error } = await query.single();
 
     if (error) return this.handleError(error, "updateProduct");
 
@@ -370,13 +375,16 @@ export class ProductRepository extends BaseRepository {
   async softDeleteProduct(id: string): Promise<void> {
     if (!this.isConnected) throw new Error("Not connected");
 
-    const { error } = await this.client
+    let query = this.client
       .from("products")
       .update({
         deleted_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id);
+    query = this.withTenantScope(query);
+
+    const { error } = await query;
 
     if (error) this.handleError(error, "softDeleteProduct");
   }
@@ -388,10 +396,13 @@ export class ProductRepository extends BaseRepository {
   async getCategories(): Promise<ProductCategory[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("product_categories")
       .select("*")
       .is("deleted_at", null);
+    query = this.withTenantScope(query);
+
+    const { data, error } = await query;
 
     if (error) return this.handleError(error, "getCategories");
 

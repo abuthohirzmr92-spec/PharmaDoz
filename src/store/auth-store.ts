@@ -107,6 +107,8 @@ const DEMO_USERS: Record<
   { email: string; displayName: string; pharmacyId?: string; pharmacyName?: string }
 > = {
   super_admin: { email: "super@apotek-manage.id", displayName: "Super Admin" },
+  developer: { email: "dev@apotek-manage.id", displayName: "Developer" },
+  support_ai: { email: "ai@apotek-manage.id", displayName: "Support AI" },
   tenant_owner: {
     email: "owner@apotek-sehat.id",
     displayName: "Budi Santoso",

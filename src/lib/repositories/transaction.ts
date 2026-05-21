@@ -207,17 +207,22 @@ export class TransactionRepository extends BaseRepository {
     if (!this.isConnected) throw new Error("Not connected");
 
     // Insert transaction header
+    const txnInsert: Record<string, unknown> = {
+      pharmacy_id: data.pharmacyId ?? this.pharmacyId,
+      invoice_number: data.invoiceNumber,
+      cashier_name: data.cashierName,
+      subtotal: data.subtotal,
+      discount: data.discount,
+      tax: data.tax,
+      total: data.total,
+    };
+    if (this.getTenantId()) {
+      txnInsert["tenant_id"] = this.getTenantId();
+    }
+
     const { data: txn, error: txnError } = await this.client
       .from("transactions")
-      .insert({
-        pharmacy_id: data.pharmacyId ?? this.pharmacyId,
-        invoice_number: data.invoiceNumber,
-        cashier_name: data.cashierName,
-        subtotal: data.subtotal,
-        discount: data.discount,
-        tax: data.tax,
-        total: data.total,
-      })
+      .insert(txnInsert)
       .select()
       .single();
 
@@ -228,14 +233,20 @@ export class TransactionRepository extends BaseRepository {
       const { error: itemsError } = await this.client
         .from("transaction_items")
         .insert(
-          data.items.map((item) => ({
-            transaction_id: txn.id,
-            product_id: item.productId,
-            product_name: item.productName,
-            quantity: item.quantity,
-            unit_price: item.unitPrice,
-            subtotal: item.subtotal,
-          })),
+          data.items.map((item) => {
+            const row: Record<string, unknown> = {
+              transaction_id: txn.id,
+              product_id: item.productId,
+              product_name: item.productName,
+              quantity: item.quantity,
+              unit_price: item.unitPrice,
+              subtotal: item.subtotal,
+            };
+            if (this.getTenantId()) {
+              row["tenant_id"] = this.getTenantId();
+            }
+            return row;
+          }),
         );
 
       if (itemsError) return this.handleError(itemsError, "createTransaction");
@@ -246,12 +257,18 @@ export class TransactionRepository extends BaseRepository {
       const { error: paymentsError } = await this.client
         .from("transaction_payments")
         .insert(
-          data.payments.map((pmt) => ({
-            transaction_id: txn.id,
-            amount: pmt.amount,
-            method: pmt.method,
-            ref: pmt.ref ?? null,
-          })),
+          data.payments.map((pmt) => {
+            const row: Record<string, unknown> = {
+              transaction_id: txn.id,
+              amount: pmt.amount,
+              method: pmt.method,
+              ref: pmt.ref ?? null,
+            };
+            if (this.getTenantId()) {
+              row["tenant_id"] = this.getTenantId();
+            }
+            return row;
+          }),
         );
 
       if (paymentsError)

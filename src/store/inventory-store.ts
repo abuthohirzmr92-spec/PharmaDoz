@@ -48,6 +48,9 @@ interface InventoryState {
   stockMovements: StockMovement[];
   stockOpnames: StockOpname[];
 
+  /* Branch context */
+  branchId: string | null;
+
   /* UI */
   activeTab: InventoryTab;
   searchQuery: string;
@@ -55,6 +58,9 @@ interface InventoryState {
   dataSource: "demo" | "database" | "loading";
   isLoading: boolean;
   isSubmitting: boolean;
+
+  /* Actions — branch context */
+  setBranchContext: (branchId: string | null) => void;
 
   /* Actions — UI */
   setActiveTab: (tab: InventoryTab) => void;
@@ -114,12 +120,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   purchaseInvoices: [],
   stockMovements: [],
   stockOpnames: [],
+  branchId: null,
   activeTab: "dashboard",
   searchQuery: "",
   isDemoMode: checkDemoMode(),
   dataSource: checkDemoMode() ? ("demo" as const) : ("loading" as const),
   isLoading: false,
   isSubmitting: false,
+
+  /* ---- branch context ---- */
+  setBranchContext: (branchId) => {
+    set({ branchId });
+    inventoryRepo.setBranchContext(branchId ?? undefined);
+  },
 
   /* ---- UI ---- */
   setActiveTab: (tab) => set({ activeTab: tab, searchQuery: "" }),
@@ -132,6 +145,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     // DB-aware path
     if (state.dataSource === 'database') {
       set({ isSubmitting: true });
+
+      // Sync branch context before DB queries
+      const { branchId } = get();
+      if (branchId) {
+        inventoryRepo.setBranchContext(branchId);
+      }
+
       try {
         // 1. Create purchase invoice with items in the DB
         await supplierRepo.createPurchaseInvoice({
@@ -314,6 +334,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
     if (state.dataSource === 'database') {
       set({ isSubmitting: true });
+
+      // Sync branch context before DB queries
+      const { branchId } = get();
+      if (branchId) {
+        inventoryRepo.setBranchContext(branchId);
+      }
+
       try {
         // Create stock opname in DB
         await inventoryRepo.createStockOpname({
@@ -411,6 +438,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
     if (state.dataSource === 'database') {
       set({ isSubmitting: true });
+
+      // Sync branch context before DB queries
+      const { branchId } = get();
+      if (branchId) {
+        inventoryRepo.setBranchContext(branchId);
+      }
+
       try {
         for (const id of batchIds) {
           const batch = state.batches.find(b => b.id === id);
@@ -484,6 +518,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const state = get();
 
     if (state.dataSource === 'database') {
+      const { branchId } = get();
+      if (branchId) {
+        inventoryRepo.setBranchContext(branchId);
+      }
+
       const invoice = state.purchaseInvoices.find(inv => inv.id === invoiceId);
       if (invoice) {
         const newPaid = invoice.paidAmount + amount;
@@ -585,6 +624,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     // 4. Persist — DB or in-memory
     if (state.dataSource === "database") {
       set({ isSubmitting: true });
+
+      // Sync branch context before DB queries
+      const { branchId } = get();
+      if (branchId) {
+        inventoryRepo.setBranchContext(branchId);
+      }
+
       try {
         for (const movement of newMovements) {
           await inventoryRepo.updateBatchQuantity(
@@ -645,6 +691,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
     if (productRepo.isConnected) {
       set({ dataSource: "loading", isLoading: true });
+
+      // Sync branch context to repositories before querying
+      const { branchId } = get();
+      if (branchId) {
+        inventoryRepo.setBranchContext(branchId);
+      }
+
       try {
         const [products, suppliers] = await Promise.all([
           productRepo.getProducts(),

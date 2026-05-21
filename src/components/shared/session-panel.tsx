@@ -2,10 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, Building2, Wifi, WifiOff } from "lucide-react";
+import { LogOut, Building2, Wifi, WifiOff, Shield } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
 import { ROLE_LABELS } from "@/lib/auth/roles";
+import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 
@@ -55,9 +56,19 @@ export function SessionPanel({ collapsed }: SessionPanelProps) {
         <p className="text-sm font-medium text-neutral-900 dark:text-neutral-100 truncate">
           {user.displayName}
         </p>
-        <p className="text-xs text-neutral-500">
-          {ROLE_LABELS[user.role]}
-        </p>
+        <div className="flex items-center gap-1.5">
+          {isPlatformUser(user.role) && (
+            <Shield className="h-3 w-3 shrink-0 text-brand-500" />
+          )}
+          <span className={cn(
+            "text-xs",
+            isPlatformUser(user.role)
+              ? "font-medium text-brand-600 dark:text-brand-400"
+              : "text-neutral-500",
+          )}>
+            {ROLE_LABELS[user.role]}
+          </span>
+        </div>
         {user.pharmacyName && (
           <div className="flex items-center gap-1 text-xs text-neutral-400">
             <Building2 className="h-3 w-3 shrink-0" />

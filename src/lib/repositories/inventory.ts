@@ -20,6 +20,7 @@ export class InventoryRepository extends BaseRepository {
       .select(`*, product:product_id(name)`)
       .is("deleted_at", null);
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data, error } = await query;
 
@@ -34,11 +35,15 @@ export class InventoryRepository extends BaseRepository {
   async getBatchesByProduct(productId: string): Promise<ProductBatch[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("product_batches")
       .select(`*, product:product_id(name)`)
       .is("deleted_at", null)
       .eq("product_id", productId);
+    query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
+
+    const { data, error } = await query;
 
     if (error) return this.handleError(error, "getBatchesByProduct");
 
@@ -51,12 +56,16 @@ export class InventoryRepository extends BaseRepository {
   async getFefoBatches(productId: string): Promise<ProductBatch[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("product_batches")
       .select(`*, product:product_id(name)`)
       .is("deleted_at", null)
       .eq("product_id", productId)
       .order("expired_date", { ascending: true });
+    query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
+
+    const { data, error } = await query;
 
     if (error) return this.handleError(error, "getFefoBatches");
 
@@ -69,12 +78,14 @@ export class InventoryRepository extends BaseRepository {
   async getBatchById(id: string): Promise<ProductBatch | null> {
     if (!this.isConnected) return null;
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("product_batches")
       .select(`*, product:product_id(name)`)
       .is("deleted_at", null)
-      .eq("id", id)
-      .single();
+      .eq("id", id);
+    query = this.withTenantScope(query);
+
+    const { data, error } = await query.single();
 
     if (error) {
       if (error.code === "PGRST116") return null;
@@ -107,6 +118,7 @@ export class InventoryRepository extends BaseRepository {
         unit_price: data.unitPrice,
         selling_price: data.sellingPrice,
         tenant_id: this.getTenantId(),
+        ...(this.branchId ? { pharmacy_id: this.branchId } : {}),
       })
       .select(`*, product:product_id(name)`)
       .single();
@@ -122,12 +134,14 @@ export class InventoryRepository extends BaseRepository {
   async updateBatchQuantity(id: string, quantity: number): Promise<ProductBatch> {
     if (!this.isConnected) throw new Error("Not connected");
 
-    const { data: row, error } = await this.client
+    let query = this.client
       .from("product_batches")
       .update({ quantity, updated_at: new Date().toISOString() })
       .eq("id", id)
-      .select(`*, product:product_id(name)`)
-      .single();
+      .select(`*, product:product_id(name)`);
+    query = this.withTenantScope(query);
+
+    const { data: row, error } = await query.single();
 
     if (error) return this.handleError(error, "updateBatchQuantity");
 
@@ -172,6 +186,7 @@ export class InventoryRepository extends BaseRepository {
       .order("timestamp", { ascending: false });
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     if (filters?.productId) query = query.eq("product_id", filters.productId);
     if (filters?.batchId) query = query.eq("batch_id", filters.batchId);
@@ -335,6 +350,7 @@ export class InventoryRepository extends BaseRepository {
       )
       .order("opname_date", { ascending: false });
     opnameQuery = this.withTenantScope(opnameQuery);
+    opnameQuery = this.withBranchScope(opnameQuery);
 
     const { data, error } = await opnameQuery;
 
@@ -388,6 +404,55 @@ export class InventoryRepository extends BaseRepository {
     ).toISOString();
 
     try {
+      const q1 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("products")
+          .select("*", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .eq("is_active", true),
+      ));
+      const q2 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("product_batches")
+          .select("product_id, quantity, selling_price")
+          .is("deleted_at", null),
+      ));
+      const q3 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("products")
+          .select("id, min_stock")
+          .is("deleted_at", null)
+          .eq("is_active", true),
+      ));
+      const q4 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("product_batches")
+          .select("id", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .gt("expired_date", now)
+          .lte("expired_date", ninetyDaysLater),
+      ));
+      const q5 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("product_batches")
+          .select("id", { count: "exact", head: true })
+          .is("deleted_at", null)
+          .lte("expired_date", now),
+      ));
+      const q6 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("purchase_invoices")
+          .select("total_amount, paid_amount")
+          .is("deleted_at", null)
+          .neq("status", "paid"),
+      ));
+      const q7 = this.withBranchScope(this.withTenantScope(
+        this.client
+          .from("stock_movements")
+          .select("id", { count: "exact", head: true })
+          .gte("timestamp", twentyFourHoursAgo),
+      ));
+
       const [
         totalProductsResult,
         batchesResult,
@@ -396,42 +461,7 @@ export class InventoryRepository extends BaseRepository {
         expiredResult,
         purchaseResult,
         movementResult,
-      ] = await Promise.all([
-        this.client
-          .from("products")
-          .select("*", { count: "exact", head: true })
-          .is("deleted_at", null)
-          .eq("is_active", true),
-        this.client
-          .from("product_batches")
-          .select("product_id, quantity, selling_price")
-          .is("deleted_at", null),
-        this.client
-          .from("products")
-          .select("id, min_stock")
-          .is("deleted_at", null)
-          .eq("is_active", true),
-        this.client
-          .from("product_batches")
-          .select("id", { count: "exact", head: true })
-          .is("deleted_at", null)
-          .gt("expired_date", now)
-          .lte("expired_date", ninetyDaysLater),
-        this.client
-          .from("product_batches")
-          .select("id", { count: "exact", head: true })
-          .is("deleted_at", null)
-          .lte("expired_date", now),
-        this.client
-          .from("purchase_invoices")
-          .select("total_amount, paid_amount")
-          .is("deleted_at", null)
-          .neq("status", "paid"),
-        this.client
-          .from("stock_movements")
-          .select("id", { count: "exact", head: true })
-          .gte("timestamp", twentyFourHoursAgo),
-      ]);
+      ] = await Promise.all([q1, q2, q3, q4, q5, q6, q7]);
 
       const batches = batchesResult.data || [];
       const totalStockValue = batches.reduce(

@@ -19,6 +19,7 @@ import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode as checkDemoMode } from "@/config/env";
+import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
 import type { AppRole } from "@/types";
 
@@ -44,7 +45,7 @@ export default function LoginPage() {
 
   const handleDemoLogin = (role: AppRole) => {
     loginAs(role);
-    router.push(role === "super_admin" ? "/admin" : "/dashboard");
+    router.push(isSuperAdmin(role) ? "/admin" : "/dashboard");
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -79,7 +80,7 @@ export default function LoginPage() {
 
       if (result.success) {
         const role = useAuthStore.getState().user?.role;
-        router.push(role === "super_admin" ? "/admin" : "/dashboard");
+        router.push(isSuperAdmin(role) ? "/admin" : "/dashboard");
       } else {
         setError(result.error ?? "Gagal masuk. Coba lagi.");
       }

@@ -5,6 +5,7 @@ import { ShoppingCart, AlertCircle } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { cn } from "@/lib/cn";
 import { formatCurrencyID } from "@/lib/date-utils";
+import { CardSkeleton } from "@/components/shared/card-skeleton";
 
 export function SupplierDebtCard() {
   const isLoading = useInventoryStore((s) => s.isLoading);
@@ -27,13 +28,7 @@ export function SupplierDebtCard() {
   );
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
-      </div>
-    );
+    return <CardSkeleton />;
   }
 
   const now = new Date();

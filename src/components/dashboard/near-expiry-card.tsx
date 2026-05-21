@@ -5,6 +5,7 @@ import { Clock } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { getDaysUntilExpiry } from "@/lib/inventory-demo";
 import { cn } from "@/lib/cn";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
 
 export function NearExpiryCard() {
   const isLoading = useInventoryStore((s) => s.isLoading);
@@ -17,13 +18,7 @@ export function NearExpiryCard() {
   }, [batches.length, load]);
 
   if (isLoading) {
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
-      </div>
-    );
+    return <TableSkeleton rows={5} />;
   }
 
   const near = getNearExpiry(30).slice(0, 5);

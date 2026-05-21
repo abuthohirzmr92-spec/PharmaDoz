@@ -1,5 +1,6 @@
 import { BaseRepository } from "./base";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
+import { resolveUserRole, isSystemRoleType } from "@/lib/auth/role-resolver";
 import type { UserProfile, AppRole, SystemRole, TenantRole, Permission, Role, Tenant } from "@/types";
 
 const DEV = process.env.NODE_ENV === "development";
@@ -29,12 +30,13 @@ export class AuthRepository extends BaseRepository {
     }
 
     const profile = data as any;
+    const resolved = resolveUserRole(profile.role, undefined);
     return {
       id: profile.id,
       email: profile.email ?? "",
       displayName: profile.display_name ?? "",
-      role: (profile.role as AppRole) ?? "staff",
-      systemRole: profile.role === "super_admin" ? (profile.role as SystemRole) : undefined,
+      role: resolved as AppRole,
+      systemRole: isSystemRoleType(profile.role) ? (profile.role as SystemRole) : undefined,
       isActive: profile.is_active ?? true,
       tenantId: profile.tenant_id ?? undefined,
       avatarUrl: profile.avatar_url ?? null,
@@ -74,47 +76,85 @@ export class AuthRepository extends BaseRepository {
     if (!profileData) return null;
 
     const p = profileData as any;
+    const profileRoleRaw: string | null = p.role ?? null;
 
-    const profile: UserProfile = {
+    /* 2. System roles (super_admin, etc.) bypass tenant resolution entirely.
+     *    They have no tenant_users row and must never fall back to "staff". */
+    if (isSystemRoleType(profileRoleRaw)) {
+      return {
+        id: p.id,
+        email: p.email ?? "",
+        displayName: p.display_name ?? "",
+        role: profileRoleRaw,
+        systemRole: profileRoleRaw as SystemRole,
+        isActive: p.is_active ?? true,
+        tenantId: p.tenant_id ?? undefined,
+        pharmacyId: p.tenant_id ?? undefined,
+        avatarUrl: p.avatar_url ?? null,
+        phone: p.phone ?? null,
+        lastLoginAt: p.last_login_at ?? null,
+      };
+    }
+
+    /* 3. Business user: resolve tenant info + tenant_users role in parallel */
+    let tenantRole: string | null = null;
+
+    if (p.tenant_id) {
+      try {
+        const [tenantResult, roleResult] = await Promise.all([
+          this.client
+            .from("tenants")
+            .select("id, name, slug")
+            .eq("id", p.tenant_id)
+            .is("deleted_at", null)
+            .single(),
+          this.client
+            .from("tenant_users")
+            .select("role")
+            .eq("user_id", p.id)
+            .eq("tenant_id", p.tenant_id)
+            .eq("is_active", true)
+            .single(),
+        ]);
+
+        const { data: tenantData, error: tenantError } = tenantResult;
+        const { data: roleData, error: roleError } = roleResult;
+
+        if (!tenantError && tenantData) {
+          const t = tenantData as any;
+          p._tenantName = t.name ?? undefined;
+        } else if (tenantError && tenantError.code !== "PGRST116") {
+          repoLog("getUserBySupabaseUid: tenant lookup error (non-fatal):", tenantError.message);
+        }
+
+        if (!roleError && roleData) {
+          tenantRole = (roleData as any).role ?? null;
+        } else if (roleError && roleError.code !== "PGRST116") {
+          repoLog("getUserBySupabaseUid: tenant_users role lookup error (non-fatal):", roleError.message);
+        }
+      } catch (err) {
+        /* Non-fatal: profile is valid even without tenant data */
+        repoLog("getUserBySupabaseUid: tenant lookup exception (non-fatal):", err);
+      }
+    }
+
+    const resolvedRole = resolveUserRole(profileRoleRaw, tenantRole);
+
+    return {
       id: p.id,
       email: p.email ?? "",
       displayName: p.display_name ?? "",
-      role: (p.role as AppRole) ?? "staff",
-      systemRole: isSuperAdmin(p.role as AppRole) ? (p.role as SystemRole) : undefined,
+      role: resolvedRole as AppRole,
+      systemRole: undefined,
       isActive: p.is_active ?? true,
       tenantId: p.tenant_id ?? undefined,
       pharmacyId: p.tenant_id ?? undefined,
+      tenantName: (p as any)._tenantName ?? undefined,
+      pharmacyName: (p as any)._tenantName ?? undefined,
       avatarUrl: p.avatar_url ?? null,
       phone: p.phone ?? null,
       lastLoginAt: p.last_login_at ?? null,
     };
-
-    /* 2. If profile has tenant_id, resolve tenant info in a separate query.
-     *    This way, even if tenant RLS blocks the tenant read, the profile
-     *    itself is already hydrated and login can proceed. */
-    if (p.tenant_id) {
-      try {
-        const { data: tenantData, error: tenantError } = await this.client
-          .from("tenants")
-          .select("id, name, slug")
-          .eq("id", p.tenant_id)
-          .is("deleted_at", null)
-          .single();
-
-        if (!tenantError && tenantData) {
-          const t = tenantData as any;
-          profile.tenantName = t.name ?? undefined;
-          profile.pharmacyName = t.name ?? undefined;
-        } else if (tenantError && tenantError.code !== "PGRST116") {
-          repoLog("getUserBySupabaseUid: tenant lookup error (non-fatal):", tenantError.message);
-        }
-      } catch (tenantErr) {
-        /* Non-fatal: profile is valid even without tenant name */
-        repoLog("getUserBySupabaseUid: tenant lookup exception (non-fatal):", tenantErr);
-      }
-    }
-
-    return profile;
   }
 
   /* ------------------------------------------------------------------ */
@@ -134,12 +174,14 @@ export class AuthRepository extends BaseRepository {
 
     if (!profileError && profileData) {
       const p = profileData as any;
+      const profileRoleRaw: string | null = p.role ?? null;
+      const resolved = resolveUserRole(profileRoleRaw, undefined);
       return {
         id: p.id,
         email: p.email ?? "",
         displayName: p.display_name ?? "",
-        role: (p.role as AppRole) ?? "staff",
-        systemRole: isSuperAdmin(p.role as AppRole) ? (p.role as SystemRole) : undefined,
+        role: resolved as AppRole,
+        systemRole: isSystemRoleType(profileRoleRaw) ? (profileRoleRaw as SystemRole) : undefined,
         isActive: p.is_active ?? true,
         tenantId: p.tenant_id ?? undefined,
         pharmacyId: p.tenant_id ?? undefined,
@@ -162,14 +204,15 @@ export class AuthRepository extends BaseRepository {
         return null;
       }
 
-      const role = ((data as any).role?.name as AppRole) ?? ("cashier" as AppRole);
+      const roleRaw = ((data as any).role?.name as string) ?? null;
+      const resolved = resolveUserRole(roleRaw, undefined);
 
       return {
         id: data.id,
         email: data.email,
         displayName: data.display_name,
-        role,
-        systemRole: role === "super_admin" ? (role as SystemRole) : undefined,
+        role: resolved as AppRole,
+        systemRole: isSystemRoleType(roleRaw) ? (roleRaw as SystemRole) : undefined,
         isActive: data.is_active,
         pharmacyId: (data as any).pharmacy?.id ?? undefined,
         pharmacyName: (data as any).pharmacy?.name ?? undefined,
@@ -337,7 +380,7 @@ export class AuthRepository extends BaseRepository {
           id: params.id,
           email: params.email,
           displayName: params.displayName,
-          role: "staff",
+          role: resolveUserRole(null, null) as AppRole,
           isActive: true,
         };
       }
@@ -347,7 +390,7 @@ export class AuthRepository extends BaseRepository {
         id: params.id,
         email: params.email,
         displayName: params.displayName,
-        role: "staff",
+        role: resolveUserRole(null, null) as AppRole,
         isActive: true,
       };
     }
@@ -362,7 +405,7 @@ export class AuthRepository extends BaseRepository {
       id: params.id,
       email: params.email,
       displayName: params.displayName,
-      role: "staff",
+      role: resolveUserRole(null, null) as AppRole,
       isActive: true,
     };
   }

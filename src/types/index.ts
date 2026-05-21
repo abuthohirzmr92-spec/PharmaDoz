@@ -1,7 +1,7 @@
 // ---------------------------------------------------------------------------
 // System roles (platform/internal — SaaS)
 // ---------------------------------------------------------------------------
-export type SystemRole = "super_admin";
+export type SystemRole = "super_admin" | "developer" | "support_ai";
 
 // ---------------------------------------------------------------------------
 // Tenant roles (per-tenant operational)
@@ -100,6 +100,7 @@ export interface Profile {
   id: string; // = auth.users.id
   tenantId?: string | null;
   displayName: string;
+  role?: string | null; // system_role — "super_admin" | "developer" | "support_ai" | null
   avatarUrl?: string | null;
   phone?: string | null;
   isActive: boolean;
@@ -115,7 +116,7 @@ export interface TenantUser {
   id: string;
   tenantId: string;
   userId: string;
-  role: AppRole;
+  role: TenantRole;
   isActive: boolean;
   invitedAt?: string | null;
   joinedAt?: string | null;

@@ -1,12 +1,63 @@
+import dynamic from "next/dynamic";
 import { Container } from "@/components/shared/container";
-import { DashboardStatsGrid } from "@/components/dashboard/dashboard-stats-grid";
-import { SalesChartCard } from "@/components/dashboard/sales-chart-card";
-import { TopProductsCard } from "@/components/dashboard/top-products-card";
-import { LowStockCard } from "@/components/dashboard/low-stock-card";
-import { NearExpiryCard } from "@/components/dashboard/near-expiry-card";
-import { SupplierDebtCard } from "@/components/dashboard/supplier-debt-card";
-import { RecentTransactionsCard } from "@/components/dashboard/recent-transactions-card";
 import { WidgetErrorBoundary } from "@/components/shared/widget-error-boundary";
+import { CardSkeleton } from "@/components/shared/card-skeleton";
+import { TableSkeleton } from "@/components/shared/table-skeleton";
+
+const DashboardStatsGrid = dynamic(
+  () => import("@/components/dashboard/dashboard-stats-grid").then((m) => m.DashboardStatsGrid),
+  {
+    loading: () => (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <CardSkeleton key={i} />
+        ))}
+      </div>
+    ),
+  },
+);
+
+const SalesChartCard = dynamic(
+  () => import("@/components/dashboard/sales-chart-card").then((m) => m.SalesChartCard),
+  {
+    loading: () => <CardSkeleton className="h-[280px]" />,
+  },
+);
+
+const TopProductsCard = dynamic(
+  () => import("@/components/dashboard/top-products-card").then((m) => m.TopProductsCard),
+  {
+    loading: () => <TableSkeleton rows={5} />,
+  },
+);
+
+const LowStockCard = dynamic(
+  () => import("@/components/dashboard/low-stock-card").then((m) => m.LowStockCard),
+  {
+    loading: () => <TableSkeleton rows={5} />,
+  },
+);
+
+const NearExpiryCard = dynamic(
+  () => import("@/components/dashboard/near-expiry-card").then((m) => m.NearExpiryCard),
+  {
+    loading: () => <TableSkeleton rows={5} />,
+  },
+);
+
+const SupplierDebtCard = dynamic(
+  () => import("@/components/dashboard/supplier-debt-card").then((m) => m.SupplierDebtCard),
+  {
+    loading: () => <CardSkeleton />,
+  },
+);
+
+const RecentTransactionsCard = dynamic(
+  () => import("@/components/dashboard/recent-transactions-card").then((m) => m.RecentTransactionsCard),
+  {
+    loading: () => <TableSkeleton rows={5} />,
+  },
+);
 
 export default function DashboardPage() {
   return (

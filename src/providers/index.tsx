@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { AuthProvider } from "./auth-provider";
 import { TenantProvider } from "./tenant-provider";
+import { BranchProvider } from "./branch-provider";
 import { TenantBrandProvider } from "./tenant-brand-provider";
 import { MaintenanceProvider } from "./maintenance-provider";
 import { NetworkProvider } from "./network-provider";
@@ -16,14 +17,16 @@ export function AppProviders({ children }: { children: ReactNode }) {
       <NetworkProvider>
         <AuthProvider>
           <TenantProvider>
-            <TenantBrandProvider>
-              <MaintenanceProvider>
-                <QueryProvider>
-                  {children}
-                  <ToastProvider />
-                </QueryProvider>
-              </MaintenanceProvider>
-            </TenantBrandProvider>
+            <BranchProvider>
+              <TenantBrandProvider>
+                <MaintenanceProvider>
+                  <QueryProvider>
+                    {children}
+                    <ToastProvider />
+                  </QueryProvider>
+                </MaintenanceProvider>
+              </TenantBrandProvider>
+            </BranchProvider>
           </TenantProvider>
         </AuthProvider>
       </NetworkProvider>

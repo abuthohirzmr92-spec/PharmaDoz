@@ -8,8 +8,10 @@ import {
   Clock,
   ShoppingCart,
   DollarSign,
+  Store,
 } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
+import { useBranchContext } from "@/providers/branch-provider";
 import { buildDashboardSummary } from "@/lib/inventory-demo";
 import { cn } from "@/lib/cn";
 
@@ -32,6 +34,7 @@ const CARD_DEFS: CardDef[] = [
 ];
 
 export function InventoryDashboardCards() {
+  const { activeBranch } = useBranchContext();
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
   const purchaseInvoices = useInventoryStore((s) => s.purchaseInvoices);
@@ -56,7 +59,17 @@ export function InventoryDashboardCards() {
   };
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+    <div>
+      <div className="mb-4 flex items-center gap-2 text-sm text-neutral-500 dark:text-neutral-400">
+        <Store className="h-4 w-4" />
+        <span>
+          Cabang:{" "}
+          <span className="font-semibold text-neutral-800 dark:text-neutral-200">
+            {activeBranch?.name ?? "Semua Cabang"}
+          </span>
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
       {CARD_DEFS.map((def) => {
         const val = values[def.key] ?? 0;
         const Icon = def.icon;
@@ -102,6 +115,7 @@ export function InventoryDashboardCards() {
           </div>
         );
       })}
+    </div>
     </div>
   );
 }
