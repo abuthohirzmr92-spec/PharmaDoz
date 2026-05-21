@@ -107,21 +107,23 @@ export async function proxy(request: NextRequest) {
 
   const userRole = profile?.role ?? null;
 
-  /* ---- Admin routes: require system role ---- */
+  /* ---- Role-based routing ---- */
   if (isAdminPath(request.nextUrl.pathname)) {
-    if (profileError || !profile || !isSystemRole(userRole)) {
+    /* Platform routes: only system roles allowed */
+    if (profileError || !profile) {
       return NextResponse.redirect(new URL("/unauthorized", request.url));
     }
-  }
-
-  /* ---- Tenant routes: redirect platform users to /platform ---- */
-  if (isSystemRole(userRole) && !isAdminPath(request.nextUrl.pathname)) {
-    return NextResponse.redirect(new URL("/platform", request.url));
-  }
-
-  /* ---- Platform routes: redirect tenant users to /dashboard ---- */
-  if (userRole && !isSystemRole(userRole) && isAdminPath(request.nextUrl.pathname)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (!isSystemRole(userRole)) {
+      /* Tenant user on platform route → redirect to /dashboard */
+      return NextResponse.redirect(new URL("/dashboard", request.url));
+    }
+    /* System role on platform route → allowed through */
+  } else {
+    /* Tenant routes: redirect platform users to /platform */
+    if (isSystemRole(userRole)) {
+      return NextResponse.redirect(new URL("/platform", request.url));
+    }
+    /* Tenant user on tenant route → allowed through */
   }
 
   return response;
