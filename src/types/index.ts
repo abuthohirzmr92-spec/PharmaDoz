@@ -589,3 +589,113 @@ export interface BackupMetadata {
   checksum: string | null;
   error: string | null;
 }
+
+// ---------------------------------------------------------------------------
+// Branch — multi-branch pharmacy location
+// ---------------------------------------------------------------------------
+export interface Branch {
+  id: string;
+  tenantId: string;
+  name: string;
+  code: string;
+  address?: string | null;
+  phone?: string | null;
+  email?: string | null;
+  isMain: boolean;
+  isActive: boolean;
+  openingTime?: string | null;
+  closingTime?: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// OnboardingState — tenant onboarding wizard progress
+// ---------------------------------------------------------------------------
+export type OnboardingStep =
+  | "welcome"
+  | "profile_setup"
+  | "branch_setup"
+  | "product_setup"
+  | "team_invite"
+  | "done";
+
+export interface OnboardingStepRecord {
+  step: OnboardingStep | "provisioned";
+  completedAt: string | null;
+  completedBy: string | null;
+}
+
+export interface OnboardingState {
+  id: string;
+  tenantId: string;
+  currentStep: OnboardingStep;
+  stepsCompleted: OnboardingStepRecord[];
+  data: Record<string, unknown>;
+  isCompleted: boolean;
+  completedAt?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Provisioning — tenant provisioning types
+// ---------------------------------------------------------------------------
+export interface ProvisioningInput {
+  ownerEmail: string;
+  ownerDisplayName: string;
+  tenantName: string;
+  slug?: string;          // auto-generated from tenantName if empty
+  domain?: string | null;
+  packageSlug?: string;   // "basic" | "professional" | "enterprise", defaults to "basic"
+  settings?: Record<string, unknown>;
+}
+
+export interface ProvisioningResult {
+  success: boolean;
+  tenantId?: string;
+  ownerUserId?: string;
+  ownerEmail?: string;
+  errors?: ProvisioningError[];
+}
+
+export interface ProvisioningError {
+  code: ProvisioningErrorCode;
+  message: string;
+  field?: string;
+  retryable: boolean;
+  suggestion?: string;
+}
+
+export type ProvisioningErrorCode =
+  | "VALIDATION_ERROR"
+  | "AUTH_ERROR"
+  | "RACE_CONSTRAINT"
+  | "DATABASE_ERROR"
+  | "NETWORK_ERROR"
+  | "UNAUTHORIZED";
+
+export type ProvisioningAuditStatus =
+  | "pending"
+  | "success"
+  | "failed"
+  | "NEEDS_MANUAL_REVIEW";
+
+export interface ProvisioningAudit {
+  id: string;
+  actorId: string;
+  ownerEmail: string;
+  ownerUserId?: string | null;
+  tenantName: string;
+  slug: string;
+  packageId?: string | null;
+  tenantId?: string | null;
+  status: ProvisioningAuditStatus;
+  errorMessage?: string | null;
+  errorStep?: string | null;
+  compensationAttempted: boolean;
+  compensationError?: string | null;
+  createdAt: string;
+  resolvedAt?: string | null;
+}
