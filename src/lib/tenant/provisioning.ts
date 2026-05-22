@@ -3,7 +3,11 @@
 import { createClient } from "@supabase/supabase-js";
 import { createServerSupabase } from "@/lib/supabase/server";
 import { validateProvisioning } from "./provisioning-validator";
-import type { ProvisioningInput, ProvisioningResult } from "@/types";
+import type {
+  ProvisioningInput,
+  ProvisioningResult,
+  ProvisioningWarning,
+} from "@/types";
 
 /** Stateless Supabase client — no cookie management, for auth-only calls.
  *  Using this for signUp/resetPasswordForEmail prevents the admin's
@@ -28,6 +32,29 @@ function generateSecurePassword(): string {
 }
 
 /**
+ * Recovery: check if a tenant with the given slug already exists in the DB.
+ * Used when the RPC call is unreliable (timeout, network error) — we verify
+ * against the source of truth before reporting failure.
+ */
+async function findTenantBySlug(
+  supabase: Awaited<ReturnType<typeof createServerSupabase>>,
+  slug: string,
+): Promise<{ id: string; name: string } | null> {
+  try {
+    const { data } = await supabase
+      .from("tenants")
+      .select("id, name")
+      .eq("slug", slug)
+      .is("deleted_at", null)
+      .single();
+
+    return data as { id: string; name: string } | null;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Provision a new tenant with owner account, branch, subscription, and onboarding.
  *
  * Flow:
@@ -35,12 +62,13 @@ function generateSecurePassword(): string {
  *   2. Verify caller is super_admin
  *   3. Create auth user (magic-link flow via signUp + resetPasswordForEmail)
  *   4. Call SECURITY DEFINER provision_tenant() for atomic DB writes
- *   5. On failure: log to provisioning_audit, attempt compensation
+ *   5. On RPC failure: recovery check via slug lookup in DB
+ *   6. Classify result as: success | success_with_warning | failure
  *
- * The owner receives:
- *   - Supabase confirmation email (from signUp)
- *   - Password reset email (so they can set their own password)
- * No plaintext passwords are delivered via email.
+ * RESULT CLASSIFICATION:
+ *   - success              → tenant fully provisioned, no issues
+ *   - success_with_warning → tenant created but non-critical issue (email, RPC response lost)
+ *   - failure              → provisioning transaction failed, nothing created
  */
 export async function provisionTenant(
   input: ProvisioningInput,
@@ -50,7 +78,10 @@ export async function provisionTenant(
   // ------------------------------------------------------------------
   const validation = await validateProvisioning(input);
   if (!validation.valid) {
-    return { success: false, errors: validation.errors };
+    return {
+      status: "failure",
+      errors: validation.errors,
+    };
   }
 
   // ------------------------------------------------------------------
@@ -61,7 +92,7 @@ export async function provisionTenant(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) {
     return {
-      success: false,
+      status: "failure",
       errors: [{
         code: "UNAUTHORIZED",
         message: "Anda harus login terlebih dahulu.",
@@ -80,7 +111,7 @@ export async function provisionTenant(
 
   if (profileError || profileData?.system_role !== "super_admin") {
     return {
-      success: false,
+      status: "failure",
       errors: [{
         code: "UNAUTHORIZED",
         message: "Hanya super_admin yang dapat melakukan provisioning tenant.",
@@ -112,7 +143,7 @@ export async function provisionTenant(
       authError.message?.includes("network");
 
     return {
-      success: false,
+      status: "failure",
       errors: [{
         code: retryable ? "NETWORK_ERROR" : "AUTH_ERROR",
         message: authError.message,
@@ -124,7 +155,7 @@ export async function provisionTenant(
 
   if (!authData.user) {
     return {
-      success: false,
+      status: "failure",
       errors: [{
         code: "AUTH_ERROR",
         message: "Gagal membuat akun pengguna.",
@@ -137,50 +168,75 @@ export async function provisionTenant(
 
   // ------------------------------------------------------------------
   // 3b. Send password setup email (magic-link equivalent)
-  //     The owner clicks the reset link and sets their own password.
   // ------------------------------------------------------------------
+  let emailWarning: ProvisioningWarning | null = null;
+
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     await authClient().auth.resetPasswordForEmail(validation.ownerEmail, {
       redirectTo: `${appUrl}/login`,
     });
   } catch {
-    // Non-fatal: the confirmation email from signUp is sufficient.
-    // The admin can relay the temporary password out-of-band.
+    emailWarning = {
+      type: "email_delivery_failed",
+      message:
+        "Email setup password gagal dikirim. Pemilik dapat menggunakan 'Lupa Password' di halaman login.",
+      recoverable: true,
+    };
   }
 
   // ------------------------------------------------------------------
   // 4. Call SECURITY DEFINER provision_tenant() — atomic DB writes
   // ------------------------------------------------------------------
-  let rpcError: Error | null = null;
+  let rpcError: string | null = null;
   let tenantId: string | null = null;
 
   try {
-    const { data: rpcResult, error } = await (supabase.rpc as any)("provision_tenant", {
-      p_owner_user_id: ownerUserId,
-      p_name: validation.tenantName,
-      p_slug: validation.slug,
-      p_package_id: validation.packageId,
-      p_domain: validation.domain,
-      p_settings: validation.settings,
-    });
+    const { data: rpcResult, error } = await (supabase.rpc as any)(
+      "provision_tenant",
+      {
+        p_owner_user_id: ownerUserId,
+        p_name: validation.tenantName,
+        p_slug: validation.slug,
+        p_package_id: validation.packageId,
+        p_domain: validation.domain,
+        p_settings: validation.settings,
+      },
+    );
 
     if (error) {
-      rpcError = new Error(error.message);
+      rpcError = error.message;
     } else if (rpcResult) {
       tenantId = (rpcResult as any).tenant_id ?? null;
     }
   } catch (err) {
-    rpcError = err instanceof Error ? err : new Error(String(err));
+    rpcError = err instanceof Error ? err.message : String(err);
   }
 
   // ------------------------------------------------------------------
-  // 5. Handle RPC failure — log to provisioning_audit, attempt compensation
+  // 5. RECOVERY: if RPC failed or returned no tenant_id, verify against DB
+  //    The SECURITY DEFINER function may have succeeded on the database
+  //    but the HTTP response was lost (timeout, network blip).
   // ------------------------------------------------------------------
-  if (rpcError || !tenantId) {
-    const errorMessage = rpcError?.message ?? "Provisioning RPC returned no tenant_id";
+  let recovered = false;
 
-    // Log the failure for manual review
+  if (!tenantId && rpcError) {
+    const found = await findTenantBySlug(supabase, validation.slug);
+    if (found) {
+      tenantId = found.id;
+      recovered = true;
+    }
+  }
+
+  // ------------------------------------------------------------------
+  // 6. Classify result
+  // ------------------------------------------------------------------
+
+  // --- FAILURE: no tenant, no recovery ---
+  if (!tenantId) {
+    const errorMessage = rpcError ?? "Provisioning RPC returned no tenant_id";
+
+    // Log to provisioning_audit
     try {
       await (supabase.from as any)("provisioning_audit").insert({
         actor_id: session.user.id,
@@ -199,7 +255,7 @@ export async function provisionTenant(
     }
 
     return {
-      success: false,
+      status: "failure",
       errors: [{
         code: "DATABASE_ERROR",
         message: `Provisioning gagal: ${errorMessage}. Tim teknis telah diberitahu.`,
@@ -208,9 +264,25 @@ export async function provisionTenant(
     };
   }
 
-  // ------------------------------------------------------------------
-  // 6. Log success to provisioning_audit
-  // ------------------------------------------------------------------
+  // --- SUCCESS or SUCCESS_WITH_WARNING ---
+  const warnings: ProvisioningWarning[] = [];
+
+  if (recovered) {
+    warnings.push({
+      type: "rpc_response_unreliable",
+      message:
+        "Tenant berhasil dibuat tetapi response dari server tertunda. Data sudah tersimpan dengan aman.",
+      recoverable: true,
+    });
+  }
+
+  if (emailWarning) {
+    warnings.push(emailWarning);
+  }
+
+  const status = warnings.length > 0 ? "success_with_warning" : "success";
+
+  // Log to provisioning_audit
   try {
     await (supabase.from as any)("provisioning_audit").insert({
       actor_id: session.user.id,
@@ -220,20 +292,20 @@ export async function provisionTenant(
       slug: validation.slug,
       package_id: validation.packageId,
       tenant_id: tenantId,
-      status: "success",
+      status: recovered ? "NEEDS_MANUAL_REVIEW" : "success",
+      error_message: recovered ? rpcError : null,
+      error_step: recovered ? "rpc_call_recovered" : null,
       compensation_attempted: false,
     });
   } catch {
-    // Non-fatal: the tenant is provisioned, audit just missed a record
+    // Non-fatal
   }
 
-  // ------------------------------------------------------------------
-  // 7. Return success with provisioning details
-  // ------------------------------------------------------------------
   return {
-    success: true,
+    status,
     tenantId,
     ownerUserId,
     ownerEmail: validation.ownerEmail,
+    warnings: warnings.length > 0 ? warnings : undefined,
   };
 }

@@ -652,12 +652,21 @@ export interface ProvisioningInput {
   settings?: Record<string, unknown>;
 }
 
+export type ProvisioningStatus = "success" | "success_with_warning" | "failure";
+
+export interface ProvisioningWarning {
+  type: "email_delivery_failed" | "rpc_response_unreliable" | "auth_rate_limited";
+  message: string;
+  recoverable: boolean;
+}
+
 export interface ProvisioningResult {
-  success: boolean;
+  status: ProvisioningStatus;
   tenantId?: string;
   ownerUserId?: string;
   ownerEmail?: string;
   errors?: ProvisioningError[];
+  warnings?: ProvisioningWarning[];
 }
 
 export interface ProvisioningError {

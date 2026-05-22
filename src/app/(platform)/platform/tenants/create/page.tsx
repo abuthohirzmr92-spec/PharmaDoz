@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -11,18 +11,16 @@ import {
   Loader2,
   CheckCircle,
   AlertTriangle,
+  Info,
   ArrowLeft,
-  Copy,
-  Eye,
-  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 import { provisionTenant } from "@/lib/tenant/provisioning";
 import { generateSlug } from "@/lib/tenant/onboarding";
-import type { ProvisioningInput, ProvisioningError } from "@/types";
+import type { ProvisioningInput, ProvisioningError, ProvisioningWarning } from "@/types";
 import { cn } from "@/lib/cn";
 
-type FormState = "idle" | "submitting" | "success" | "error";
+type FormState = "idle" | "submitting" | "success" | "success_with_warning" | "failure";
 
 const PACKAGES = [
   { value: "basic", label: "Basic", desc: "3 user, 1 cabang, 200 produk", price: "Gratis" },
@@ -32,6 +30,7 @@ const PACKAGES = [
 
 export default function CreateTenantPage() {
   const router = useRouter();
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const [form, setForm] = useState({
     ownerEmail: "",
@@ -43,11 +42,27 @@ export default function CreateTenantPage() {
   const [slug, setSlug] = useState("");
   const [state, setState] = useState<FormState>("idle");
   const [errors, setErrors] = useState<ProvisioningError[]>([]);
+  const [warnings, setWarnings] = useState<ProvisioningWarning[]>([]);
   const [result, setResult] = useState<{
     tenantId?: string;
     ownerEmail?: string;
   } | null>(null);
-  const [showPassword, setShowPassword] = useState(false);
+
+  // Bersihkan timer redirect saat unmount
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
+
+  // Auto-redirect ke daftar tenant setelah sukses
+  useEffect(() => {
+    if (state === "success" || state === "success_with_warning") {
+      redirectTimerRef.current = setTimeout(() => {
+        router.push("/platform/tenants");
+      }, state === "success" ? 2500 : 5000);
+    }
+  }, [state, router]);
 
   const updateField = useCallback(
     (field: string, value: string) => {
@@ -56,7 +71,7 @@ export default function CreateTenantPage() {
       if (field === "tenantName") {
         setSlug(generateSlug(value));
       }
-      if (state === "error") {
+      if (state === "failure") {
         setState("idle");
         setErrors([]);
       }
@@ -66,10 +81,25 @@ export default function CreateTenantPage() {
 
   const fieldError = (field: string) => errors.find((e) => e.field === field);
 
+  const resetForm = () => {
+    if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    setState("idle");
+    setResult(null);
+    setErrors([]);
+    setWarnings([]);
+    setForm({ ownerEmail: "", ownerDisplayName: "", tenantName: "", packageSlug: "basic", domain: "" });
+    setSlug("");
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    // Cegah duplicate submission
+    if (state === "submitting") return;
+
     setState("submitting");
     setErrors([]);
+    setWarnings([]);
 
     const input: ProvisioningInput = {
       ownerEmail: form.ownerEmail,
@@ -82,23 +112,27 @@ export default function CreateTenantPage() {
 
     const res = await provisionTenant(input);
 
-    if (!res.success) {
+    // --- FAILURE ---
+    if (res.status === "failure") {
       setErrors(res.errors ?? []);
-      setState("error");
-
-      const fatal = res.errors?.some((e) => !e.retryable);
-      if (fatal) {
-        toast.error("Provisioning gagal. Periksa kembali input.");
-      }
+      setState("failure");
       return;
     }
 
+    // --- SUCCESS / SUCCESS_WITH_WARNING ---
     setResult({
       tenantId: res.tenantId,
       ownerEmail: res.ownerEmail,
     });
-    setState("success");
-    toast.success("Tenant berhasil diprovisikan!");
+
+    if (res.status === "success_with_warning") {
+      setWarnings(res.warnings ?? []);
+      setState("success_with_warning");
+      toast.warning("Tenant berhasil dibuat dengan beberapa catatan.");
+    } else {
+      setState("success");
+      toast.success("Tenant berhasil diprovisikan!");
+    }
   };
 
   // ------------------------------------------------------------------
@@ -106,80 +140,87 @@ export default function CreateTenantPage() {
   // ------------------------------------------------------------------
   if (state === "success" && result) {
     return (
-      <div className="mx-auto max-w-2xl space-y-8 py-4">
-        <div className="rounded-xl border border-green-200 bg-green-50 p-8 text-center dark:border-green-800 dark:bg-green-950">
-          <CheckCircle className="mx-auto mb-4 h-12 w-12 text-green-600" />
-          <h2 className="text-xl font-bold text-green-800 dark:text-green-200">
-            Tenant Berhasil Diprovisikan
-          </h2>
-          <p className="mt-2 text-sm text-green-700 dark:text-green-300">
-            Akun pemilik telah dibuat dan email konfirmasi telah dikirim.
-          </p>
+      <div className="mx-auto max-w-2xl space-y-4 py-4 text-center">
+        <CheckCircle className="mx-auto h-14 w-14 text-green-500" />
+        <h2 className="text-xl font-bold">Tenant Berhasil Diprovisikan</h2>
+        <p className="text-sm text-muted-foreground">
+          {form.tenantName} ({result.ownerEmail}) telah dibuat.
+        </p>
+        <p className="text-xs text-muted-foreground">
+          Mengarahkan ke daftar tenant...
+        </p>
+        <button
+          type="button"
+          onClick={() => router.push("/platform/tenants")}
+          className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+        >
+          Lihat Daftar Tenant
+        </button>
+      </div>
+    );
+  }
 
-          <div className="mt-6 rounded-lg bg-white p-4 text-left dark:bg-neutral-900 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Email Pemilik</span>
-              <span className="font-mono font-medium">{result.ownerEmail}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Tenant ID</span>
-              <span className="font-mono text-xs">{result.tenantId}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Nama Apotek</span>
-              <span className="font-medium">{form.tenantName}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Slug</span>
-              <span className="font-mono">{slug}</span>
-            </div>
-            <div className="flex justify-between text-sm">
-              <span className="text-muted-foreground">Paket</span>
-              <span className="font-medium capitalize">{form.packageSlug}</span>
-            </div>
-          </div>
-
-          <div className="mt-6 rounded-lg bg-amber-50 p-4 text-left dark:bg-amber-950">
-            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
-              Langkah Selanjutnya
+  // ------------------------------------------------------------------
+  // SUCCESS WITH WARNING STATE
+  // ------------------------------------------------------------------
+  if (state === "success_with_warning" && result) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-4 py-4">
+        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-800 dark:bg-amber-950">
+          <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+          <div className="space-y-2">
+            <p className="font-semibold text-amber-800 dark:text-amber-200">
+              Tenant Berhasil Dibuat dengan Catatan
             </p>
-            <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-amber-700 dark:text-amber-300">
-              <li>Pemilik akan menerima email konfirmasi dari Supabase</li>
-              <li>Pemilik harus mengkonfirmasi email sebelum login</li>
-              <li>Setelah login, pemilik dapat menyelesaikan onboarding</li>
-            </ul>
+            {warnings.map((w, i) => (
+              <p key={i} className="text-sm text-amber-700 dark:text-amber-300">
+                {w.message}
+              </p>
+            ))}
           </div>
+        </div>
 
-          <div className="mt-6 flex gap-3 justify-center">
-            <button
-              type="button"
-              onClick={() => router.push("/platform/tenants")}
-              className="inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm hover:bg-muted"
-            >
-              <ArrowLeft className="h-4 w-4" />
-              Kembali ke Daftar Tenant
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setState("idle");
-                setResult(null);
-                setForm({ ownerEmail: "", ownerDisplayName: "", tenantName: "", packageSlug: "basic", domain: "" });
-                setSlug("");
-                setErrors([]);
-              }}
-              className="inline-flex items-center gap-2 rounded-lg bg-primary px-4 py-2 text-sm text-primary-foreground hover:bg-primary/90"
-            >
-              Provisioning Baru
-            </button>
+        <div className="rounded-lg border bg-background p-4 text-sm space-y-1">
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Tenant</span>
+            <span className="font-medium">{form.tenantName}</span>
           </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Email Pemilik</span>
+            <span className="font-mono">{result.ownerEmail}</span>
+          </div>
+          <div className="flex justify-between">
+            <span className="text-muted-foreground">Tenant ID</span>
+            <span className="font-mono text-xs">{result.tenantId}</span>
+          </div>
+        </div>
+
+        <p className="text-center text-xs text-muted-foreground">
+          Mengarahkan ke daftar tenant dalam 5 detik...
+        </p>
+
+        <div className="flex justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => router.push("/platform/tenants")}
+            className="rounded-lg bg-primary px-6 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+          >
+            Lihat Daftar Tenant
+          </button>
+          <button
+            type="button"
+            onClick={resetForm}
+            className="rounded-lg border px-4 py-2 text-sm hover:bg-muted"
+          >
+            Provisioning Baru
+          </button>
         </div>
       </div>
     );
   }
 
   // ------------------------------------------------------------------
-  // FORM (idle / submitting / error)
+  // FORM (idle / submitting / failure)
   // ------------------------------------------------------------------
   return (
     <div className="mx-auto max-w-2xl space-y-6 py-4">
@@ -199,8 +240,8 @@ export default function CreateTenantPage() {
         </div>
       </div>
 
-      {/* Error summary */}
-      {state === "error" && errors.length > 0 && (
+      {/* Failure summary */}
+      {state === "failure" && errors.length > 0 && (
         <div className="rounded-lg border border-red-200 bg-red-50 p-4 dark:border-red-800 dark:bg-red-950">
           <div className="flex items-start gap-3">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" />
@@ -221,7 +262,10 @@ export default function CreateTenantPage() {
               {errors.some((e) => e.retryable) && (
                 <button
                   type="button"
-                  onClick={handleSubmit}
+                  onClick={() => {
+                    setState("idle");
+                    setErrors([]);
+                  }}
                   className="mt-2 text-sm font-medium text-red-700 underline hover:text-red-800 dark:text-red-300"
                 >
                   Coba Lagi
@@ -246,9 +290,7 @@ export default function CreateTenantPage() {
                 placeholder="pemilik@apotek.com"
                 className={cn(
                   "w-full rounded-lg border py-2 pl-10 pr-3 text-sm",
-                  fieldError("ownerEmail")
-                    ? "border-red-300 bg-red-50"
-                    : "bg-background",
+                  fieldError("ownerEmail") ? "border-red-300 bg-red-50" : "bg-background",
                 )}
                 required
               />
@@ -373,9 +415,7 @@ export default function CreateTenantPage() {
         {state === "submitting" && (
           <div className="space-y-2 text-center text-xs text-muted-foreground">
             <p className="animate-pulse">Membuat akun pemilik...</p>
-            <p className="animate-pulse" style={{ animationDelay: "500ms" }}>
-              Memprovisikan tenant, cabang, dan langganan...
-            </p>
+            <p className="animate-pulse">Memprovisikan tenant, cabang, dan langganan...</p>
           </div>
         )}
       </form>
