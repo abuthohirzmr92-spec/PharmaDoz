@@ -20,7 +20,6 @@ export class AuthRepository extends BaseRepository {
       .from("profiles")
       .select(`*`)
       .eq("id", userId)
-      .is("deleted_at", null)
       .single();
 
     if (error) {
@@ -59,7 +58,6 @@ export class AuthRepository extends BaseRepository {
       .from("profiles")
       .select("*")
       .eq("id", supabaseUid)
-      .is("deleted_at", null)
       .single();
 
     if (profileError) {
@@ -168,7 +166,6 @@ export class AuthRepository extends BaseRepository {
     const { data: profileData, error: profileError } = await this.client
       .from("profiles")
       .select("*")
-      .is("deleted_at", null)
       .eq("email", email)
       .single();
 
