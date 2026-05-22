@@ -13,11 +13,13 @@ import {
   ChevronUp,
   AlertCircle,
   AlertTriangle,
+  Mail,
+  CheckCircle2,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
-import { isSupabaseConnected } from "@/lib/supabase/client";
+import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
@@ -46,6 +48,32 @@ export default function LoginPage() {
   const handleDemoLogin = (role: AppRole) => {
     loginAs(role);
     router.push(isPlatformUser(role) ? "/platform" : "/dashboard");
+  };
+
+  /* ---- forgot password ---- */
+  const [showForgot, setShowForgot] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotSent, setForgotSent] = useState(false);
+  const [forgotLoading, setForgotLoading] = useState(false);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!forgotEmail.trim() || !supabase) return;
+
+    setForgotLoading(true);
+    const appUrl = typeof window !== "undefined" ? window.location.origin : "";
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      forgotEmail.trim(),
+      { redirectTo: `${appUrl}/auth/callback` },
+    );
+
+    if (resetError) {
+      toast.error(resetError.message);
+    } else {
+      setForgotSent(true);
+      toast.success("Email reset password telah dikirim. Cek inbox Anda.");
+    }
+    setForgotLoading(false);
   };
 
   const handleEmailLogin = async (e: React.FormEvent) => {
@@ -204,14 +232,50 @@ export default function LoginPage() {
             <p className="mt-3 text-center">
               <button
                 type="button"
-                onClick={() =>
-                  toast.info("Hubungi Super Admin untuk reset password.")
-                }
+                onClick={() => {
+                  setShowForgot(!showForgot);
+                  setForgotSent(false);
+                }}
                 className="text-[11px] text-neutral-400 hover:text-brand-600"
               >
-                Lupa password?
+                {showForgot ? "Kembali ke Login" : "Lupa password?"}
               </button>
             </p>
+
+            {showForgot && (
+              <form onSubmit={handleForgotPassword} className="mt-3 space-y-3 rounded-lg border border-neutral-100 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900/50">
+                {forgotSent ? (
+                  <div className="flex items-center gap-2 text-xs text-green-600 dark:text-green-400">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Email terkirim! Cek inbox Anda.
+                  </div>
+                ) : (
+                  <>
+                    <p className="text-[10px] text-neutral-500">
+                      Masukkan email Anda. Link reset password akan dikirim.
+                    </p>
+                    <div className="relative">
+                      <Mail className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+                      <input
+                        type="email"
+                        value={forgotEmail}
+                        onChange={(e) => setForgotEmail(e.target.value)}
+                        placeholder="email@contoh.com"
+                        required
+                        className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-8 pr-3 text-xs dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                      />
+                    </div>
+                    <button
+                      type="submit"
+                      disabled={forgotLoading}
+                      className="w-full rounded-lg bg-brand-600 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50"
+                    >
+                      {forgotLoading ? "Mengirim..." : "Kirim Reset Password"}
+                    </button>
+                  </>
+                )}
+              </form>
+            )}
           </form>
         )}
 
