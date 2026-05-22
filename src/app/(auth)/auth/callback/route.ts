@@ -5,9 +5,11 @@ import { cookies } from "next/headers";
 export async function GET(request: Request) {
   const { searchParams, origin } = new URL(request.url);
   const code = searchParams.get("code");
+  const accessToken = searchParams.get("access_token");
+  const refreshToken = searchParams.get("refresh_token");
   const next = searchParams.get("next") ?? "/dashboard";
 
-  if (!code) {
+  if (!code && !accessToken) {
     return NextResponse.redirect(`${origin}/login`);
   }
 
@@ -29,13 +31,23 @@ export async function GET(request: Request) {
     },
   );
 
-  const { error } = await supabase.auth.exchangeCodeForSession(code);
+  let error: Error | null = null;
+
+  if (code) {
+    const result = await supabase.auth.exchangeCodeForSession(code);
+    error = result.error;
+  } else if (accessToken && refreshToken) {
+    const result = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
+    });
+    error = result.error;
+  }
 
   if (error) {
     return NextResponse.redirect(`${origin}/login?error=auth`);
   }
 
-  // Build response with cookies explicitly set on the Response
   const response = NextResponse.redirect(`${origin}${next}`);
   for (const { name, value, options } of cookieJar) {
     response.cookies.set(name, value, options as any);

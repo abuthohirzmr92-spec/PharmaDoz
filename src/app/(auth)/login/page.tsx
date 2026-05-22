@@ -58,7 +58,12 @@ export default function LoginPage() {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!forgotEmail.trim() || !supabase) return;
+    if (!forgotEmail.trim()) return;
+
+    if (!supabase) {
+      toast.error("Layanan reset password tidak tersedia saat ini.");
+      return;
+    }
 
     setForgotLoading(true);
     const appUrl = typeof window !== "undefined" ? window.location.origin : "";
