@@ -65,8 +65,10 @@ export default function LoginPage() {
     }
 
     setForgotLoading(true);
+    const appUrl = typeof window !== "undefined" ? window.location.origin : "";
     const { error: resetError } = await supabase.auth.resetPasswordForEmail(
       forgotEmail.trim(),
+      { redirectTo: `${appUrl}/auth/callback` },
     );
 
     if (resetError) {
