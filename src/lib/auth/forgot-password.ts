@@ -1,19 +1,27 @@
 "use server";
 
-import { createServerSupabase } from "@/lib/supabase/server";
-
 export async function sendPasswordResetEmail(email: string): Promise<{
   success: boolean;
   error?: string;
 }> {
-  const supabase = await createServerSupabase();
+  // Direct REST API call — bypasses PKCE setup entirely.
+  // Without code_challenge, Supabase uses implicit flow and the recovery
+  // link redirects back with access_token in the hash fragment.
+  const res = await fetch(
+    `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      },
+      body: JSON.stringify({ email }),
+    },
+  );
 
-  // Don't pass redirectTo — let Supabase use the Site URL configured in
-  // the dashboard. The root page will catch ?code= and forward to /auth/callback.
-  const { error } = await supabase.auth.resetPasswordForEmail(email);
-
-  if (error) {
-    return { success: false, error: error.message };
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    return { success: false, error: (body as any).msg ?? body.error ?? `HTTP ${res.status}` };
   }
 
   return { success: true };
