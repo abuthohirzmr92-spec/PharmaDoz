@@ -8,15 +8,9 @@ export async function sendPasswordResetEmail(email: string): Promise<{
 }> {
   const supabase = await createServerSupabase();
 
-  // Derive the site URL from server-side env vars.
-  // VERCEL_URL is set automatically on all Vercel deployments (no protocol).
-  const siteUrl = process.env.VERCEL_URL
-    ? `https://${process.env.VERCEL_URL}`
-    : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
-
-  const { error } = await supabase.auth.resetPasswordForEmail(email, {
-    redirectTo: `${siteUrl}/auth/callback`,
-  });
+  // Don't pass redirectTo — let Supabase use the Site URL configured in
+  // the dashboard. The root page will catch ?code= and forward to /auth/callback.
+  const { error } = await supabase.auth.resetPasswordForEmail(email);
 
   if (error) {
     return { success: false, error: error.message };
