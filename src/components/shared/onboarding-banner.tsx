@@ -7,6 +7,15 @@ import { useAuthStore } from "@/store/auth-store";
 import { useOnboardingStore } from "@/store/onboarding-store";
 import { isDemoMode } from "@/config/env";
 
+const STEP_TO_ROUTE: Record<string, string> = {
+  welcome: "welcome",
+  profile_setup: "profile",
+  branch_setup: "branch",
+  product_setup: "products",
+  team_invite: "team",
+  done: "done",
+};
+
 export function OnboardingBanner() {
   const router = useRouter();
   const pathname = usePathname();
@@ -44,7 +53,7 @@ export function OnboardingBanner() {
           </div>
           <button
             type="button"
-            onClick={() => router.push(`/onboarding/${state.currentStep}`)}
+            onClick={() => router.push(`/onboarding/${STEP_TO_ROUTE[state.currentStep] ?? state.currentStep}`)}
             className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition shrink-0"
           >
             Lanjutkan
@@ -65,7 +74,7 @@ export function OnboardingBanner() {
         Pengaturan awal tenant belum selesai.{" "}
         <button
           type="button"
-          onClick={() => router.push(`/onboarding/${state.currentStep}`)}
+          onClick={() => router.push(`/onboarding/${STEP_TO_ROUTE[state.currentStep] ?? state.currentStep}`)}
           className="underline hover:text-amber-800 dark:hover:text-amber-200"
         >
           Lanjutkan onboarding
