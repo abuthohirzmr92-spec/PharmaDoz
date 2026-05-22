@@ -15,7 +15,14 @@ export async function sendPasswordResetEmail(email: string): Promise<{
         "Content-Type": "application/json",
         apikey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
       },
-      body: JSON.stringify({ email }),
+      body: JSON.stringify({
+        email,
+        gotrue_meta_security: {
+          redirect_to: process.env.VERCEL_URL
+            ? `https://${process.env.VERCEL_URL}`
+            : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+        },
+      }),
     },
   );
 
