@@ -19,7 +19,8 @@ import {
 import { cn } from "@/lib/cn";
 import { toast } from "sonner";
 import { useAuthStore } from "@/store/auth-store";
-import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
+import { isSupabaseConnected } from "@/lib/supabase/client";
+import { sendPasswordResetEmail } from "@/lib/auth/forgot-password";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
@@ -60,20 +61,11 @@ export default function LoginPage() {
     e.preventDefault();
     if (!forgotEmail.trim()) return;
 
-    if (!supabase) {
-      toast.error("Layanan reset password tidak tersedia saat ini.");
-      return;
-    }
-
     setForgotLoading(true);
-    const appUrl = typeof window !== "undefined" ? window.location.origin : "";
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      forgotEmail.trim(),
-      { redirectTo: `${appUrl}/auth/callback` },
-    );
+    const result = await sendPasswordResetEmail(forgotEmail.trim());
 
-    if (resetError) {
-      toast.error(resetError.message);
+    if (!result.success) {
+      toast.error(result.error ?? "Gagal mengirim email reset password.");
     } else {
       setForgotSent(true);
       toast.success("Email reset password telah dikirim. Cek inbox Anda.");
