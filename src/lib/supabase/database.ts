@@ -196,7 +196,25 @@ export interface RolePermissionUpdate {
 // PHARMACY / BRANCH (tenant-scoped)
 // ============================================================================
 
-// --- pharmacies (tenant branch, now with tenant_id) ---
+// --- branches (new multi-branch table, migration 020) ---
+export interface BranchRow {
+  id: string;
+  tenant_id: string;
+  name: string;
+  code: string;
+  address: string | null;
+  phone: string | null;
+  email: string | null;
+  is_main: boolean;
+  is_active: boolean;
+  opening_time: string | null;
+  closing_time: string | null;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+// --- pharmacies (legacy, synced with tenant UUID for backward compat) ---
 export interface PharmacyRow {
   id: string;
   tenant_id: string | null;

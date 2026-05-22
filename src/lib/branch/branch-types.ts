@@ -11,6 +11,7 @@ export interface Branch {
   address: string | null;
   phone: string | null;
   email: string | null;
+  isMain: boolean;
   isActive: boolean;
   openingTime: string | null;
   closingTime: string | null;

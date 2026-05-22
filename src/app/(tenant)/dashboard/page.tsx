@@ -3,6 +3,7 @@ import { Container } from "@/components/shared/container";
 import { WidgetErrorBoundary } from "@/components/shared/widget-error-boundary";
 import { CardSkeleton } from "@/components/shared/card-skeleton";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
+import { OnboardingBanner } from "@/components/shared/onboarding-banner";
 
 const DashboardStatsGrid = dynamic(
   () => import("@/components/dashboard/dashboard-stats-grid").then((m) => m.DashboardStatsGrid),
@@ -62,6 +63,8 @@ const RecentTransactionsCard = dynamic(
 export default function DashboardPage() {
   return (
     <Container>
+      <OnboardingBanner />
+
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
           Dashboard

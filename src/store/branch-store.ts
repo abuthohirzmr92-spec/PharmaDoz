@@ -4,7 +4,7 @@ import { create } from "zustand";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 import type { Branch } from "@/lib/branch/branch-types";
-import type { PharmacyRow } from "@/lib/supabase/database";
+import type { BranchRow } from "@/lib/supabase/database";
 
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
@@ -13,17 +13,18 @@ import type { PharmacyRow } from "@/lib/supabase/database";
 const STORAGE_KEY = "activeBranchId";
 
 /**
- * Maps a raw PharmacyRow from the database to the Branch application type.
+ * Maps a raw BranchRow from the database to the Branch application type.
  */
-function mapPharmacyRowToBranch(row: PharmacyRow): Branch {
+function mapBranchRowToBranch(row: BranchRow): Branch {
   return {
     id: row.id,
-    tenantId: row.tenant_id ?? "",
+    tenantId: row.tenant_id,
     name: row.name,
     code: row.code,
     address: row.address,
     phone: row.phone,
     email: row.email,
+    isMain: row.is_main,
     isActive: row.is_active,
     openingTime: row.opening_time,
     closingTime: row.closing_time,
@@ -79,7 +80,7 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
       }
 
       const { data, error } = await supabase!
-        .from("pharmacies")
+        .from("branches")
         .select("*")
         .eq("tenant_id", tenantId)
         .is("deleted_at", null)
@@ -94,7 +95,7 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
         return;
       }
 
-      const branches = (data ?? []).map(mapPharmacyRowToBranch);
+      const branches = (data ?? []).map(mapBranchRowToBranch);
       set({ branches, isLoading: false });
     } catch (e) {
       set({

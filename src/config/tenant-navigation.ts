@@ -6,6 +6,7 @@ import {
   FileText,
   Users,
   Settings,
+  Store,
 } from "lucide-react";
 import type { NavItem } from "./navigation";
 
@@ -33,6 +34,12 @@ export const TENANT_NAVIGATION: NavItem[] = [
     href: "/cashier",
     icon: ShoppingCart,
     permission: "cashier.transaction.create",
+  },
+  {
+    label: "Branches",
+    href: "/branches",
+    icon: Store,
+    permission: "settings.view",
   },
   {
     label: "Reports",

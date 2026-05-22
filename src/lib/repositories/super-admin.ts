@@ -17,11 +17,30 @@ export class SuperAdminRepository extends BaseRepository {
 
     if (error) return this.handleError(error, "getAllTenants");
 
-    return ((data as any[]) || []).map((t: any) => ({
+    const tenants = (data as any[]) || [];
+
+    // Fetch owner names from tenant_users + profiles (single source of truth)
+    const ownerMap = new Map<string, string>();
+    if (tenants.length > 0) {
+      const tenantIds = tenants.map((t: any) => t.id);
+      const { data: ownerData } = await this.client
+        .from("tenant_users")
+        .select("tenant_id, profile:user_id!inner(display_name)")
+        .eq("role", "tenant_owner")
+        .in("tenant_id", tenantIds)
+        .eq("is_active", true);
+
+      for (const row of (ownerData as any[]) || []) {
+        const displayName = row.profile?.display_name;
+        if (displayName) ownerMap.set(row.tenant_id, displayName);
+      }
+    }
+
+    return tenants.map((t: any) => ({
       pharmacyId: t.id,
       pharmacyName: t.name,
       packageName: (t.package_id ? this.resolvePackageName(t.package_id) : "basic") as TenantPackage,
-      ownerName: t.settings?.owner_name ?? "—",
+      ownerName: ownerMap.get(t.id) ?? "—",
       userCount: t.profiles?.[0]?.count ?? 0,
       branchCount: t.expansions?.[0]?.count ?? 0,
       isActive: t.is_active ?? true,
