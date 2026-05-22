@@ -1,10 +1,12 @@
 "use client";
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
 import { ChevronLeft } from "lucide-react";
+import { hasPermission } from "@/lib/auth/permissions";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { TENANT_NAVIGATION } from "@/config/navigation";
 import { NavItem } from "./nav-item";
@@ -20,10 +22,16 @@ export function Sidebar() {
   // Defense-in-depth: proxy + (tenant) layout prevent platform users from reaching this.
   if (isPlatformUser(user?.role)) return null;
 
-  const filteredNav = TENANT_NAVIGATION.filter(
-    (item) =>
-      !item.permission ||
-      useAuthStore.getState().can(item.permission),
+  // Compute nav from the subscribed user, not getState(), so React re-runs
+  // this filter on every render where user changes.
+  const filteredNav = useMemo(
+    () =>
+      TENANT_NAVIGATION.filter(
+        (item) =>
+          !item.permission ||
+          (user && hasPermission(user.role, item.permission)),
+      ),
+    [user],
   );
 
   return (
@@ -46,7 +54,7 @@ export function Sidebar() {
       </div>
 
       {/* Navigation */}
-      <nav key={user?.role} className="flex-1 space-y-1 overflow-y-auto p-3">
+      <nav className="flex-1 space-y-1 overflow-y-auto p-3">
         {filteredNav.map((item) => (
           <NavItem
             key={item.href}

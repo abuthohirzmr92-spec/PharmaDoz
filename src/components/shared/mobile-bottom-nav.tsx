@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/cn";
@@ -8,6 +9,7 @@ import { MOBILE_BOTTOM_NAV_HEIGHT } from "@/config/constants";
 import { TENANT_NAVIGATION } from "@/config/navigation";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
+import { hasPermission } from "@/lib/auth/permissions";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 
 export function MobileBottomNav() {
@@ -19,17 +21,20 @@ export function MobileBottomNav() {
   // Defense-in-depth: middleware redirects platform users away from tenant routes first.
   if (isPlatformUser(user?.role)) return null;
 
-  const displayItems = TENANT_NAVIGATION
-    .filter(
-      (item) =>
-        !item.permission ||
-        useAuthStore.getState().can(item.permission),
-    )
-    .slice(0, 4);
+  const displayItems = useMemo(
+    () =>
+      TENANT_NAVIGATION
+        .filter(
+          (item) =>
+            !item.permission ||
+            (user && hasPermission(user.role, item.permission)),
+        )
+        .slice(0, 4),
+    [user],
+  );
 
   return (
     <nav
-      key={user?.role}
       className="fixed bottom-0 left-0 right-0 z-50 flex border-t border-neutral-200 bg-white md:hidden dark:border-neutral-800 dark:bg-neutral-900"
       style={{ height: MOBILE_BOTTOM_NAV_HEIGHT }}
     >
