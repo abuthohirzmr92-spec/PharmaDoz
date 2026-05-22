@@ -3,9 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useAuthStore } from "@/store/auth-store";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
-import { PlatformSidebar } from "@/components/platform/platform-sidebar";
 import { useEffect } from "react";
 
+/**
+ * Platform sub-layout — auth guard only.
+ * The shell (PlatformSidebar + main wrapper) is rendered by
+ * (platform)/layout.tsx → PlatformShell. This layout must NOT
+ * render a second shell.
+ */
 export default function PlatformLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
@@ -20,12 +25,5 @@ export default function PlatformLayout({ children }: { children: React.ReactNode
 
   if (isLoading || !isAuthenticated) return null;
 
-  return (
-    <div className="flex min-h-screen">
-      <PlatformSidebar />
-      <main className="flex-1 overflow-auto bg-white dark:bg-neutral-950">
-        <div className="mx-auto max-w-6xl p-6">{children}</div>
-      </main>
-    </div>
-  );
+  return <>{children}</>;
 }
