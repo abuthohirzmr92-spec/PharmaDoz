@@ -91,14 +91,18 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
 
   admin: [
     "inventory.stock.view",
+    "inventory.stock.edit",
     "cashier.transaction.create",
     "cashier.transaction.void",
     "reports.sales.view",
     "reports.inventory.view",
     "products.view",
+    "products.edit",
     "suppliers.view",
+    "purchases.create",
     "purchases.view",
     "expired.view",
+    "expired.edit",
     "users.view",
     "tenant.users.invite",
   ],
@@ -127,6 +131,7 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
   ],
 
   staff: [
+    "cashier.transaction.create",
     "inventory.stock.view",
     "products.view",
     "reports.sales.view",
