@@ -22,33 +22,62 @@ export default async function TenantLayout({
     return <TenantShell>{children}</TenantShell>;
   }
 
-  const cookieStore = await cookies();
+  let cookieStore;
+  try {
+    cookieStore = await cookies();
+  } catch (e) {
+    console.error("[TENANT-LAYOUT] cookies() failed:", e);
+    return <TenantShell>{children}</TenantShell>;
+  }
 
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
-    cookies: {
-      getAll() {
-        return cookieStore.getAll();
+  let supabase;
+  try {
+    supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll();
+        },
+        setAll() {
+          // Read-only auth check — no need to set cookies in layout
+        },
       },
-      setAll() {
-        // Read-only auth check — no need to set cookies in layout
-      },
-    },
-  });
+    });
+  } catch (e) {
+    console.error("[TENANT-LAYOUT] createServerClient failed:", e);
+    return <TenantShell>{children}</TenantShell>;
+  }
 
-  const { data } = await supabase.auth.getSession();
+  let sessionResult;
+  try {
+    sessionResult = await supabase.auth.getSession();
+  } catch (e) {
+    console.error("[TENANT-LAYOUT] getSession failed:", e);
+    return <TenantShell>{children}</TenantShell>;
+  }
+
+  const { data } = sessionResult;
 
   if (!data.session) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
-    .from("profiles")
-    .select("system_role")
-    .eq("id", data.session.user.id)
-    .single();
+  try {
+    const { data: profile, error: profileError } = await supabase
+      .from("profiles")
+      .select("system_role")
+      .eq("id", data.session.user.id)
+      .single();
 
-  if (profile && isPlatformUser(profile.system_role)) {
-    redirect("/platform");
+    if (profileError && profileError.code !== "PGRST116") {
+      console.error("[TENANT-LAYOUT] profiles query error:", profileError.message, profileError.code);
+    }
+
+    if (profile && isPlatformUser(profile.system_role)) {
+      redirect("/platform");
+    }
+  } catch (e) {
+    console.error("[TENANT-LAYOUT] profile check failed:", e);
+    // Continue rendering — don't block tenant access on profile lookup failure
   }
 
   return <TenantShell>{children}</TenantShell>;
