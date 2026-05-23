@@ -117,8 +117,12 @@ export class BaseRepository {
 
   protected handleError(error: unknown, context: string): never {
     console.error(`[${context}] Repository error:`, error);
-    throw error instanceof Error
-      ? error
-      : new Error(`Error in ${context}: ${String(error)}`);
+    if (error instanceof Error) throw error;
+    const msg =
+      (error as Record<string, unknown>)?.message ??
+      (error as Record<string, unknown>)?.error_description ??
+      (error as Record<string, unknown>)?.msg ??
+      JSON.stringify(error);
+    throw new Error(`Error in ${context}: ${msg}`);
   }
 }
