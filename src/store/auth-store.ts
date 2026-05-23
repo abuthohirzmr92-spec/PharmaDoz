@@ -454,25 +454,31 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   /* ---- Supabase: initFromSupabaseSession ---- */
   initFromSupabaseSession: async () => {
+    console.log("[SIDEBAR-DIAG] initFromSupabaseSession: ENTERED", {
+      isSupabaseConnected: isSupabaseConnected(),
+      loginInProgress,
+      alreadyAuth: get().isAuthenticated,
+    });
+
     if (!isSupabaseConnected()) {
-      devLog("initFromSupabaseSession: not connected");
+      console.error("[SIDEBAR-DIAG] initFromSupabaseSession: supabase not connected — ABORT");
       return false;
     }
 
     /* If loginWithEmail is in progress, don't race — it handles everything */
     if (loginInProgress) {
-      devLog("initFromSupabaseSession: login in progress, deferring to loginWithEmail");
+      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: login in progress — DEFER");
       return false;
     }
 
     /* Prevent duplicate concurrent initializations */
     const state = get();
     if (state.isAuthenticated && state.user) {
-      devLog("initFromSupabaseSession: already authenticated, skipping");
+      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: already authenticated — SKIP", { role: state.user.role });
       return true;
     }
 
-    devLog("initFromSupabaseSession: checking session...");
+    console.log("[SIDEBAR-DIAG] initFromSupabaseSession: calling getSession...");
 
     try {
       const { data } = await withTimeout(

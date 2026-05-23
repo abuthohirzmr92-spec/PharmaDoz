@@ -142,7 +142,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               SESSION_CHECK_TIMEOUT_MS,
               "initFromSupabaseSession",
             );
-            if (!cancelled && useAuthStore.getState().isAuthenticated) {
+            const hydrateResult = useAuthStore.getState().isAuthenticated;
+            console.log("[SIDEBAR-DIAG] AuthProvider after initFromSupabaseSession", {
+              isAuthenticated: hydrateResult,
+              userRole: useAuthStore.getState().user?.role ?? null,
+              cancelled,
+            });
+            if (!cancelled && hydrateResult) {
               const restoredRole = useAuthStore.getState().user?.role;
               logAuthHydration("success", restoredRole);
               devLog("hydrate: session restored, role =", restoredRole);
@@ -152,11 +158,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
               return;
             }
           } catch (err) {
-            devLog("hydrate: session check timed out or failed", err);
+            console.error("[SIDEBAR-DIAG] AuthProvider hydrate: initFromSupabaseSession threw", err);
             /* Continue — might be demo mode or redirect to login */
           }
         } else {
-          devLog("hydrate: supabase not connected");
+          console.log("[SIDEBAR-DIAG] AuthProvider: supabase not connected, skipping init");
         }
 
         if (cancelled) return;
@@ -192,7 +198,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         /* 3. Production with no session → redirect to /login */
         if (!cancelled) {
-          devLog("hydrate: no session, redirect /login");
+          console.log("[SIDEBAR-DIAG] AuthProvider: no session, redirecting to /login");
           router.replace("/login");
           clearTimeout(hydrationTimerRef.current!);
           setIsHydrating(false);
