@@ -43,16 +43,8 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     }
   }, [user, router]);
 
-  // Map URL path segment → OnboardingStep key
-  // URLs use short names (branch, products) but STEPS uses full keys (branch_setup, product_setup)
-  const PATH_TO_STEP: Record<string, OnboardingStep> = {
-    welcome: "welcome",
-    profile: "profile_setup",
-    branch: "branch_setup",
-    products: "product_setup",
-    team: "team_invite",
-    done: "done",
-  };
+  // Map DB step key → URL path segment
+  // DB uses full keys (branch_setup, product_setup) but URLs use short names (branch, products)
   const STEP_TO_PATH: Record<OnboardingStep, string> = {
     welcome: "welcome",
     profile_setup: "profile",
@@ -63,8 +55,6 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
   };
 
   const urlSegment = pathname.split("/").pop() ?? "";
-  const currentStepKey = PATH_TO_STEP[urlSegment];
-  const currentIndex = STEPS.findIndex((s) => s.key === currentStepKey);
 
   // Auto-redirect if DB state doesn't match the URL
   useEffect(() => {
@@ -87,6 +77,11 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     return null; // Will redirect in useEffect
   }
 
+  // Progress indicator is driven by DB state (state.currentStep), not URL.
+  // state.currentStep is updated synchronously by advance() before navigation,
+  // so the indicator moves immediately — URL catches up via auto-redirect above.
+  const activeIndex = STEPS.findIndex((s) => s.key === state.currentStep);
+
   return (
     <div className="mx-auto max-w-2xl space-y-8 px-4 py-8">
       {/* Progress indicator */}
@@ -97,8 +92,8 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (s: any) => s.step === step.key,
             );
-            const isCurrent = step.key === currentStepKey;
-            const isPast = i < currentIndex;
+            const isCurrent = step.key === state.currentStep;
+            const isPast = i < activeIndex;
 
             return (
               <li key={step.key} className="flex items-center">
