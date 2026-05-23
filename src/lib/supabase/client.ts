@@ -36,12 +36,14 @@ function createSupabaseClient() {
     return null;
   }
 
-  /* The @supabase/ssr type definitions don't expose `lock` but the
-   * runtime spreads all options through to createClient() → GoTrueClient.
-   * `detectSessionInUrl` is typed correctly inside `auth:`. */
+  /* The @supabase/ssr type definitions don't expose `lock` inside `auth`
+   * but the runtime passes all auth options through createClient() →
+   * SupabaseClient → _initSupabaseAuthClient → GoTrueClient constructor.
+   * `lock` MUST be inside `auth:` — SupabaseClient only passes settings.auth
+   * to _initSupabaseAuthClient, which destructures lock from it. */
   return createBrowserClient<Database>(url, key, {
-    lock: noOpLock,
     auth: {
+      lock: noOpLock,
       detectSessionInUrl: false,
     },
   } as any);
