@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, AlertTriangle, Scan } from "lucide-react";
+import { X, AlertTriangle, Scan, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { generateProductCode, validateBarcode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
 import { isDemoMode } from "@/config/env";
+import { toast } from "sonner";
 import type { ProductRow } from "./product-table";
 
 /* ------------------------------------------------------------------ */
@@ -105,7 +106,13 @@ export function ProductFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sellingPriceWarning, setSellingPriceWarning] = useState(false);
 
+  // Quick create category
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
+
   const nameRef = useRef<HTMLInputElement>(null);
+  const newCategoryRef = useRef<HTMLInputElement>(null);
   const isEdit = !!editingProduct;
 
   /* ---- Load categories/units from DB when connected ---- */
@@ -299,6 +306,28 @@ export function ProductFormModal({
     }
   }, [validate, isEdit, editingProduct, form, onSaved, onClose]);
 
+  /* ---- Quick create category ---- */
+  const handleCreateCategory = useCallback(async () => {
+    const name = newCategoryName.trim();
+    if (!name || name.length < 2) return;
+    setCreatingCategory(true);
+    try {
+      const cat = await productRepo.createCategory(name);
+      const option: CategoryOption = { id: cat.id, name: cat.name };
+      setCategories((prev) => [...prev, option]);
+      updateField("categoryId", cat.id);
+      updateField("category", cat.name);
+      setShowNewCategory(false);
+      setNewCategoryName("");
+    } catch (err) {
+      toast.error(
+        err instanceof Error ? err.message : "Gagal membuat kategori",
+      );
+    } finally {
+      setCreatingCategory(false);
+    }
+  }, [newCategoryName, updateField]);
+
   /* ---- Close confirmation ---- */
   const handleOverlayClick = useCallback(() => {
     if (isDirty) {
@@ -395,32 +424,83 @@ export function ProductFormModal({
             <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
               Kategori <span className="text-red-500">*</span>
             </label>
-            <select
-              value={form.categoryId || form.category}
-              onChange={(e) => {
-                const val = e.target.value;
-                const cat = categories.find((c) => c.id === val || c.name === val);
-                if (cat) {
-                  updateField("categoryId", cat.id);
-                  updateField("category", cat.name);
-                } else {
-                  updateField("category", val);
-                }
-              }}
-              className={cn(
-                "w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 dark:bg-neutral-800 dark:text-neutral-50",
-                errors.category
-                  ? "border-red-300 focus:border-red-400 focus:ring-red-100 dark:border-red-700"
-                  : "border-neutral-200 focus:border-brand-400 focus:ring-brand-100 dark:border-neutral-700",
-              )}
-            >
-              <option value="">Pilih kategori</option>
-              {categories.map((cat) => (
-                <option key={cat.id} value={cat.id}>
-                  {cat.name}
+            {showNewCategory ? (
+              <div className="flex gap-2">
+                <input
+                  ref={newCategoryRef}
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Nama kategori baru..."
+                  disabled={creatingCategory}
+                  className={cn(
+                    "flex-1 rounded-lg border bg-white px-3 py-2 text-sm placeholder-neutral-400 focus:outline-none focus:ring-2 dark:bg-neutral-800 dark:text-neutral-50",
+                    errors.category
+                      ? "border-red-300 focus:border-red-400 focus:ring-red-100 dark:border-red-700"
+                      : "border-neutral-200 focus:border-brand-400 focus:ring-brand-100 dark:border-neutral-700",
+                  )}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleCreateCategory();
+                    if (e.key === "Escape") setShowNewCategory(false);
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={handleCreateCategory}
+                  disabled={creatingCategory || newCategoryName.trim().length < 2}
+                  className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700 transition disabled:opacity-50"
+                >
+                  {creatingCategory ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  ) : (
+                    "Simpan"
+                  )}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowNewCategory(false)}
+                  disabled={creatingCategory}
+                  className="rounded-lg px-2 py-2 text-xs text-neutral-500 hover:text-neutral-700 dark:text-neutral-400 dark:hover:text-neutral-200"
+                >
+                  Batal
+                </button>
+              </div>
+            ) : (
+              <select
+                value={form.categoryId || form.category}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  if (val === "__new__") {
+                    setShowNewCategory(true);
+                    setNewCategoryName("");
+                    setTimeout(() => newCategoryRef.current?.focus(), 50);
+                    return;
+                  }
+                  const cat = categories.find((c) => c.id === val || c.name === val);
+                  if (cat) {
+                    updateField("categoryId", cat.id);
+                    updateField("category", cat.name);
+                  }
+                }}
+                className={cn(
+                  "w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 dark:bg-neutral-800 dark:text-neutral-50",
+                  errors.category
+                    ? "border-red-300 focus:border-red-400 focus:ring-red-100 dark:border-red-700"
+                    : "border-neutral-200 focus:border-brand-400 focus:ring-brand-100 dark:border-neutral-700",
+                )}
+              >
+                <option value="">Pilih kategori</option>
+                {categories.map((cat) => (
+                  <option key={cat.id} value={cat.id}>
+                    {cat.name}
+                  </option>
+                ))}
+                <option disabled>──────────</option>
+                <option value="__new__">
+                  + Kategori Baru
                 </option>
-              ))}
-            </select>
+              </select>
+            )}
             {errors.category && (
               <p className="mt-1 text-[10px] text-red-500">{errors.category}</p>
             )}

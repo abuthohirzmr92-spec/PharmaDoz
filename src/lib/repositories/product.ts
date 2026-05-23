@@ -424,6 +424,25 @@ export class ProductRepository extends BaseRepository {
     return mapRows<ProductCategory>(data || []);
   }
 
+  async createCategory(name: string): Promise<ProductCategory> {
+    if (!this.isConnected) throw new Error("Not connected");
+
+    const insertData: Record<string, unknown> = {
+      name,
+      tenant_id: this.getTenantId() ?? null,
+    };
+
+    const { data: row, error } = await this.client
+      .from("product_categories")
+      .insert(insertData)
+      .select()
+      .single();
+
+    if (error) return this.handleError(error, "createCategory");
+
+    return mapRow<ProductCategory>(row as Record<string, unknown>);
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Product Units                                                      */
   /* ------------------------------------------------------------------ */
