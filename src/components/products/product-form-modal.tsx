@@ -5,6 +5,7 @@ import { X, AlertTriangle, Scan } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { generateProductCode, validateBarcode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
+import { isDemoMode } from "@/config/env";
 import type { ProductRow } from "./product-table";
 
 /* ------------------------------------------------------------------ */
@@ -96,7 +97,7 @@ export function ProductFormModal({
   editingProduct,
 }: ProductFormModalProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [categories, setCategories] = useState<CategoryOption[]>(DEMO_CATEGORIES);
+  const [categories, setCategories] = useState<CategoryOption[]>([]);
   const [units, setUnits] = useState<string[]>(DEMO_UNITS);
   const [isScanning, setIsScanning] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
@@ -121,14 +122,24 @@ export function ProductFormModal({
 
           if (cats.length > 0) {
             setCategories(cats.map((c) => ({ id: c.id, name: c.name })));
+          } else if (isDemoMode()) {
+            setCategories(DEMO_CATEGORIES);
           }
 
           if (unitRows.length > 0) {
             setUnits(unitRows.map((u) => u.name));
+          } else if (isDemoMode()) {
+            setUnits(DEMO_UNITS);
           }
         } catch {
-          // Fall back to hardcoded values
+          if (isDemoMode()) {
+            setCategories(DEMO_CATEGORIES);
+            setUnits(DEMO_UNITS);
+          }
         }
+      } else if (isDemoMode()) {
+        setCategories(DEMO_CATEGORIES);
+        setUnits(DEMO_UNITS);
       }
     };
 
