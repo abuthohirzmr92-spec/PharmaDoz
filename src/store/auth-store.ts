@@ -507,6 +507,33 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     hydrationPromise = (async (): Promise<boolean> => {
       let supabaseUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null = null;
 
+      /* ---- Step 0: wait for GoTrue auto-initialization ----
+       * GoTrue's constructor calls initialize() which acquires the
+       * Navigator Lock (Web Locks API — browser-level, cross-tab).
+       * _initialize() runs inside this lock and may make network calls
+       * (PKCE code exchange, token refresh). If we call getSession()
+       * while _initialize() still holds the lock, both deadlock on
+       * navigator.locks.request().
+       *
+       * Waiting for initializePromise guarantees the lock is free
+       * before we attempt getSession(). After initialization,
+       * initializePromise is a settled promise → await returns
+       * immediately on all subsequent calls. */
+      const goTrueAuth = supabase!.auth as any;
+      if (goTrueAuth.initializePromise) {
+        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: waiting for GoTrue auto-initialization...");
+        try {
+          await withTimeout(
+            Promise.resolve(goTrueAuth.initializePromise),
+            5000,
+            "goTrueInitialize",
+          );
+          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: GoTrue auto-initialization done");
+        } catch {
+          console.warn("[SIDEBAR-DIAG] initFromSupabaseSession: GoTrue auto-initialization timed out — proceeding anyway");
+        }
+      }
+
       /* ---- Step A: getSession (4s timeout) ----
        * Reads session from cookie storage via GoTrue's state machine.
        * Can deadlock if GoTrue's internal _acquireLock is held (e.g. by a
@@ -693,6 +720,22 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     }
 
     let userId: string | null = null;
+
+    /* Wait for GoTrue auto-initialization to release the Navigator Lock */
+    const goTrueAuth = supabase!.auth as any;
+    if (goTrueAuth.initializePromise) {
+      console.log("[SIDEBAR-DIAG] refreshUserProfile: waiting for GoTrue auto-initialization...");
+      try {
+        await withTimeout(
+          Promise.resolve(goTrueAuth.initializePromise),
+          5000,
+          "goTrueInitialize",
+        );
+        console.log("[SIDEBAR-DIAG] refreshUserProfile: GoTrue auto-initialization done");
+      } catch {
+        console.warn("[SIDEBAR-DIAG] refreshUserProfile: GoTrue auto-initialization timed out — proceeding anyway");
+      }
+    }
 
     /* Try getSession first (cookie-based, fast) */
     try {
