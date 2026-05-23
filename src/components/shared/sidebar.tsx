@@ -5,7 +5,15 @@ import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
-import { ChevronLeft, AlertTriangle } from "lucide-react";
+import {
+  ChevronLeft,
+  Menu,
+  Monitor,
+  PanelLeftClose,
+  PanelRightClose,
+  PanelBottom,
+  AlertTriangle,
+} from "lucide-react";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { TENANT_NAVIGATION } from "@/config/navigation";
@@ -15,12 +23,61 @@ import { SyncStatus } from "./sync-status";
 import { RoleSwitcher } from "./role-switcher";
 import { SessionPanel } from "./session-panel";
 import { logSidebarRender, isDiagnosticsEnabled } from "@/lib/diagnostics";
+import type { SidebarMode } from "@/store/sidebar-store";
+
+/* ------------------------------------------------------------------ */
+/*  Sidebar mode badge (shown in toggle row)                           */
+/* ------------------------------------------------------------------ */
+
+const MODE_LABELS: Record<SidebarMode, string> = {
+  expanded: "Penuh",
+  icon: "Ikon",
+  sliding: "Geser",
+};
+
+const MODE_ICONS: Record<SidebarMode, typeof Monitor> = {
+  expanded: PanelRightClose,
+  icon: PanelBottom,
+  sliding: PanelLeftClose,
+};
+
+function ModeSwitcher({ mode, collapsed }: { mode: SidebarMode; collapsed: boolean }) {
+  const toggle = useSidebarStore((s) => s.toggle);
+
+  const nextMode = (
+    { expanded: "icon", icon: "sliding", sliding: "expanded" } as const
+  )[mode];
+
+  return (
+    <button
+      onClick={toggle}
+      title={`Mode: ${MODE_LABELS[mode]} — klik untuk ${MODE_LABELS[nextMode]}`}
+      className="flex h-10 w-full items-center justify-center gap-2 border-t border-neutral-200 text-xs text-neutral-500 transition hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800"
+    >
+      {collapsed ? (
+        <ChevronLeft className={cn("h-4 w-4 transition-transform", mode === "sliding" && "rotate-180")} />
+      ) : (
+        <>
+          <span className="text-[10px] font-medium uppercase tracking-wider text-neutral-400">
+            {MODE_LABELS[mode]}
+          </span>
+          <span className="text-[10px] text-neutral-300">→ {MODE_LABELS[nextMode]}</span>
+        </>
+      )}
+    </button>
+  );
+}
+
+/* ------------------------------------------------------------------ */
+/*  Sidebar content (reusable between sticky and sliding overlay)      */
+/* ------------------------------------------------------------------ */
 
 export function Sidebar() {
-  const { expanded, toggle } = useSidebarStore();
+  const { mode, slidingOpen } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
+  const isExpanded = mode === "expanded" || (mode === "sliding" && slidingOpen);
+  const isCollapsed = mode === "icon";
 
-  /* Diagnostic render log — fires on every render when diagnostics enabled */
   if (isDiagnosticsEnabled()) {
     console.log("%c[DIAG] Sidebar render", "color:#8B5CF6", {
       hasUser: !!user,
@@ -31,11 +88,8 @@ export function Sidebar() {
     });
   }
 
-  // Defense-in-depth: proxy + (tenant) layout prevent platform users from reaching this.
   if (isPlatformUser(user?.role)) return null;
 
-  // Compute nav from the subscribed user, not getState(), so React re-runs
-  // this filter on every render where user changes.
   const filteredNav = useMemo(
     () => {
       const result = TENANT_NAVIGATION.filter(
@@ -43,14 +97,12 @@ export function Sidebar() {
           !item.permission ||
           (user && hasPermission(user.role, item.permission)),
       );
-      /* Diagnostic nav filter log + empty-sidebar probe */
       logSidebarRender({
         hasUser: !!user,
         role: user?.role ?? null,
         navFiltered: result.length,
         navTotal: TENANT_NAVIGATION.length,
       });
-
       if (isDiagnosticsEnabled()) {
         console.log("%c[DIAG] sidebar nav filter", "color:#8B5CF6", {
           hasUser: !!user,
@@ -59,11 +111,6 @@ export function Sidebar() {
           navTotal: TENANT_NAVIGATION.length,
           navFiltered: result.length,
           navFilteredLabels: result.map(i => i.label),
-          navRejectedLabels: TENANT_NAVIGATION.filter(i => !result.includes(i)).map(i => ({
-            label: i.label,
-            permission: i.permission,
-            hasUserHasPermission: user ? hasPermission(user.role, i.permission!) : false,
-          })),
         });
       }
       return result;
@@ -71,11 +118,16 @@ export function Sidebar() {
     [user],
   );
 
+  // In sliding mode and closed, render nothing (hamburger is in layout)
+  if (mode === "sliding" && !slidingOpen) return null;
+
+  const widthClass = isExpanded ? "w-[260px]" : "w-[68px]";
+
   return (
     <aside
       className={cn(
         "sticky top-0 flex h-screen flex-col border-r border-neutral-200 bg-white transition-all duration-200 dark:border-neutral-800 dark:bg-neutral-900",
-        expanded ? "w-[260px]" : "w-[68px]"
+        widthClass,
       )}
     >
       {/* Brand */}
@@ -85,7 +137,7 @@ export function Sidebar() {
           className="flex items-center gap-2 font-bold text-brand-600"
         >
           <span className="text-xl">+</span>
-          {expanded && <span className="text-base">Apotek</span>}
+          {isExpanded && <span className="text-base">Apotek</span>}
         </Link>
         <OfflineIndicator />
       </div>
@@ -99,16 +151,14 @@ export function Sidebar() {
               label={item.label}
               href={item.href}
               icon={<item.icon />}
-              collapsed={!expanded}
+              collapsed={!isExpanded}
             />
           ))
         ) : user ? (
           <div className="flex flex-col items-center gap-2 py-6 text-center">
             <AlertTriangle className="h-5 w-5 text-amber-500" />
             <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
-              {expanded
-                ? "Gagal memuat navigasi. Muat ulang halaman."
-                : ""}
+              {isExpanded ? "Gagal memuat navigasi. Muat ulang halaman." : ""}
             </p>
           </div>
         ) : null}
@@ -120,23 +170,13 @@ export function Sidebar() {
       </div>
 
       {/* Session Panel */}
-      <SessionPanel collapsed={!expanded} />
+      <SessionPanel collapsed={!isExpanded} />
 
       {/* Role Switcher */}
       <RoleSwitcher />
 
-      {/* Toggle */}
-      <button
-        onClick={toggle}
-        className="flex h-10 items-center justify-center border-t border-neutral-200 text-neutral-500 hover:bg-neutral-100 dark:border-neutral-800 dark:hover:bg-neutral-800"
-      >
-        <ChevronLeft
-          className={cn(
-            "h-4 w-4 transition-transform",
-            !expanded && "rotate-180"
-          )}
-        />
-      </button>
+      {/* Mode toggle */}
+      <ModeSwitcher mode={mode} collapsed={!isExpanded} />
     </aside>
   );
 }
