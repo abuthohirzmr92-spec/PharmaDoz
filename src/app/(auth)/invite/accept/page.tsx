@@ -34,15 +34,21 @@ function AcceptInvitationForm() {
       return;
     }
 
-    validateInvitationToken(token).then((res) => {
-      if (res.valid && res.invite) {
-        setInviteInfo(res.invite);
-        setState("valid");
-      } else {
+    validateInvitationToken(token)
+      .then((res) => {
+        if (res.valid && res.invite) {
+          setInviteInfo(res.invite);
+          setState("valid");
+        } else {
+          setState("invalid");
+          setValidError(res.error ?? "Token tidak valid.");
+        }
+      })
+      .catch((err) => {
+        console.error("validateInvitationToken failed:", err);
         setState("invalid");
-        setValidError(res.error ?? "Token tidak valid.");
-      }
-    });
+        setValidError("Gagal memeriksa undangan. Coba lagi nanti.");
+      });
   }, [token]);
 
   const handleSubmit = async (e: React.FormEvent) => {

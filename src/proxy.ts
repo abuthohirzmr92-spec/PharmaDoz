@@ -10,6 +10,10 @@ const PUBLIC_PATHS = new Set([
   "/offline",
 ]);
 
+const PUBLIC_PATH_PREFIXES = [
+  "/invite/accept",  // Accept invitation — does not require auth
+];
+
 const ADMIN_PREFIX = "/admin";
 const PLATFORM_PREFIX = "/platform";
 
@@ -23,6 +27,7 @@ const SYSTEM_ROLES: ReadonlySet<string> = new Set([
 
 function isPublicPath(pathname: string): boolean {
   if (PUBLIC_PATHS.has(pathname)) return true;
+  if (PUBLIC_PATH_PREFIXES.some((p) => pathname.startsWith(p))) return true;
   return (
     ASSET_PREFIXES.some((p) => pathname.startsWith(p)) ||
     pathname.includes(".")

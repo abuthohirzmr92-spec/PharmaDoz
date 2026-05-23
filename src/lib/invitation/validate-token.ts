@@ -20,11 +20,18 @@ export async function validateInvitationToken(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const db: any = supabase;
 
-  const { data: invite } = await db
-    .from("invitation_tokens")
-    .select("id, email, role, tenant_id, is_used, expires_at, tenant:tenant_id(name)")
-    .eq("token", token)
-    .single();
+  let invite: any;
+  try {
+    const result = await db
+      .from("invitation_tokens")
+      .select("id, email, role, tenant_id, is_used, expires_at, tenant:tenant_id(name)")
+      .eq("token", token)
+      .maybeSingle();
+    invite = result.data;
+  } catch (e) {
+    console.error("validateInvitationToken query error:", e);
+    return { valid: false, error: "Gagal memeriksa token undangan. Coba lagi nanti." };
+  }
 
   if (!invite) {
     return { valid: false, error: "Link undangan tidak valid." };
