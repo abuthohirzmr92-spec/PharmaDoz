@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X, AlertTriangle } from "lucide-react";
+import { X, AlertTriangle, Scan } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { generateProductCode, validateBarcode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
@@ -11,16 +11,21 @@ import type { ProductRow } from "./product-table";
 /*  Constants                                                          */
 /* ------------------------------------------------------------------ */
 
-const DEMO_CATEGORIES = [
-  "Obat Bebas",
-  "Obat Bebas Terbatas",
-  "Obat Keras",
-  "Antibiotik",
-  "Alat Kesehatan",
-  "Kosmetik",
-  "Suplemen",
-  "Vitamin",
-  "Lainnya",
+interface CategoryOption {
+  id: string;
+  name: string;
+}
+
+const DEMO_CATEGORIES: CategoryOption[] = [
+  { id: "demo-obat-bebas", name: "Obat Bebas" },
+  { id: "demo-obat-terbatas", name: "Obat Bebas Terbatas" },
+  { id: "demo-obat-keras", name: "Obat Keras" },
+  { id: "demo-antibiotik", name: "Antibiotik" },
+  { id: "demo-alkes", name: "Alat Kesehatan" },
+  { id: "demo-kosmetik", name: "Kosmetik" },
+  { id: "demo-suplemen", name: "Suplemen" },
+  { id: "demo-vitamin", name: "Vitamin" },
+  { id: "demo-lainnya", name: "Lainnya" },
 ];
 
 const DEMO_UNITS = [
@@ -91,8 +96,9 @@ export function ProductFormModal({
   editingProduct,
 }: ProductFormModalProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
-  const [categories, setCategories] = useState<string[]>(DEMO_CATEGORIES);
+  const [categories, setCategories] = useState<CategoryOption[]>(DEMO_CATEGORIES);
   const [units, setUnits] = useState<string[]>(DEMO_UNITS);
+  const [isScanning, setIsScanning] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -114,7 +120,7 @@ export function ProductFormModal({
           ]);
 
           if (cats.length > 0) {
-            setCategories(cats.map((c) => c.name));
+            setCategories(cats.map((c) => ({ id: c.id, name: c.name })));
           }
 
           if (unitRows.length > 0) {
@@ -254,7 +260,7 @@ export function ProductFormModal({
           });
         } else {
           await productRepo.createProduct({
-            categoryId: form.categoryId || form.category,
+            categoryId: form.categoryId,
             name: form.name.trim(),
             barcode: form.barcode.trim() || null,
             unit: form.unit,
@@ -272,9 +278,10 @@ export function ProductFormModal({
       onClose();
     } catch (err) {
       console.error("Failed to save product:", err);
+      const msg = err instanceof Error ? err.message : "Gagal menyimpan produk. Silakan coba lagi.";
       setErrors((prev) => ({
         ...prev,
-        _general: "Gagal menyimpan produk. Silakan coba lagi.",
+        _general: msg,
       }));
     } finally {
       setIsSubmitting(false);
@@ -378,8 +385,17 @@ export function ProductFormModal({
               Kategori <span className="text-red-500">*</span>
             </label>
             <select
-              value={form.category}
-              onChange={(e) => updateField("category", e.target.value)}
+              value={form.categoryId || form.category}
+              onChange={(e) => {
+                const val = e.target.value;
+                const cat = categories.find((c) => c.id === val || c.name === val);
+                if (cat) {
+                  updateField("categoryId", cat.id);
+                  updateField("category", cat.name);
+                } else {
+                  updateField("category", val);
+                }
+              }}
               className={cn(
                 "w-full rounded-lg border bg-white px-3 py-2 text-sm focus:outline-none focus:ring-2 dark:bg-neutral-800 dark:text-neutral-50",
                 errors.category
@@ -389,8 +405,8 @@ export function ProductFormModal({
             >
               <option value="">Pilih kategori</option>
               {categories.map((cat) => (
-                <option key={cat} value={cat}>
-                  {cat}
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
                 </option>
               ))}
             </select>
@@ -425,6 +441,62 @@ export function ProductFormModal({
               >
                 Auto
               </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  setIsScanning(true);
+                  try {
+                    // @ts-expect-error — BarcodeDetector API (Chrome 88+)
+                    if (typeof BarcodeDetector !== "undefined") {
+                      // @ts-expect-error
+                      const detector = new BarcodeDetector({ formats: ["ean_13", "ean_8", "code_128", "code_39", "upc_a"] });
+                      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                      const video = document.createElement("video");
+                      video.srcObject = stream;
+                      video.setAttribute("playsinline", "true");
+                      await video.play();
+                      const scan = async () => {
+                        const barcodes = await detector.detect(video);
+                        if (barcodes.length > 0) {
+                          updateField("barcode", barcodes[0].rawValue);
+                          stream.getTracks().forEach((t) => t.stop());
+                          video.remove();
+                          setIsScanning(false);
+                        } else {
+                          requestAnimationFrame(scan);
+                        }
+                      };
+                      // Auto-stop after 15 seconds
+                      setTimeout(() => {
+                        stream.getTracks().forEach((t) => t.stop());
+                        video.remove();
+                        if (isScanning) setIsScanning(false);
+                      }, 15000);
+                      scan();
+                    } else {
+                      alert("Browser tidak mendukung Barcode Scanner. Gunakan Chrome di Android atau masukkan barcode manual.");
+                      setIsScanning(false);
+                    }
+                  } catch {
+                    alert("Gagal mengakses kamera. Pastikan izin kamera diaktifkan.");
+                    setIsScanning(false);
+                  }
+                }}
+                disabled={isScanning}
+                className="shrink-0 rounded-lg border border-brand-200 bg-brand-50 px-3 text-[11px] font-medium text-brand-600 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-800 dark:bg-brand-950 dark:text-brand-400 dark:hover:bg-brand-900 transition-colors"
+              >
+                {isScanning ? (
+                  <span className="inline-flex items-center gap-1">
+                    <span className="h-3 w-3 animate-pulse rounded-full bg-brand-500" />
+                    Scan...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1">
+                    <Scan className="h-3.5 w-3.5" />
+                    Scan
+                  </span>
+                )}
+              </button>
             </div>
             {errors.barcode && (
               <p className="mt-1 text-[10px] text-red-500">{errors.barcode}</p>
@@ -458,10 +530,11 @@ export function ProductFormModal({
               <input
                 type="number"
                 min={0}
-                value={form.defaultPrice}
+                value={form.defaultPrice || ""}
                 onChange={(e) =>
                   updateField("defaultPrice", Math.max(0, Number(e.target.value)))
                 }
+                placeholder="0"
                 className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
@@ -472,7 +545,8 @@ export function ProductFormModal({
               <input
                 type="number"
                 min={0}
-                value={form.defaultSellingPrice}
+                value={form.defaultSellingPrice || ""}
+                placeholder="0"
                 onChange={(e) =>
                   updateField(
                     "defaultSellingPrice",
@@ -503,7 +577,8 @@ export function ProductFormModal({
             <input
               type="number"
               min={0}
-              value={form.minStock}
+              value={form.minStock || ""}
+              placeholder="0"
               onChange={(e) =>
                 updateField("minStock", Math.max(0, Number(e.target.value)))
               }
