@@ -159,6 +159,12 @@ export async function acceptInvitation(input: {
       return { success: false, error: insertError.message };
     }
 
+    // Update profile.tenant_id so getUserBySupabaseUid can resolve the role
+    await db
+      .from("profiles")
+      .update({ tenant_id: invite.tenant_id, updated_at: new Date().toISOString() })
+      .eq("id", existingUserId);
+
     // Mark token as used
     await db
       .from("invitation_tokens")
@@ -190,6 +196,12 @@ export async function acceptInvitation(input: {
   if (insertError) {
     return { success: false, error: insertError.message };
   }
+
+  // Update profile.tenant_id so getUserBySupabaseUid can resolve the role
+  await db
+    .from("profiles")
+    .update({ tenant_id: invite.tenant_id, updated_at: new Date().toISOString() })
+    .eq("id", userId);
 
   // 5. Mark token as used
   await db
