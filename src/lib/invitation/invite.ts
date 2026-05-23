@@ -203,3 +203,149 @@ export async function acceptInvitation(input: {
 
   return { success: true, email: invite.email };
 }
+
+// ============================================================================
+// Types for invitation listing
+// ============================================================================
+
+export interface TenantInvitation {
+  id: string;
+  email: string;
+  role: TenantRole;
+  branchId: string | null;
+  branchName: string | null;
+  invitedBy: string | null;
+  invitedByName: string | null;
+  status: "pending" | "used" | "expired";
+  invitedAt: string;
+  expiresAt: string;
+  usedAt: string | null;
+  token: string;
+}
+
+// ============================================================================
+// listInvitations — daftar semua undangan dalam tenant (pending/used/expired)
+// ============================================================================
+
+export async function listInvitations(
+  tenantId: string,
+): Promise<{ success: boolean; invitations?: TenantInvitation[]; error?: string }> {
+  const supabase = await createServerSupabase();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db: any = supabase;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    return { success: false, error: "Anda harus login terlebih dahulu." };
+  }
+
+  const { data: invitations, error } = await db
+    .from("invitation_tokens")
+    .select(`
+      id,
+      email,
+      role,
+      assigned_branch_id,
+      is_used,
+      invited_by,
+      used_at,
+      created_at,
+      expires_at,
+      token,
+      branch:assigned_branch_id(name),
+      inviter:invited_by(display_name)
+    `)
+    .eq("tenant_id", tenantId)
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return { success: false, error: error.message };
+  }
+
+  const now = new Date();
+
+  const mapped: TenantInvitation[] = (invitations ?? []).map((inv: any) => {
+    const isExpired = !inv.is_used && new Date(inv.expires_at) < now;
+    let status: TenantInvitation["status"];
+    if (inv.is_used) {
+      status = "used";
+    } else if (isExpired) {
+      status = "expired";
+    } else {
+      status = "pending";
+    }
+
+    return {
+      id: inv.id,
+      email: inv.email,
+      role: inv.role as TenantRole,
+      branchId: inv.assigned_branch_id ?? null,
+      branchName: inv.branch?.name ?? null,
+      invitedBy: inv.invited_by ?? null,
+      invitedByName: inv.inviter?.display_name ?? null,
+      status,
+      invitedAt: inv.created_at,
+      expiresAt: inv.expires_at,
+      usedAt: inv.used_at ?? null,
+      token: inv.token,
+    };
+  });
+
+  return { success: true, invitations: mapped };
+}
+
+// ============================================================================
+// resendInvitation — buat token baru untuk email yang sama (kirim ulang)
+// ============================================================================
+// Tidak bisa UPDATE invitation_tokens karena RLS tidak mengizinkan direct UPDATE.
+// Sebagai gantinya, kita INSERT token baru; token lama dibiarkan expire natural.
+// ============================================================================
+
+export async function resendInvitation(
+  invitationId: string,
+  tenantId: string,
+): Promise<{ success: boolean; token?: string; error?: string }> {
+  const supabase = await createServerSupabase();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db: any = supabase;
+
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) {
+    return { success: false, error: "Anda harus login terlebih dahulu." };
+  }
+
+  // Validasi invitation milik tenant ini
+  const { data: existing } = await db
+    .from("invitation_tokens")
+    .select("id, email, role, assigned_branch_id, is_used")
+    .eq("id", invitationId)
+    .eq("tenant_id", tenantId)
+    .single();
+
+  if (!existing) {
+    return { success: false, error: "Undangan tidak ditemukan." };
+  }
+
+  if (existing.is_used) {
+    return { success: false, error: "Undangan sudah digunakan, tidak bisa dikirim ulang." };
+  }
+
+  // Insert token baru (token lama dibiarkan expire natural)
+  const { data: newInvite, error: insertError } = await db
+    .from("invitation_tokens")
+    .insert({
+      tenant_id: tenantId,
+      email: existing.email,
+      role: existing.role,
+      assigned_branch_id: existing.assigned_branch_id ?? null,
+      invited_by: session.user.id,
+    })
+    .select("token")
+    .single();
+
+  if (insertError) {
+    return { success: false, error: insertError.message };
+  }
+
+  return { success: true, token: newInvite.token };
+}
