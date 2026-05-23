@@ -40,6 +40,18 @@ export function isLoginInProgress(): boolean {
   return loginInProgress;
 }
 
+/**
+ * Module-level hydration mutex. React StrictMode double-mount + fast
+ * navigation can trigger parallel initFromSupabaseSession calls. Two
+ * concurrent supabase.auth.getSession() calls deadlock the GoTrue
+ * client's internal state machine, causing both to time out (8 s).
+ *
+ * By storing the Promise itself, subsequent callers await the same
+ * single getSession() → profile hydration chain instead of starting
+ * a duplicate that races on the same auth state.
+ */
+let hydrationPromise: Promise<boolean> | null = null;
+
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
@@ -458,7 +470,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       isSupabaseConnected: isSupabaseConnected(),
       loginInProgress,
       alreadyAuth: get().isAuthenticated,
+      existingHydrationPromise: !!hydrationPromise,
     });
+
+    /* Module-level mutex: if hydration is already in flight, await the
+     * existing promise instead of starting a parallel getSession() that
+     * would deadlock the GoTrue client's internal state machine. */
+    if (hydrationPromise) {
+      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: reusing in-flight hydration promise");
+      return hydrationPromise;
+    }
 
     if (!isSupabaseConnected()) {
       console.error("[SIDEBAR-DIAG] initFromSupabaseSession: supabase not connected — ABORT");
@@ -480,121 +501,130 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
     console.log("[SIDEBAR-DIAG] initFromSupabaseSession: calling getSession...");
 
-    try {
-      const { data } = await withTimeout(
-        supabase!.auth.getSession(),
-        8000,
-        "getSession",
-      );
-
-      const now = Date.now() / 1000;
-      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getSession result", {
-        hasSession: !!data.session,
-        userId: data.session?.user?.id ?? null,
-        email: data.session?.user?.email ?? null,
-        expiresAt: data.session?.expires_at ?? null,
-        expiresInSec: data.session?.expires_at ? (data.session.expires_at - now).toFixed(0) : null,
-        isExpired: data.session?.expires_at ? data.session.expires_at < now : null,
-        tokenLength: data.session?.access_token?.length ?? 0,
-      });
-
-      if (!data.session?.user) {
-        devLog("initFromSupabaseSession: no session");
-        return false;
-      }
-
-      const supabaseUser = data.session.user;
-
-      /* Profile lookup (8s timeout) */
-      let profile: UserProfile | null = null;
+    /* Wrap all async work in a single promise stored at module level.
+     * Subsequent callers (StrictMode remount, auth listener, etc.) will
+     * await this same promise instead of starting a duplicate chain. */
+    hydrationPromise = (async (): Promise<boolean> => {
       try {
-        profile = await withTimeout(
-          authRepo.getUserBySupabaseUid(supabaseUser.id),
+        const { data } = await withTimeout(
+          supabase!.auth.getSession(),
           8000,
-          "getUserBySupabaseUid",
+          "getSession",
         );
-        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: profile lookup result", {
-          found: !!profile,
-          role: profile?.role ?? null,
-          tenantId: profile?.tenantId ?? null,
-          displayName: profile?.displayName ?? null,
-          email: profile?.email ?? null,
-          isActive: profile?.isActive ?? null,
+
+        const now = Date.now() / 1000;
+        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getSession result", {
+          hasSession: !!data.session,
+          userId: data.session?.user?.id ?? null,
+          email: data.session?.user?.email ?? null,
+          expiresAt: data.session?.expires_at ?? null,
+          expiresInSec: data.session?.expires_at ? (data.session.expires_at - now).toFixed(0) : null,
+          isExpired: data.session?.expires_at ? data.session.expires_at < now : null,
+          tokenLength: data.session?.access_token?.length ?? 0,
         });
-      } catch {
-        devLog("initFromSupabaseSession: profile lookup timed out");
-        set({ isLoading: false });
-        return false;
-      }
 
-      /* If profile has tenant_id but role is "unaffiliated", the tenant_users
-       * lookup failed — try ensureProfile to repair the profile state. */
-      if (profile && (profile.role as string) === "unaffiliated" && profile.tenantId) {
-        console.error(
-          "[auth] profile has tenant_id but role is unaffiliated — attempting repair via ensureProfile",
-          { userId: profile.id, tenantId: profile.tenantId },
-        );
-        profile = null;
-      }
+        if (!data.session?.user) {
+          devLog("initFromSupabaseSession: no session");
+          return false;
+        }
 
-      /* Ensure profile (8s timeout) */
-      if (!profile) {
-        devLog("initFromSupabaseSession: profile missing, running ensureProfile");
+        const supabaseUser = data.session.user;
+
+        /* Profile lookup (8s timeout) */
+        let profile: UserProfile | null = null;
         try {
           profile = await withTimeout(
-            authRepo.ensureProfile({
-              id: supabaseUser.id,
-              email: supabaseUser.email ?? "",
-              displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email ?? "",
-            }),
+            authRepo.getUserBySupabaseUid(supabaseUser.id),
             8000,
-            "ensureProfile",
+            "getUserBySupabaseUid",
           );
+          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: profile lookup result", {
+            found: !!profile,
+            role: profile?.role ?? null,
+            tenantId: profile?.tenantId ?? null,
+            displayName: profile?.displayName ?? null,
+            email: profile?.email ?? null,
+            isActive: profile?.isActive ?? null,
+          });
         } catch {
-          devLog("initFromSupabaseSession: ensureProfile timed out");
+          devLog("initFromSupabaseSession: profile lookup timed out");
           set({ isLoading: false });
           return false;
         }
-      }
 
-      if (!profile) {
-        devLog("initFromSupabaseSession: profile creation failed");
-        set({ isLoading: false });
-        return false;
-      }
-
-      if ((profile.role as string) === "unaffiliated" && profile.tenantId) {
-        console.error(
-          "[auth] initFromSupabaseSession: CRITICAL — profile still unaffiliated after repair.",
-          { userId: profile.id, tenantId: profile.tenantId },
-        );
-        /* Session storage may be corrupted. Clear the Supabase session
-         * and redirect to login so the user gets a fresh token. */
-        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: clearing corrupted session and redirecting to login");
-        try {
-          await supabase!.auth.signOut();
-        } catch {
-          /* non-fatal */
+        /* If profile has tenant_id but role is "unaffiliated", the tenant_users
+         * lookup failed — try ensureProfile to repair the profile state. */
+        if (profile && (profile.role as string) === "unaffiliated" && profile.tenantId) {
+          console.error(
+            "[auth] profile has tenant_id but role is unaffiliated — attempting repair via ensureProfile",
+            { userId: profile.id, tenantId: profile.tenantId },
+          );
+          profile = null;
         }
+
+        /* Ensure profile (8s timeout) */
+        if (!profile) {
+          devLog("initFromSupabaseSession: profile missing, running ensureProfile");
+          try {
+            profile = await withTimeout(
+              authRepo.ensureProfile({
+                id: supabaseUser.id,
+                email: supabaseUser.email ?? "",
+                displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email ?? "",
+              }),
+              8000,
+              "ensureProfile",
+            );
+          } catch {
+            devLog("initFromSupabaseSession: ensureProfile timed out");
+            set({ isLoading: false });
+            return false;
+          }
+        }
+
+        if (!profile) {
+          devLog("initFromSupabaseSession: profile creation failed");
+          set({ isLoading: false });
+          return false;
+        }
+
+        if ((profile.role as string) === "unaffiliated" && profile.tenantId) {
+          console.error(
+            "[auth] initFromSupabaseSession: CRITICAL — profile still unaffiliated after repair.",
+            { userId: profile.id, tenantId: profile.tenantId },
+          );
+          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: clearing corrupted session and redirecting to login");
+          try {
+            await supabase!.auth.signOut();
+          } catch {
+            /* non-fatal */
+          }
+          set({ isLoading: false });
+          return false;
+        }
+
+        syncRepositoryContext(profile);
+        set({
+          user: profile,
+          isAuthenticated: true,
+          isLoading: false,
+          lastActiveAt: new Date().toISOString(),
+          error: null,
+        });
+
+        devLog("initFromSupabaseSession: success, role =", profile.role);
+        return true;
+      } catch (err) {
+        console.error("[SIDEBAR-DIAG] initFromSupabaseSession: exception", err);
         set({ isLoading: false });
         return false;
       }
+    })();
 
-      syncRepositoryContext(profile);
-      set({
-        user: profile,
-        isAuthenticated: true,
-        isLoading: false,
-        lastActiveAt: new Date().toISOString(),
-        error: null,
-      });
-
-      devLog("initFromSupabaseSession: success, role =", profile.role);
-      return true;
-    } catch (err) {
-      console.error("[SIDEBAR-DIAG] initFromSupabaseSession: exception", err);
-      set({ isLoading: false });
-      return false;
+    try {
+      return await hydrationPromise;
+    } finally {
+      hydrationPromise = null;
     }
   },
 
@@ -602,11 +632,23 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   refreshUserProfile: async () => {
     if (!isSupabaseConnected()) return false;
 
+    /* If a full hydration is already in flight, reuse its result —
+     * it already does profile lookup which is a superset of refresh. */
+    if (hydrationPromise) {
+      console.log("[SIDEBAR-DIAG] refreshUserProfile: deferring to in-flight hydration promise");
+      return hydrationPromise;
+    }
+
+    if (loginInProgress) {
+      console.log("[SIDEBAR-DIAG] refreshUserProfile: login in progress — DEFER");
+      return false;
+    }
+
     try {
       const { data } = await withTimeout(
         supabase!.auth.getSession(),
         8000,
-        "getSession",
+        "refreshUserProfile-getSession",
       );
       if (!data.session?.user) return false;
 
