@@ -692,16 +692,43 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       return false;
     }
 
+    let userId: string | null = null;
+
+    /* Try getSession first (cookie-based, fast) */
     try {
       const { data } = await withTimeout(
         supabase!.auth.getSession(),
-        8000,
+        4000,
         "refreshUserProfile-getSession",
       );
-      if (!data.session?.user) return false;
+      if (data.session?.user) {
+        userId = data.session.user.id;
+      }
+    } catch (getSessionErr) {
+      console.error("[SIDEBAR-DIAG] refreshUserProfile: getSession failed:", (getSessionErr as Error)?.message ?? getSessionErr);
+    }
 
+    /* Fallback: getUser bypasses GoTrue internal lock */
+    if (!userId) {
+      try {
+        const { data: userData } = await withTimeout(
+          supabase!.auth.getUser(),
+          4000,
+          "refreshUserProfile-getUser",
+        );
+        if (userData.user) {
+          userId = userData.user.id;
+        }
+      } catch (getUserErr) {
+        console.error("[SIDEBAR-DIAG] refreshUserProfile: getUser fallback also failed:", (getUserErr as Error)?.message ?? getUserErr);
+      }
+    }
+
+    if (!userId) return false;
+
+    try {
       const profile = await withTimeout(
-        authRepo.getUserBySupabaseUid(data.session.user.id),
+        authRepo.getUserBySupabaseUid(userId),
         8000,
         "refreshUserProfile",
       );
