@@ -6,6 +6,7 @@ import { useAiStore } from "@/store/ai-store";
 import DiagnosticsOverview from "@/components/ai/diagnostics-overview";
 import AlertList from "@/components/ai/alert-list";
 import DiagnosticsSummary from "@/components/ai/diagnostics-summary";
+import AuthDiagnosticsPanel from "@/components/diagnostics/auth-diagnostics-panel";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 
 /* ------------------------------------------------------------------ */
@@ -167,6 +168,9 @@ export default function PlatformDiagnosticsPage() {
           />
         </div>
       </div>
+
+      {/* Auth Hydration Diagnostics */}
+      <AuthDiagnosticsPanel />
     </div>
   );
 }
