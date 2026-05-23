@@ -481,11 +481,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         "getSession",
       );
 
+      const now = Date.now() / 1000;
       console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getSession result", {
         hasSession: !!data.session,
         userId: data.session?.user?.id ?? null,
         email: data.session?.user?.email ?? null,
         expiresAt: data.session?.expires_at ?? null,
+        expiresInSec: data.session?.expires_at ? (data.session.expires_at - now).toFixed(0) : null,
+        isExpired: data.session?.expires_at ? data.session.expires_at < now : null,
+        tokenLength: data.session?.access_token?.length ?? 0,
       });
 
       if (!data.session?.user) {
@@ -558,9 +562,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           "[auth] initFromSupabaseSession: CRITICAL — profile still unaffiliated after repair.",
           { userId: profile.id, tenantId: profile.tenantId },
         );
-        /* Don't block — the user can still access the dashboard.
-         * Sidebar navigation may be empty until the root cause
-         * (tenant_users lookup failure) is resolved. */
+        /* Session storage may be corrupted. Clear the Supabase session
+         * and redirect to login so the user gets a fresh token. */
+        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: clearing corrupted session and redirecting to login");
+        try {
+          await supabase!.auth.signOut();
+        } catch {
+          /* non-fatal */
+        }
+        set({ isLoading: false });
+        return false;
       }
 
       syncRepositoryContext(profile);

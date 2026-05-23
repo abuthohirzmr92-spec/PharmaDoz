@@ -115,7 +115,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, HYDRATION_TIMEOUT_MS);
 
     async function hydrate() {
-      console.log("[SIDEBAR-DIAG] AuthProvider hydrate START", { pathname, isPublic });
+      /* Log all Supabase-related cookies/storage for stale-state diagnosis */
+      if (typeof window !== "undefined" && typeof document !== "undefined") {
+        const supabaseCookies = document.cookie.split(";").filter(c => c.includes("sb-"));
+        const localStorageKeys = Object.keys(localStorage).filter(k => k.includes("sb-") || k.includes("supabase") || k.includes("apotek"));
+        console.log("[SIDEBAR-DIAG] AuthProvider hydrate START", {
+          pathname,
+          isPublic,
+          supabaseCookieCount: supabaseCookies.length,
+          supabaseCookieNames: supabaseCookies.map(c => c.trim().split("=")[0]),
+          localStorageKeys,
+        });
+      } else {
+        console.log("[SIDEBAR-DIAG] AuthProvider hydrate START", { pathname, isPublic });
+      }
       logAuthHydration("start");
       devLog("hydrate: start for", pathname);
 
