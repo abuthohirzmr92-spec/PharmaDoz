@@ -43,9 +43,37 @@ export default function OnboardingLayout({ children }: { children: React.ReactNo
     }
   }, [user, router]);
 
-  // Map pathname to current step index
-  const currentStepKey = pathname.split("/").pop() as OnboardingStep | undefined;
+  // Map URL path segment → OnboardingStep key
+  // URLs use short names (branch, products) but STEPS uses full keys (branch_setup, product_setup)
+  const PATH_TO_STEP: Record<string, OnboardingStep> = {
+    welcome: "welcome",
+    profile: "profile_setup",
+    branch: "branch_setup",
+    products: "product_setup",
+    team: "team_invite",
+    done: "done",
+  };
+  const STEP_TO_PATH: Record<OnboardingStep, string> = {
+    welcome: "welcome",
+    profile_setup: "profile",
+    branch_setup: "branch",
+    product_setup: "products",
+    team_invite: "team",
+    done: "done",
+  };
+
+  const urlSegment = pathname.split("/").pop() ?? "";
+  const currentStepKey = PATH_TO_STEP[urlSegment];
   const currentIndex = STEPS.findIndex((s) => s.key === currentStepKey);
+
+  // Auto-redirect if DB state doesn't match the URL
+  useEffect(() => {
+    if (!state || !state.currentStep) return;
+    const expectedPath = STEP_TO_PATH[state.currentStep];
+    if (expectedPath && urlSegment !== expectedPath) {
+      router.replace(`/onboarding/${expectedPath}`);
+    }
+  }, [state?.currentStep, urlSegment, router]);
 
   if (isLoading || !state) {
     return (
