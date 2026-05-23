@@ -505,10 +505,17 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
      * Subsequent callers (StrictMode remount, auth listener, etc.) will
      * await this same promise instead of starting a duplicate chain. */
     hydrationPromise = (async (): Promise<boolean> => {
+      let supabaseUser: { id: string; email?: string | null; user_metadata?: Record<string, unknown> } | null = null;
+
+      /* ---- Step A: getSession (4s timeout) ----
+       * Reads session from cookie storage via GoTrue's state machine.
+       * Can deadlock if GoTrue's internal _acquireLock is held (e.g. by a
+       * stalled auto-refresh or stale PKCE exchange). Short timeout so we
+       * can fall through to getUser() quickly. */
       try {
         const { data } = await withTimeout(
           supabase!.auth.getSession(),
-          8000,
+          4000,
           "getSession",
         );
 
@@ -523,12 +530,53 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           tokenLength: data.session?.access_token?.length ?? 0,
         });
 
-        if (!data.session?.user) {
-          devLog("initFromSupabaseSession: no session");
-          return false;
+        if (data.session?.user) {
+          supabaseUser = data.session.user;
         }
+      } catch (getSessionErr) {
+        console.error("[SIDEBAR-DIAG] getSession failed:", (getSessionErr as Error)?.message ?? getSessionErr);
+        /* Don't give up — try getUser() below */
+      }
 
-        const supabaseUser = data.session.user;
+      /* ---- Step B: getUser fallback (4s timeout) ----
+       * Direct API call to /auth/v1/user. Bypasses GoTrue's internal
+       * _acquireLock entirely — reads the access token from storage and
+       * validates it with the Supabase Auth server. This is the recovery
+       * path when getSession() hangs due to a deadlocked state machine. */
+      if (!supabaseUser) {
+        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: trying getUser as fallback...");
+        try {
+          const { data: userData } = await withTimeout(
+            supabase!.auth.getUser(),
+            4000,
+            "getUser",
+          );
+          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getUser result", {
+            hasUser: !!userData.user,
+            userId: userData.user?.id ?? null,
+            email: userData.user?.email ?? null,
+            role: userData.user?.role ?? null,
+          });
+          if (userData.user) {
+            supabaseUser = {
+              id: userData.user.id,
+              email: userData.user.email,
+              user_metadata: userData.user.user_metadata as Record<string, unknown> | undefined,
+            };
+          }
+        } catch (getUserErr) {
+          console.error("[SIDEBAR-DIAG] getUser fallback also failed:", (getUserErr as Error)?.message ?? getUserErr);
+        }
+      }
+
+      /* ---- Step C: no user from either method — give up ---- */
+      if (!supabaseUser) {
+        console.error("[SIDEBAR-DIAG] initFromSupabaseSession: both getSession and getUser failed — no session");
+        set({ isLoading: false });
+        return false;
+      }
+
+      try {
 
         /* Profile lookup (8s timeout) */
         let profile: UserProfile | null = null;
@@ -570,7 +618,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
               authRepo.ensureProfile({
                 id: supabaseUser.id,
                 email: supabaseUser.email ?? "",
-                displayName: supabaseUser.user_metadata?.display_name ?? supabaseUser.email ?? "",
+                displayName: (supabaseUser.user_metadata?.display_name as string | undefined) ?? supabaseUser.email ?? "",
               }),
               8000,
               "ensureProfile",
