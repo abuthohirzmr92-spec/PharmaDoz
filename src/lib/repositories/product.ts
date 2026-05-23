@@ -49,6 +49,7 @@ export class ProductRepository extends BaseRepository {
     isActive?: boolean;
   }): Promise<InventoryProduct[]> {
     if (!this.isConnected) return [];
+    if (!this.hasTenantScope()) return [];
 
     let query = this.client
       .from("products")
@@ -115,6 +116,7 @@ export class ProductRepository extends BaseRepository {
 
   async getProductById(id: string): Promise<InventoryProduct | null> {
     if (!this.isConnected) return null;
+    if (!this.hasTenantScope()) return null;
 
     let query = this.client
       .from("products")
@@ -181,6 +183,7 @@ export class ProductRepository extends BaseRepository {
 
   async searchByBarcode(barcode: string): Promise<InventoryProduct | null> {
     if (!this.isConnected) return null;
+    if (!this.hasTenantScope()) return null;
 
     let query = this.client
       .from("products")
@@ -330,6 +333,8 @@ export class ProductRepository extends BaseRepository {
     if (data.minStock !== undefined) updateData["min_stock"] = data.minStock;
     if (data.isActive !== undefined) updateData["is_active"] = data.isActive;
 
+    this.requireTenant();
+
     let query = this.client
       .from("products")
       .update(updateData)
@@ -354,6 +359,10 @@ export class ProductRepository extends BaseRepository {
     isActive?: boolean;
   }): Promise<Product[]> {
     if (!this.isConnected) return [];
+    if (!this.hasTenantScope()) {
+      console.error("[TENANT-SCOPE] getRawProducts blocked — no tenant context set on productRepo");
+      return [];
+    }
 
     let query = this.client
       .from("products")
@@ -378,6 +387,7 @@ export class ProductRepository extends BaseRepository {
 
   async softDeleteProduct(id: string): Promise<void> {
     if (!this.isConnected) throw new Error("Not connected");
+    this.requireTenant();
 
     let query = this.client
       .from("products")
@@ -399,6 +409,7 @@ export class ProductRepository extends BaseRepository {
 
   async getCategories(): Promise<ProductCategory[]> {
     if (!this.isConnected) return [];
+    if (!this.hasTenantScope()) return [];
 
     let query = this.client
       .from("product_categories")

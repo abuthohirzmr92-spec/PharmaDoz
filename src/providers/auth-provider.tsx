@@ -6,10 +6,22 @@ import { useAuthStore, syncRepositoryContext, isLoginInProgress, clearDomainStor
 import { logAuthHydration } from "@/lib/observability/route-debug";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
+import {
+  isDiagnosticsEnabled,
+  authHydrationProbe,
+  checkSessionHealth,
+  runAllPatternMatchers,
+  diagnosticRepo,
+  reportFindings,
+  captureStorageSnapshot,
+} from "@/lib/diagnostics";
+import { telemetryBus } from "@/lib/observability/telemetry";
 
 /* Module-level log — confirms this version of the file is loaded */
 if (typeof window !== "undefined") {
-  console.log("[SIDEBAR-DIAG] auth-provider MODULE LOADED — version f35f247+");
+  const tag = isDiagnosticsEnabled() ? "%c[DIAG]" : "[auth-provider]";
+  const style = isDiagnosticsEnabled() ? "color:#8B5CF6;font-weight:600" : "";
+  console.log(tag, style, "AuthProvider module loaded — v2.0");
 }
 
 /* ------------------------------------------------------------------ */
@@ -121,24 +133,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     async function hydrate() {
       /* STEP 1 — unconditional */
-      console.log("[SIDEBAR-DIAG] hydrate STEP-1 start");
-
-      /* Log all Supabase-related cookies/storage for stale-state diagnosis */
-      if (typeof window !== "undefined" && typeof document !== "undefined") {
-        const supabaseCookies = document.cookie.split(";").filter(c => c.includes("sb-"));
-        const localStorageKeys = Object.keys(localStorage).filter(k => k.includes("sb-") || k.includes("supabase") || k.includes("apotek"));
-        console.log("[SIDEBAR-DIAG] hydrate STEP-2 storage", {
-          pathname,
-          isPublic,
-          supabaseCookieCount: supabaseCookies.length,
-          supabaseCookieNames: supabaseCookies.map(c => c.trim().split("=")[0]),
-          localStorageKeys,
-        });
-      } else {
-        console.log("[SIDEBAR-DIAG] hydrate STEP-2 no-window", { pathname, isPublic });
-      }
+      authHydrationProbe.startStep("overall");
       logAuthHydration("start");
       devLog("hydrate: start for", pathname);
+
+      /* Storage snapshot (diagnostics-enabled only) */
+      if (isDiagnosticsEnabled()) {
+        const storage = captureStorageSnapshot();
+        checkSessionHealth();
+        console.log(
+          "%c[DIAG] Storage snapshot",
+          "color:#8B5CF6",
+          { pathname, isPublic, storage },
+        );
+      }
 
       try {
         /* STEP 3 — check isSupabaseConnected */

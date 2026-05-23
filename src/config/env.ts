@@ -23,6 +23,10 @@ const envSchema = z.object({
     .enum(["true", "false"])
     .default("false")
     .transform((v) => v === "true"),
+  NEXT_PUBLIC_ENABLE_AUTH_DIAGNOSTICS: z
+    .enum(["true", "false"])
+    .default("false")
+    .transform((v) => v === "true"),
 });
 
 export type Env = z.infer<typeof envSchema>;
@@ -34,6 +38,7 @@ function parseEnv(): Env {
     NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL,
     NEXT_PUBLIC_APP_NAME: process.env.NEXT_PUBLIC_APP_NAME,
     NEXT_PUBLIC_DEMO_MODE: process.env.NEXT_PUBLIC_DEMO_MODE,
+    NEXT_PUBLIC_ENABLE_AUTH_DIAGNOSTICS: process.env.NEXT_PUBLIC_ENABLE_AUTH_DIAGNOSTICS,
   });
 
   if (!parsed.success) {
@@ -51,4 +56,8 @@ export const env = parseEnv();
 
 export function isDemoMode(): boolean {
   return env.NEXT_PUBLIC_DEMO_MODE;
+}
+
+export function isAuthDiagnosticsEnabled(): boolean {
+  return env.NEXT_PUBLIC_ENABLE_AUTH_DIAGNOSTICS;
 }

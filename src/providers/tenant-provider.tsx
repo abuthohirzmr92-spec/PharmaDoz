@@ -65,6 +65,16 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    // Set repo context SYNCHRONOUSLY from user profile BEFORE any async work.
+    // This prevents a race where pages/stores query before getTenantForProfile
+    // completes — without tenant scope, withTenantScope() uses a sentinel that
+    // returns zero rows (safe, but produces empty states instead of data).
+    const ctx = { tenantId, role: user.role, userId: user.id };
+    productRepo.setTenantContext(ctx);
+    supplierRepo.setTenantContext(ctx);
+    inventoryRepo.setTenantContext(ctx);
+    transactionRepo.setTenantContext(ctx);
+
     setIsLoading(true);
     setError(null);
 
@@ -74,11 +84,12 @@ export function TenantProvider({ children }: { children: ReactNode }) {
         if (t) {
           setTenant(t);
           setTenantRole(user.role);
-          const ctx = { tenantId: t.id, role: user.role, userId: user.id };
-          productRepo.setTenantContext(ctx);
-          supplierRepo.setTenantContext(ctx);
-          inventoryRepo.setTenantContext(ctx);
-          transactionRepo.setTenantContext(ctx);
+          // Re-apply context with potentially richer tenant data
+          const freshCtx = { tenantId: t.id, role: user.role, userId: user.id };
+          productRepo.setTenantContext(freshCtx);
+          supplierRepo.setTenantContext(freshCtx);
+          inventoryRepo.setTenantContext(freshCtx);
+          transactionRepo.setTenantContext(freshCtx);
         } else if (tenantId) {
           // Fallback: use tenant info from user profile
           const fallback: Tenant = {

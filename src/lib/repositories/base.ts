@@ -1,6 +1,10 @@
 import { supabase } from "@/lib/supabase/client";
 import type { AppRole } from "@/types";
 
+/** Sentinel UUID used when tenant scope is missing — guarantees zero rows
+ *  instead of returning unfiltered cross-tenant data. */
+const NO_TENANT_SENTINEL = "00000000-0000-0000-0000-000000000000";
+
 export function snakeToCamel(str: string): string {
   return str.replace(/_([a-z])/g, (_, c: string) => c.toUpperCase());
 }
@@ -80,8 +84,21 @@ export class BaseRepository {
 
   protected withTenantScope(query: any, column: string = "tenant_id"): any {
     const tid = this.getTenantId();
-    if (!tid) return query;
+    if (!tid) {
+      if (typeof window !== "undefined") {
+        console.error(
+          "[TENANT-SCOPE] query executed WITHOUT tenant filter — using sentinel to prevent data leak. " +
+          "Stack trace:",
+          new Error().stack?.split("\n").slice(1, 4).join("\n"),
+        );
+      }
+      return query.eq(column, NO_TENANT_SENTINEL);
+    }
     return query.eq(column, tid);
+  }
+
+  protected hasTenantScope(): boolean {
+    return !!this.getTenantId();
   }
 
   protected withCrossTenantScope(query: any, column: string = "tenant_id"): any {
@@ -92,6 +109,10 @@ export class BaseRepository {
   protected withBranchScope(query: any, column: string = "pharmacy_id"): any {
     if (!this.branchId) return query;
     return query.eq(column, this.branchId);
+  }
+
+  protected hasBranchScope(): boolean {
+    return !!this.branchId;
   }
 
   protected handleError(error: unknown, context: string): never {
