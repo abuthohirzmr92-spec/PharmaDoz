@@ -2,7 +2,9 @@
 
 import { create } from "zustand";
 import type { AppRole, Permission, UserProfile } from "@/types";
-import { hasPermission } from "@/lib/auth/permissions";
+import { hasEffectivePermission } from "@/lib/auth/permissions";
+import type { PermissionOverride } from "@/lib/auth/permissions";
+import { getUserOverrides, toOverrides } from "@/lib/permissions/user-overrides";
 import { isSessionStale } from "@/lib/auth/roles";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
@@ -113,6 +115,18 @@ export function clearDomainStores() {
   useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
 }
 
+function fetchAndSetUserOverrides(tenantId: string, userId: string) {
+  getUserOverrides(tenantId, userId)
+    .then((result) => {
+      if (result.success && result.overrides) {
+        useAuthStore.setState({ userOverrides: toOverrides(result.overrides) });
+      }
+    })
+    .catch(() => {
+      /* Non-critical — use role defaults if override loading fails */
+    });
+}
+
 /** Promise-based timeout guard for hydration operations */
 function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
   let timer: ReturnType<typeof setTimeout>;
@@ -190,6 +204,7 @@ interface AuthState {
   isLoading: boolean;
   lastActiveAt: string;
   error: string | null;
+  userOverrides: PermissionOverride[];
 
   /* Demo actions (development / testing only) */
   loginAs: (role: AppRole) => void;
@@ -236,6 +251,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
   isLoading: false,
   lastActiveAt: new Date().toISOString(),
   error: null,
+  userOverrides: [],
   impersonating: false,
   originalUser: null,
 
@@ -423,6 +439,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         lastActiveAt: new Date().toISOString(),
         error: null,
       });
+
+      if (profile.tenantId) {
+        fetchAndSetUserOverrides(profile.tenantId, profile.id);
+      }
 
       devLog("loginWithEmail: success, role =", profile.role);
       return { success: true };
@@ -719,6 +739,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           error: null,
         });
 
+        if (profile.tenantId) {
+          fetchAndSetUserOverrides(profile.tenantId, profile.id);
+        }
+
         devLog("initFromSupabaseSession: success, role =", profile.role);
         return true;
       } catch (err) {
@@ -816,6 +840,10 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         isLoading: false,
       });
 
+      if (profile.tenantId) {
+        fetchAndSetUserOverrides(profile.tenantId, profile.id);
+      }
+
       return true;
     } catch {
       return false;
@@ -852,6 +880,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       error: null,
       impersonating: false,
       originalUser: null,
+      userOverrides: [],
     });
 
     devLog("logout: complete");
@@ -866,21 +895,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   /* ---- Permission checks ---- */
   can: (permission) => {
-    const { user } = get();
+    const { user, userOverrides } = get();
     if (!user) return false;
-    return hasPermission(user.role, permission);
+    return hasEffectivePermission(user.role, userOverrides, permission);
   },
 
   canAny: (permissions) => {
-    const { user } = get();
+    const { user, userOverrides } = get();
     if (!user) return false;
-    return permissions.some((p) => hasPermission(user.role, p));
+    return permissions.some((p) => hasEffectivePermission(user.role, userOverrides, p));
   },
 
   canAll: (permissions) => {
-    const { user } = get();
+    const { user, userOverrides } = get();
     if (!user) return false;
-    return permissions.every((p) => hasPermission(user.role, p));
+    return permissions.every((p) => hasEffectivePermission(user.role, userOverrides, p));
   },
 
   getRole: () => get().user?.role ?? null,
