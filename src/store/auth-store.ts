@@ -8,6 +8,7 @@ import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
+import { isDiagnosticsEnabled, authHydrationProbe } from "@/lib/diagnostics";
 import {
   authRepo,
   productRepo,
@@ -27,6 +28,16 @@ import { useHoldCartStore } from "@/store/hold-cart-store";
 const DEV = process.env.NODE_ENV === "development";
 function devLog(...args: unknown[]) {
   if (DEV) console.log("[auth]", ...args);
+}
+
+function diagLog(...args: unknown[]) {
+  if (isDiagnosticsEnabled()) console.log("%c[DIAG]", "color:#8B5CF6", ...args);
+}
+function diagError(...args: unknown[]) {
+  if (isDiagnosticsEnabled()) console.error("[DIAG]", ...args);
+}
+function diagWarn(...args: unknown[]) {
+  if (isDiagnosticsEnabled()) console.warn("[DIAG]", ...args);
 }
 
 
@@ -338,7 +349,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           8000,
           "getUserBySupabaseUid",
         );
-        console.log("[SIDEBAR-DIAG] loginWithEmail: profile lookup result", {
+        diagLog("loginWithEmail: profile lookup result", {
           found: !!profile,
           role: profile?.role ?? null,
           tenantId: profile?.tenantId ?? null,
@@ -466,7 +477,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   /* ---- Supabase: initFromSupabaseSession ---- */
   initFromSupabaseSession: async () => {
-    console.log("[SIDEBAR-DIAG] initFromSupabaseSession: ENTERED", {
+    diagLog("initFromSupabaseSession: ENTERED", {
       isSupabaseConnected: isSupabaseConnected(),
       loginInProgress,
       alreadyAuth: get().isAuthenticated,
@@ -477,29 +488,30 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
      * existing promise instead of starting a parallel getSession() that
      * would deadlock the GoTrue client's internal state machine. */
     if (hydrationPromise) {
-      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: reusing in-flight hydration promise");
+      diagLog("initFromSupabaseSession: reusing in-flight hydration promise");
+      authHydrationProbe.reportConcurrentHydration();
       return hydrationPromise;
     }
 
     if (!isSupabaseConnected()) {
-      console.error("[SIDEBAR-DIAG] initFromSupabaseSession: supabase not connected — ABORT");
+      diagError("initFromSupabaseSession: supabase not connected — ABORT");
       return false;
     }
 
     /* If loginWithEmail is in progress, don't race — it handles everything */
     if (loginInProgress) {
-      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: login in progress — DEFER");
+      diagLog("initFromSupabaseSession: login in progress — DEFER");
       return false;
     }
 
     /* Prevent duplicate concurrent initializations */
     const state = get();
     if (state.isAuthenticated && state.user) {
-      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: already authenticated — SKIP", { role: state.user.role });
+      diagLog("initFromSupabaseSession: already authenticated — SKIP", { role: state.user.role });
       return true;
     }
 
-    console.log("[SIDEBAR-DIAG] initFromSupabaseSession: calling getSession...");
+    diagLog("initFromSupabaseSession: calling getSession...");
 
     /* Wrap all async work in a single promise stored at module level.
      * Subsequent callers (StrictMode remount, auth listener, etc.) will
@@ -521,16 +533,19 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
        * immediately on all subsequent calls. */
       const goTrueAuth = supabase!.auth as any;
       if (goTrueAuth.initializePromise) {
-        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: waiting for GoTrue auto-initialization...");
+        diagLog("initFromSupabaseSession: waiting for GoTrue auto-initialization...");
+        authHydrationProbe.startStep("goTrue-init");
         try {
           await withTimeout(
             Promise.resolve(goTrueAuth.initializePromise),
             5000,
             "goTrueInitialize",
           );
-          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: GoTrue auto-initialization done");
+          authHydrationProbe.endStep("goTrue-init", "ok");
+          diagLog("initFromSupabaseSession: GoTrue auto-initialization done");
         } catch {
-          console.warn("[SIDEBAR-DIAG] initFromSupabaseSession: GoTrue auto-initialization timed out — proceeding anyway");
+          authHydrationProbe.endStep("goTrue-init", "timeout");
+          diagWarn("initFromSupabaseSession: GoTrue auto-initialization timed out — proceeding anyway");
         }
       }
 
@@ -539,6 +554,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
        * Can deadlock if GoTrue's internal _acquireLock is held (e.g. by a
        * stalled auto-refresh or stale PKCE exchange). Short timeout so we
        * can fall through to getUser() quickly. */
+      authHydrationProbe.startStep("getSession");
       try {
         const { data } = await withTimeout(
           supabase!.auth.getSession(),
@@ -547,7 +563,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         );
 
         const now = Date.now() / 1000;
-        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getSession result", {
+        diagLog("initFromSupabaseSession: getSession result", {
           hasSession: !!data.session,
           userId: data.session?.user?.id ?? null,
           email: data.session?.user?.email ?? null,
@@ -556,12 +572,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           isExpired: data.session?.expires_at ? data.session.expires_at < now : null,
           tokenLength: data.session?.access_token?.length ?? 0,
         });
+        authHydrationProbe.endStep("getSession", "ok");
 
         if (data.session?.user) {
           supabaseUser = data.session.user;
         }
       } catch (getSessionErr) {
-        console.error("[SIDEBAR-DIAG] getSession failed:", (getSessionErr as Error)?.message ?? getSessionErr);
+        diagError("getSession failed:", (getSessionErr as Error)?.message ?? getSessionErr);
+        authHydrationProbe.endStep("getSession", "timeout", (getSessionErr as Error)?.message ?? "timeout");
         /* Don't give up — try getUser() below */
       }
 
@@ -571,19 +589,21 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
        * validates it with the Supabase Auth server. This is the recovery
        * path when getSession() hangs due to a deadlocked state machine. */
       if (!supabaseUser) {
-        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: trying getUser as fallback...");
+        diagLog("initFromSupabaseSession: trying getUser as fallback...");
+        authHydrationProbe.startStep("getUser-fallback");
         try {
           const { data: userData } = await withTimeout(
             supabase!.auth.getUser(),
             4000,
             "getUser",
           );
-          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getUser result", {
+          diagLog("initFromSupabaseSession: getUser result", {
             hasUser: !!userData.user,
             userId: userData.user?.id ?? null,
             email: userData.user?.email ?? null,
             role: userData.user?.role ?? null,
           });
+          authHydrationProbe.endStep("getUser-fallback", userData.user ? "ok" : "error");
           if (userData.user) {
             supabaseUser = {
               id: userData.user.id,
@@ -592,13 +612,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             };
           }
         } catch (getUserErr) {
-          console.error("[SIDEBAR-DIAG] getUser fallback also failed:", (getUserErr as Error)?.message ?? getUserErr);
+          diagError("getUser fallback also failed:", (getUserErr as Error)?.message ?? getUserErr);
+          authHydrationProbe.endStep("getUser-fallback", "error", (getUserErr as Error)?.message ?? "error");
         }
       }
 
       /* ---- Step C: no user from either method — give up ---- */
       if (!supabaseUser) {
-        console.error("[SIDEBAR-DIAG] initFromSupabaseSession: both getSession and getUser failed — no session");
+        diagError("initFromSupabaseSession: both getSession and getUser failed — no session");
         set({ isLoading: false });
         return false;
       }
@@ -607,13 +628,15 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
         /* Profile lookup (8s timeout) */
         let profile: UserProfile | null = null;
+        authHydrationProbe.startStep("profile-lookup");
         try {
           profile = await withTimeout(
             authRepo.getUserBySupabaseUid(supabaseUser.id),
             8000,
             "getUserBySupabaseUid",
           );
-          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: profile lookup result", {
+          authHydrationProbe.endStep("profile-lookup", profile ? "ok" : "error");
+          diagLog("initFromSupabaseSession: profile lookup result", {
             found: !!profile,
             role: profile?.role ?? null,
             tenantId: profile?.tenantId ?? null,
@@ -622,6 +645,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             isActive: profile?.isActive ?? null,
           });
         } catch {
+          authHydrationProbe.endStep("profile-lookup", "timeout");
           devLog("initFromSupabaseSession: profile lookup timed out");
           set({ isLoading: false });
           return false;
@@ -668,7 +692,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
             "[auth] initFromSupabaseSession: CRITICAL — profile still unaffiliated after repair.",
             { userId: profile.id, tenantId: profile.tenantId },
           );
-          console.log("[SIDEBAR-DIAG] initFromSupabaseSession: clearing corrupted session and redirecting to login");
+          diagLog("initFromSupabaseSession: clearing corrupted session and redirecting to login");
           try {
             await supabase!.auth.signOut();
           } catch {
@@ -690,7 +714,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         devLog("initFromSupabaseSession: success, role =", profile.role);
         return true;
       } catch (err) {
-        console.error("[SIDEBAR-DIAG] initFromSupabaseSession: exception", err);
+        diagError("initFromSupabaseSession: exception", err);
         set({ isLoading: false });
         return false;
       }
@@ -710,12 +734,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     /* If a full hydration is already in flight, reuse its result —
      * it already does profile lookup which is a superset of refresh. */
     if (hydrationPromise) {
-      console.log("[SIDEBAR-DIAG] refreshUserProfile: deferring to in-flight hydration promise");
+      diagLog("refreshUserProfile: deferring to in-flight hydration promise");
       return hydrationPromise;
     }
 
     if (loginInProgress) {
-      console.log("[SIDEBAR-DIAG] refreshUserProfile: login in progress — DEFER");
+      diagLog("refreshUserProfile: login in progress — DEFER");
       return false;
     }
 
@@ -724,16 +748,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     /* Wait for GoTrue auto-initialization to release the Navigator Lock */
     const goTrueAuth = supabase!.auth as any;
     if (goTrueAuth.initializePromise) {
-      console.log("[SIDEBAR-DIAG] refreshUserProfile: waiting for GoTrue auto-initialization...");
+      diagLog("refreshUserProfile: waiting for GoTrue auto-initialization...");
       try {
         await withTimeout(
           Promise.resolve(goTrueAuth.initializePromise),
           5000,
           "goTrueInitialize",
         );
-        console.log("[SIDEBAR-DIAG] refreshUserProfile: GoTrue auto-initialization done");
+        diagLog("refreshUserProfile: GoTrue auto-initialization done");
       } catch {
-        console.warn("[SIDEBAR-DIAG] refreshUserProfile: GoTrue auto-initialization timed out — proceeding anyway");
+        diagWarn("refreshUserProfile: GoTrue auto-initialization timed out — proceeding anyway");
       }
     }
 
@@ -748,7 +772,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         userId = data.session.user.id;
       }
     } catch (getSessionErr) {
-      console.error("[SIDEBAR-DIAG] refreshUserProfile: getSession failed:", (getSessionErr as Error)?.message ?? getSessionErr);
+      diagError("refreshUserProfile: getSession failed:", (getSessionErr as Error)?.message ?? getSessionErr);
     }
 
     /* Fallback: getUser bypasses GoTrue internal lock */
@@ -763,7 +787,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           userId = userData.user.id;
         }
       } catch (getUserErr) {
-        console.error("[SIDEBAR-DIAG] refreshUserProfile: getUser fallback also failed:", (getUserErr as Error)?.message ?? getUserErr);
+        diagError("refreshUserProfile: getUser fallback also failed:", (getUserErr as Error)?.message ?? getUserErr);
       }
     }
 

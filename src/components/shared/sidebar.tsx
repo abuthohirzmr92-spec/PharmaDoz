@@ -14,19 +14,22 @@ import { OfflineIndicator } from "./offline-indicator";
 import { SyncStatus } from "./sync-status";
 import { RoleSwitcher } from "./role-switcher";
 import { SessionPanel } from "./session-panel";
+import { logSidebarRender, isDiagnosticsEnabled } from "@/lib/diagnostics";
 
 export function Sidebar() {
   const { expanded, toggle } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
-  /* Unconditional render log — fires on every render regardless of state */
-  console.log("[SIDEBAR-DIAG] Sidebar render", {
-    hasUser: !!user,
-    role: user?.role ?? null,
-    tenantId: user?.tenantId ?? null,
-    isAuthenticated: useAuthStore.getState().isAuthenticated,
-    isLoading: useAuthStore.getState().isLoading,
-  });
+  /* Diagnostic render log — fires on every render when diagnostics enabled */
+  if (isDiagnosticsEnabled()) {
+    console.log("%c[DIAG] Sidebar render", "color:#8B5CF6", {
+      hasUser: !!user,
+      role: user?.role ?? null,
+      tenantId: user?.tenantId ?? null,
+      isAuthenticated: useAuthStore.getState().isAuthenticated,
+      isLoading: useAuthStore.getState().isLoading,
+    });
+  }
 
   // Defense-in-depth: proxy + (tenant) layout prevent platform users from reaching this.
   if (isPlatformUser(user?.role)) return null;
@@ -40,22 +43,29 @@ export function Sidebar() {
           !item.permission ||
           (user && hasPermission(user.role, item.permission)),
       );
-      /* [SIDEBAR-DIAG] Log final nav state on every render */
-      console.log("[SIDEBAR-DIAG] sidebar render", {
+      /* Diagnostic nav filter log + empty-sidebar probe */
+      logSidebarRender({
         hasUser: !!user,
         role: user?.role ?? null,
-        tenantId: user?.tenantId ?? null,
-        isAuthenticated: !!user,
-        navTotal: TENANT_NAVIGATION.length,
         navFiltered: result.length,
-        navPermissions: TENANT_NAVIGATION.map(i => i.permission),
-        navFilteredLabels: result.map(i => i.label),
-        navRejectedLabels: TENANT_NAVIGATION.filter(i => !result.includes(i)).map(i => ({
-          label: i.label,
-          permission: i.permission,
-          hasPermission: user ? hasPermission(user.role, i.permission!) : false,
-        })),
+        navTotal: TENANT_NAVIGATION.length,
       });
+
+      if (isDiagnosticsEnabled()) {
+        console.log("%c[DIAG] sidebar nav filter", "color:#8B5CF6", {
+          hasUser: !!user,
+          role: user?.role ?? null,
+          tenantId: user?.tenantId ?? null,
+          navTotal: TENANT_NAVIGATION.length,
+          navFiltered: result.length,
+          navFilteredLabels: result.map(i => i.label),
+          navRejectedLabels: TENANT_NAVIGATION.filter(i => !result.includes(i)).map(i => ({
+            label: i.label,
+            permission: i.permission,
+            hasUserHasPermission: user ? hasPermission(user.role, i.permission!) : false,
+          })),
+        });
+      }
       return result;
     },
     [user],

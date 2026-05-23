@@ -1,11 +1,18 @@
 import { BaseRepository } from "./base";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { resolveUserRole, isSystemRoleType } from "@/lib/auth/role-resolver";
+import { isDiagnosticsEnabled } from "@/lib/diagnostics";
 import type { UserProfile, AppRole, SystemRole, TenantRole, Permission, Role, Tenant } from "@/types";
 
 const DEV = process.env.NODE_ENV === "development";
 function repoLog(...args: unknown[]) {
   if (DEV) console.log("[auth-repo]", ...args);
+}
+function diagLog(...args: unknown[]) {
+  if (isDiagnosticsEnabled()) console.log("%c[DIAG]", "color:#8B5CF6", ...args);
+}
+function diagError(...args: unknown[]) {
+  if (isDiagnosticsEnabled()) console.error("[DIAG]", ...args);
 }
 
 export class AuthRepository extends BaseRepository {
@@ -62,10 +69,10 @@ export class AuthRepository extends BaseRepository {
 
     if (profileError) {
       if (profileError.code === "PGRST116") {
-        console.log("[SIDEBAR-DIAG] getUserBySupabaseUid: no profile row for", supabaseUid);
+        diagLog("getUserBySupabaseUid: no profile row for", supabaseUid);
         return null;
       }
-      console.error("[SIDEBAR-DIAG] getUserBySupabaseUid: profiles query error:", profileError.message, profileError.code);
+      diagError("getUserBySupabaseUid: profiles query error:", profileError.message, profileError.code);
       return null;
     }
 
@@ -74,7 +81,7 @@ export class AuthRepository extends BaseRepository {
     const p = profileData as any;
     const profileRoleRaw: string | null = p.system_role ?? null;
 
-    console.log("[SIDEBAR-DIAG] getUserBySupabaseUid: profile row", {
+    diagLog("getUserBySupabaseUid: profile row", {
       profileId: p.id,
       systemRole: profileRoleRaw,
       tenantId: p.tenant_id ?? null,
@@ -174,7 +181,7 @@ export class AuthRepository extends BaseRepository {
 
     const resolvedRole = resolveUserRole(profileRoleRaw, tenantRole);
 
-    console.log("[SIDEBAR-DIAG] getUserBySupabaseUid: role resolution", {
+    diagLog("getUserBySupabaseUid: role resolution", {
       profileRoleRaw,
       tenantRole,
       resolvedRole,
