@@ -7,6 +7,11 @@ import { logAuthHydration } from "@/lib/observability/route-debug";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
 
+/* Module-level log — confirms this version of the file is loaded */
+if (typeof window !== "undefined") {
+  console.log("[SIDEBAR-DIAG] auth-provider MODULE LOADED — version f35f247+");
+}
+
 /* ------------------------------------------------------------------ */
 /*  Dev logging (stripped in production)                               */
 /* ------------------------------------------------------------------ */
@@ -115,11 +120,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, HYDRATION_TIMEOUT_MS);
 
     async function hydrate() {
+      /* STEP 1 — unconditional */
+      console.log("[SIDEBAR-DIAG] hydrate STEP-1 start");
+
       /* Log all Supabase-related cookies/storage for stale-state diagnosis */
       if (typeof window !== "undefined" && typeof document !== "undefined") {
         const supabaseCookies = document.cookie.split(";").filter(c => c.includes("sb-"));
         const localStorageKeys = Object.keys(localStorage).filter(k => k.includes("sb-") || k.includes("supabase") || k.includes("apotek"));
-        console.log("[SIDEBAR-DIAG] AuthProvider hydrate START", {
+        console.log("[SIDEBAR-DIAG] hydrate STEP-2 storage", {
           pathname,
           isPublic,
           supabaseCookieCount: supabaseCookies.length,
@@ -127,21 +135,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           localStorageKeys,
         });
       } else {
-        console.log("[SIDEBAR-DIAG] AuthProvider hydrate START", { pathname, isPublic });
+        console.log("[SIDEBAR-DIAG] hydrate STEP-2 no-window", { pathname, isPublic });
       }
       logAuthHydration("start");
       devLog("hydrate: start for", pathname);
 
       try {
-        /* 1. Supabase session (with sub-timeout) */
-        if (isSupabaseConnected()) {
+        /* STEP 3 — check isSupabaseConnected */
+        const connected = isSupabaseConnected();
+        console.log("[SIDEBAR-DIAG] hydrate STEP-3 isSupabaseConnected =", connected, {
+          hasAuth: typeof supabase?.auth !== "undefined",
+          authType: typeof supabase?.auth,
+          hasGetSession: typeof supabase?.auth?.getSession === "function",
+        });
+        if (connected) {
           devLog("hydrate: checking supabase session");
+          console.log("[SIDEBAR-DIAG] hydrate STEP-4 calling initFromSupabaseSession");
           try {
             await withTimeout(
               initFromSupabaseSession(),
               SESSION_CHECK_TIMEOUT_MS,
               "initFromSupabaseSession",
             );
+            console.log("[SIDEBAR-DIAG] hydrate STEP-5 initFromSupabaseSession completed");
             const hydrateResult = useAuthStore.getState().isAuthenticated;
             console.log("[SIDEBAR-DIAG] AuthProvider after initFromSupabaseSession", {
               isAuthenticated: hydrateResult,

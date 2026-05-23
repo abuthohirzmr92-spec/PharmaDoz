@@ -592,7 +592,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       devLog("initFromSupabaseSession: success, role =", profile.role);
       return true;
     } catch (err) {
-      devLog("initFromSupabaseSession: exception", err);
+      console.error("[SIDEBAR-DIAG] initFromSupabaseSession: exception", err);
       set({ isLoading: false });
       return false;
     }
