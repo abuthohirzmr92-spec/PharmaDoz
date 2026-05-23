@@ -66,6 +66,9 @@ interface InventoryState {
   setActiveTab: (tab: InventoryTab) => void;
   setSearchQuery: (query: string) => void;
 
+  /* Actions — supplier */
+  addSupplier: (supplier: Supplier) => void;
+
   /* Actions — purchase */
   addPurchase: (invoice: PurchaseInvoice) => Promise<void>;
 
@@ -140,6 +143,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   /* ---- UI ---- */
   setActiveTab: (tab) => set({ activeTab: tab, searchQuery: "" }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+
+  /* ---- supplier ---- */
+  addSupplier: (supplier) => {
+    set({ suppliers: [...get().suppliers, supplier] });
+  },
 
   /* ---- purchase ---- */
   addPurchase: async (invoice) => {

@@ -18,8 +18,9 @@ import { useInventoryStore } from "@/store/inventory-store";
 import type { PurchaseStatus, PurchaseItem, PurchaseInvoice } from "@/types/inventory";
 import { cn } from "@/lib/cn";
 import { usePermission } from "@/hooks/use-auth";
-import { productRepo } from "@/lib/repository-instances";
+import { productRepo, supplierRepo } from "@/lib/repository-instances";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
+import { Loader2 } from "lucide-react";
 
 const STATUS_FILTERS: { label: string; value: PurchaseStatus | "all" }[] = [
   { label: "Semua", value: "all" },
@@ -43,6 +44,9 @@ export function InventoryPurchasePanel() {
   const suppliers = useInventoryStore((s) => s.suppliers);
   const [productList, setProductList] = useState<Array<{ id: string; name: string; defaultPrice?: number; defaultSellingPrice?: number; unit?: string }>>([]);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [showNewSupplier, setShowNewSupplier] = useState(false);
+  const [newSupplierName, setNewSupplierName] = useState("");
+  const [creatingSupplier, setCreatingSupplier] = useState(false);
 
   useEffect(() => {
     if (productRepo.isConnected) {
@@ -114,6 +118,23 @@ export function InventoryPurchasePanel() {
         return updated;
       }),
     );
+  };
+
+  const handleCreateSupplier = async () => {
+    if (!newSupplierName.trim()) return;
+    setCreatingSupplier(true);
+    try {
+      const created = await supplierRepo.createSupplier({ name: newSupplierName.trim() });
+      useInventoryStore.getState().addSupplier(created);
+      setFormSupplier(created.id);
+      setNewSupplierName("");
+      setShowNewSupplier(false);
+      toast.success(`Supplier "${created.name}" berhasil ditambahkan`);
+    } catch (e: any) {
+      toast.error(e?.message ?? "Gagal menambah supplier");
+    } finally {
+      setCreatingSupplier(false);
+    }
   };
 
   const handleSubmit = () => {
@@ -210,20 +231,69 @@ export function InventoryPurchasePanel() {
                   <label className="block text-[10px] font-medium text-neutral-500 mb-1">
                     Supplier
                   </label>
-                  <select
-                    value={formSupplier}
-                    onChange={(e) => setFormSupplier(e.target.value)}
-                    className="w-full rounded-lg border border-neutral-200 bg-white py-2 px-3 text-xs text-neutral-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                  >
-                    <option value="">Pilih supplier...</option>
-                    {suppliers
-                      .filter((s) => s.isActive)
-                      .map((s) => (
-                        <option key={s.id} value={s.id}>
-                          {s.name}
-                        </option>
-                      ))}
-                  </select>
+                  {showNewSupplier ? (
+                    <div className="flex gap-1">
+                      <input
+                        type="text"
+                        value={newSupplierName}
+                        onChange={(e) => setNewSupplierName(e.target.value)}
+                        placeholder="Nama supplier..."
+                        autoFocus
+                        className="flex-1 rounded-lg border border-brand-300 bg-white py-2 px-3 text-xs text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-brand-600 dark:bg-neutral-800 dark:text-neutral-50"
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") handleCreateSupplier();
+                          if (e.key === "Escape") {
+                            setShowNewSupplier(false);
+                            setNewSupplierName("");
+                          }
+                        }}
+                      />
+                      <button
+                        type="button"
+                        onClick={handleCreateSupplier}
+                        disabled={!newSupplierName.trim() || creatingSupplier}
+                        className="rounded-lg bg-brand-600 px-2.5 py-2 text-xs font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors inline-flex items-center gap-1"
+                      >
+                        {creatingSupplier ? <Loader2 className="h-3 w-3 animate-spin" /> : null}
+                        Simpan
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewSupplier(false);
+                          setNewSupplierName("");
+                        }}
+                        className="rounded-lg border border-neutral-200 bg-white px-2.5 py-2 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
+                      >
+                        Batal
+                      </button>
+                    </div>
+                  ) : (
+                    <select
+                      value={formSupplier}
+                      onChange={(e) => {
+                        if (e.target.value === "__new__") {
+                          setShowNewSupplier(true);
+                        } else {
+                          setFormSupplier(e.target.value);
+                        }
+                      }}
+                      className="w-full rounded-lg border border-neutral-200 bg-white py-2 px-3 text-xs text-neutral-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                    >
+                      <option value="">Pilih supplier...</option>
+                      {suppliers
+                        .filter((s) => s.isActive)
+                        .map((s) => (
+                          <option key={s.id} value={s.id}>
+                            {s.name}
+                          </option>
+                        ))}
+                      <option disabled className="border-t border-neutral-200">──────────</option>
+                      <option value="__new__" className="text-brand-600 font-medium">
+                        + Supplier Baru
+                      </option>
+                    </select>
+                  )}
                 </div>
                 <div>
                   <label className="block text-[10px] font-medium text-neutral-500 mb-1">
