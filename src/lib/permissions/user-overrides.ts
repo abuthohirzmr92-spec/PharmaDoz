@@ -1,8 +1,6 @@
 "use server";
 
 import { createServerSupabase } from "@/lib/supabase/server";
-import type { PermissionOverride } from "@/lib/auth/permissions";
-
 export interface UserPermissionOverride {
   id: string;
   tenantId: string;
@@ -166,13 +164,4 @@ export async function deleteUserOverride(
   }
 
   return { success: true };
-}
-
-/**
- * Resolve effective PermissionOverride[] for use with hasEffectivePermission.
- * Pure helper — converts DB rows to override format.
- */
-export function toOverrides(rows: UserPermissionOverride[] | undefined): PermissionOverride[] {
-  if (!rows || rows.length === 0) return [];
-  return rows.map((r) => ({ permission: r.permission, granted: r.granted }));
 }

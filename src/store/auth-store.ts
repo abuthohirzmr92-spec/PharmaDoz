@@ -2,9 +2,9 @@
 
 import { create } from "zustand";
 import type { AppRole, Permission, UserProfile } from "@/types";
-import { hasEffectivePermission } from "@/lib/auth/permissions";
+import { hasEffectivePermission, toOverrides } from "@/lib/auth/permissions";
 import type { PermissionOverride } from "@/lib/auth/permissions";
-import { getUserOverrides, toOverrides } from "@/lib/permissions/user-overrides";
+import { getUserOverrides } from "@/lib/permissions/user-overrides";
 import { isSessionStale } from "@/lib/auth/roles";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { isPlatformUser } from "@/lib/auth/role-resolver";

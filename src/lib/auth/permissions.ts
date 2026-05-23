@@ -8,6 +8,14 @@ export interface PermissionOverride {
   granted: boolean;
 }
 
+/** Convert raw override rows to PermissionOverride[] for hasEffectivePermission. */
+export function toOverrides(
+  rows: { permission: string; granted: boolean }[] | undefined,
+): PermissionOverride[] {
+  if (!rows || rows.length === 0) return [];
+  return rows.map((r) => ({ permission: r.permission, granted: r.granted }));
+}
+
 /**
  * Check if a role has a specific permission.
  * Pure function — no React dependency, usable anywhere.
