@@ -6,6 +6,8 @@ import { useAuthStore } from "@/store/auth-store";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { PLATFORM_NAV_GROUPS } from "@/config/platform-navigation";
 import { PlatformNavItem } from "./platform-nav-item";
+import { SessionPanel } from "@/components/shared/session-panel";
+import { RoleSwitcher } from "@/components/shared/role-switcher";
 
 export function PlatformSidebar() {
   const pathname = usePathname();
@@ -45,6 +47,10 @@ export function PlatformSidebar() {
           </div>
         ))}
       </nav>
+
+      {/* Footer: session info, connection status, logout */}
+      <SessionPanel collapsed={false} />
+      <RoleSwitcher />
     </aside>
   );
 }

@@ -5,7 +5,7 @@ import { useMemo } from "react";
 import { cn } from "@/lib/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
-import { ChevronLeft } from "lucide-react";
+import { ChevronLeft, AlertTriangle } from "lucide-react";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { TENANT_NAVIGATION } from "@/config/navigation";
@@ -19,18 +19,45 @@ export function Sidebar() {
   const { expanded, toggle } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
 
+  /* Unconditional render log — fires on every render regardless of state */
+  console.log("[SIDEBAR-DIAG] Sidebar render", {
+    hasUser: !!user,
+    role: user?.role ?? null,
+    tenantId: user?.tenantId ?? null,
+    isAuthenticated: useAuthStore.getState().isAuthenticated,
+    isLoading: useAuthStore.getState().isLoading,
+  });
+
   // Defense-in-depth: proxy + (tenant) layout prevent platform users from reaching this.
   if (isPlatformUser(user?.role)) return null;
 
   // Compute nav from the subscribed user, not getState(), so React re-runs
   // this filter on every render where user changes.
   const filteredNav = useMemo(
-    () =>
-      TENANT_NAVIGATION.filter(
+    () => {
+      const result = TENANT_NAVIGATION.filter(
         (item) =>
           !item.permission ||
           (user && hasPermission(user.role, item.permission)),
-      ),
+      );
+      /* [SIDEBAR-DIAG] Log final nav state on every render */
+      console.log("[SIDEBAR-DIAG] sidebar render", {
+        hasUser: !!user,
+        role: user?.role ?? null,
+        tenantId: user?.tenantId ?? null,
+        isAuthenticated: !!user,
+        navTotal: TENANT_NAVIGATION.length,
+        navFiltered: result.length,
+        navPermissions: TENANT_NAVIGATION.map(i => i.permission),
+        navFilteredLabels: result.map(i => i.label),
+        navRejectedLabels: TENANT_NAVIGATION.filter(i => !result.includes(i)).map(i => ({
+          label: i.label,
+          permission: i.permission,
+          hasPermission: user ? hasPermission(user.role, i.permission!) : false,
+        })),
+      });
+      return result;
+    },
     [user],
   );
 
@@ -55,15 +82,26 @@ export function Sidebar() {
 
       {/* Navigation */}
       <nav className="flex-1 space-y-1 overflow-y-auto p-3">
-        {filteredNav.map((item) => (
-          <NavItem
-            key={item.href}
-            label={item.label}
-            href={item.href}
-            icon={<item.icon />}
-            collapsed={!expanded}
-          />
-        ))}
+        {filteredNav.length > 0 ? (
+          filteredNav.map((item) => (
+            <NavItem
+              key={item.href}
+              label={item.label}
+              href={item.href}
+              icon={<item.icon />}
+              collapsed={!expanded}
+            />
+          ))
+        ) : user ? (
+          <div className="flex flex-col items-center gap-2 py-6 text-center">
+            <AlertTriangle className="h-5 w-5 text-amber-500" />
+            <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
+              {expanded
+                ? "Gagal memuat navigasi. Muat ulang halaman."
+                : ""}
+            </p>
+          </div>
+        ) : null}
       </nav>
 
       {/* Sync Status */}

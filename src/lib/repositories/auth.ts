@@ -62,12 +62,10 @@ export class AuthRepository extends BaseRepository {
 
     if (profileError) {
       if (profileError.code === "PGRST116") {
-        repoLog("getUserBySupabaseUid: no profile row for", supabaseUid);
+        console.log("[SIDEBAR-DIAG] getUserBySupabaseUid: no profile row for", supabaseUid);
         return null;
       }
-      /* Non-PGRST116: RLS permission error, network error, etc.
-       * Return null so callers can try ensureProfile instead of crashing. */
-      repoLog("getUserBySupabaseUid: profiles query error:", profileError.message, profileError.code);
+      console.error("[SIDEBAR-DIAG] getUserBySupabaseUid: profiles query error:", profileError.message, profileError.code);
       return null;
     }
 
@@ -75,6 +73,14 @@ export class AuthRepository extends BaseRepository {
 
     const p = profileData as any;
     const profileRoleRaw: string | null = p.system_role ?? null;
+
+    console.log("[SIDEBAR-DIAG] getUserBySupabaseUid: profile row", {
+      profileId: p.id,
+      systemRole: profileRoleRaw,
+      tenantId: p.tenant_id ?? null,
+      isActive: p.is_active,
+      displayName: p.display_name,
+    });
 
     /* 2. System roles (super_admin, etc.) bypass tenant resolution entirely.
      *    They have no tenant_users row and must never fall back to "staff". */
@@ -122,21 +128,66 @@ export class AuthRepository extends BaseRepository {
           const t = tenantData as any;
           p._tenantName = t.name ?? undefined;
         } else if (tenantError && tenantError.code !== "PGRST116") {
-          repoLog("getUserBySupabaseUid: tenant lookup error (non-fatal):", tenantError.message);
+          console.error("[auth-repo] tenant lookup error:", tenantError.message, tenantError.code);
         }
 
         if (!roleError && roleData) {
           tenantRole = (roleData as any).role ?? null;
-        } else if (roleError && roleError.code !== "PGRST116") {
-          repoLog("getUserBySupabaseUid: tenant_users role lookup error (non-fatal):", roleError.message);
+        } else if (roleError) {
+          /* Always log tenant_users lookup failures — they break role resolution.
+           * PGRST116 = 0 rows — user has no active tenant_users row for this tenant. */
+          console.error(
+            "[auth-repo] tenant_users role lookup failed:",
+            roleError.message,
+            roleError.code,
+            { userId: p.id, tenantId: p.tenant_id },
+          );
         }
       } catch (err) {
-        /* Non-fatal: profile is valid even without tenant data */
-        repoLog("getUserBySupabaseUid: tenant lookup exception (non-fatal):", err);
+        console.error("[auth-repo] tenant lookup exception:", err);
+      }
+
+      /* Fallback: if parallel query failed, try the dedicated getTenantRole method.
+       * This is a second chance for transient RLS/network failures. */
+      if (!tenantRole) {
+        try {
+          tenantRole = await this.getTenantRole(p.id, p.tenant_id);
+          if (tenantRole) {
+            console.log("[auth-repo] tenant role recovered via fallback:", tenantRole);
+          }
+        } catch (fallbackErr) {
+          console.error("[auth-repo] fallback getTenantRole also failed:", fallbackErr);
+        }
+      }
+
+      /* Hard diagnostic: user has tenant_id but we couldn't resolve a tenant role.
+       * This means either the tenant_users row is missing, is_active=false, or
+       * RLS is blocking the query. The profile will get role="unaffiliated" which
+       * grants zero permissions — sidebar will be empty. */
+      if (!tenantRole) {
+        console.error(
+          "[auth-repo] CRITICAL: user has tenant_id but NO tenant role resolved.",
+          { userId: p.id, tenantId: p.tenant_id, profileRoleRaw },
+        );
       }
     }
 
     const resolvedRole = resolveUserRole(profileRoleRaw, tenantRole);
+
+    console.log("[SIDEBAR-DIAG] getUserBySupabaseUid: role resolution", {
+      profileRoleRaw,
+      tenantRole,
+      resolvedRole,
+      tenantId: p.tenant_id ?? null,
+      tenantName: (p as any)._tenantName ?? null,
+    });
+
+    if (resolvedRole === "unaffiliated" && p.tenant_id) {
+      console.error(
+        "[auth-repo] CRITICAL: role resolved to 'unaffiliated' for user with tenant_id.",
+        { userId: p.id, tenantId: p.tenant_id, profileRoleRaw, tenantRole },
+      );
+    }
 
     return {
       id: p.id,
@@ -336,25 +387,42 @@ export class AuthRepository extends BaseRepository {
   }): Promise<UserProfile | null> {
     if (!this.isConnected) return null;
 
-    /* 1. Try getUserBySupabaseUid first (profile + optional tenant info) */
+    /* 1. Try getUserBySupabaseUid first (profile + optional tenant info).
+     *    If the profile exists with a valid role, return it immediately.
+     *    If the role is "unaffiliated" but user has a tenant_id, the
+     *    tenant_users lookup failed — don't return the broken profile,
+     *    continue to upsert+repair instead. */
     const existing = await this.getUserBySupabaseUid(params.id);
-    if (existing) {
+    if (existing && (existing.role as string) !== "unaffiliated") {
       repoLog("ensureProfile: profile already exists for", params.id);
       return existing;
     }
-
-    /* 2. Double-check with getProfileByUserId (different query path) */
-    try {
-      const byUserId = await this.getProfileByUserId(params.id);
-      if (byUserId) {
-        repoLog("ensureProfile: found via getProfileByUserId for", params.id);
-        return byUserId;
-      }
-    } catch {
-      /* Non-fatal */
+    if (existing && (existing.role as string) === "unaffiliated" && !existing.tenantId) {
+      /* No tenant affiliation — this is fine (e.g. platform user without tenant_users row) */
+      repoLog("ensureProfile: unaffiliated platform user, returning as-is");
+      return existing;
+    }
+    if (existing) {
+      console.error(
+        "[auth-repo] ensureProfile: existing profile has unaffiliated role with tenant_id — attempting repair",
+        { userId: params.id, tenantId: existing.tenantId },
+      );
     }
 
-    /* 3. Profile truly missing — try upsert.
+    /* 2. Double-check with getProfileByUserId (different query path) */
+    if (!existing) {
+      try {
+        const byUserId = await this.getProfileByUserId(params.id);
+        if (byUserId && (byUserId.role as string) !== "unaffiliated") {
+          repoLog("ensureProfile: found via getProfileByUserId for", params.id);
+          return byUserId;
+        }
+      } catch {
+        /* Non-fatal */
+      }
+    }
+
+    /* 3. Profile missing or broken — try upsert.
      *    Use onConflict("id") so it's safe even on race conditions. */
     repoLog("ensureProfile: upserting profile for", params.id);
     try {
@@ -370,9 +438,6 @@ export class AuthRepository extends BaseRepository {
 
       if (error) {
         repoLog("ensureProfile: upsert error:", error.message, error.code);
-        /* If upsert fails (e.g. RLS INSERT policy), return a minimal
-         * in-memory profile so login can still proceed. The profile
-         * can be repaired later by a super admin. */
         return {
           id: params.id,
           email: params.email,
@@ -392,11 +457,36 @@ export class AuthRepository extends BaseRepository {
       };
     }
 
-    /* 4. Read back the newly created profile */
+    /* 4. Read back the newly created profile.
+     *    getUserBySupabaseUid now has fallback retry for tenant_users lookup. */
     const created = await this.getUserBySupabaseUid(params.id);
+    if (created && (created.role as string) !== "unaffiliated") {
+      repoLog("ensureProfile: repair successful, role =", created.role);
+      return created;
+    }
+    if (created) {
+      console.error(
+        "[auth-repo] ensureProfile: repair failed — profile still unaffiliated after upsert",
+        { userId: params.id, tenantId: created.tenantId },
+      );
+    }
+
+    /* 5. Last resort: try direct getTenantRole + construct profile manually */
+    if (created?.tenantId) {
+      try {
+        const directRole = await this.getTenantRole(params.id, created.tenantId);
+        if (directRole) {
+          console.log("[auth-repo] ensureProfile: role recovered via direct getTenantRole:", directRole);
+          return { ...created, role: directRole as AppRole };
+        }
+      } catch {
+        /* exhausted all options */
+      }
+    }
+
+    /* 6. Absolute fallback: return whatever we have (may be "unaffiliated") */
     if (created) return created;
 
-    /* 5. Fallback: return a minimal in-memory profile */
     repoLog("ensureProfile: could not read back created profile, returning minimal");
     return {
       id: params.id,

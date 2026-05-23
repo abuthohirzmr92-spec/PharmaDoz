@@ -326,6 +326,12 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           8000,
           "getUserBySupabaseUid",
         );
+        console.log("[SIDEBAR-DIAG] loginWithEmail: profile lookup result", {
+          found: !!profile,
+          role: profile?.role ?? null,
+          tenantId: profile?.tenantId ?? null,
+          displayName: profile?.displayName ?? null,
+        });
         devLog("loginWithEmail: profile lookup complete, found =", !!profile);
       } catch (profileErr) {
         set({ isLoading: false });
@@ -333,6 +339,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           success: false,
           error: "Gagal mengambil profil. Periksa koneksi internet Anda.",
         };
+      }
+
+      /* If profile has tenant_id but role is "unaffiliated", the tenant_users
+       * lookup failed — repair via ensureProfile. */
+      if (profile && (profile.role as string) === "unaffiliated" && profile.tenantId) {
+        console.error(
+          "[auth] loginWithEmail: profile has tenant_id but role is unaffiliated — attempting repair",
+          { userId: profile.id, tenantId: profile.tenantId },
+        );
+        profile = null;
       }
 
       /* Step 3: Ensure profile exists (8s timeout — prevents RLS/network hang) */
@@ -364,6 +380,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           success: false,
           error: "Gagal membuat profil. Hubungi Super Admin.",
         };
+      }
+
+      if ((profile.role as string) === "unaffiliated" && profile.tenantId) {
+        console.error(
+          "[auth] loginWithEmail: CRITICAL — profile still unaffiliated after repair.",
+          { userId: profile.id, tenantId: profile.tenantId },
+        );
+        /* Don't block login — the user can still access the dashboard.
+         * The sidebar will show limited/empty navigation until the root
+         * cause (tenant_users lookup failure) is resolved. */
       }
 
       syncRepositoryContext(profile);
@@ -455,6 +481,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         "getSession",
       );
 
+      console.log("[SIDEBAR-DIAG] initFromSupabaseSession: getSession result", {
+        hasSession: !!data.session,
+        userId: data.session?.user?.id ?? null,
+        email: data.session?.user?.email ?? null,
+        expiresAt: data.session?.expires_at ?? null,
+      });
+
       if (!data.session?.user) {
         devLog("initFromSupabaseSession: no session");
         return false;
@@ -470,10 +503,28 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           8000,
           "getUserBySupabaseUid",
         );
+        console.log("[SIDEBAR-DIAG] initFromSupabaseSession: profile lookup result", {
+          found: !!profile,
+          role: profile?.role ?? null,
+          tenantId: profile?.tenantId ?? null,
+          displayName: profile?.displayName ?? null,
+          email: profile?.email ?? null,
+          isActive: profile?.isActive ?? null,
+        });
       } catch {
         devLog("initFromSupabaseSession: profile lookup timed out");
         set({ isLoading: false });
         return false;
+      }
+
+      /* If profile has tenant_id but role is "unaffiliated", the tenant_users
+       * lookup failed — try ensureProfile to repair the profile state. */
+      if (profile && (profile.role as string) === "unaffiliated" && profile.tenantId) {
+        console.error(
+          "[auth] profile has tenant_id but role is unaffiliated — attempting repair via ensureProfile",
+          { userId: profile.id, tenantId: profile.tenantId },
+        );
+        profile = null;
       }
 
       /* Ensure profile (8s timeout) */
@@ -500,6 +551,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
         devLog("initFromSupabaseSession: profile creation failed");
         set({ isLoading: false });
         return false;
+      }
+
+      if ((profile.role as string) === "unaffiliated" && profile.tenantId) {
+        console.error(
+          "[auth] initFromSupabaseSession: CRITICAL — profile still unaffiliated after repair.",
+          { userId: profile.id, tenantId: profile.tenantId },
+        );
+        /* Don't block — the user can still access the dashboard.
+         * Sidebar navigation may be empty until the root cause
+         * (tenant_users lookup failure) is resolved. */
       }
 
       syncRepositoryContext(profile);

@@ -115,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, HYDRATION_TIMEOUT_MS);
 
     async function hydrate() {
+      console.log("[SIDEBAR-DIAG] AuthProvider hydrate START", { pathname, isPublic });
       logAuthHydration("start");
       devLog("hydrate: start for", pathname);
 
