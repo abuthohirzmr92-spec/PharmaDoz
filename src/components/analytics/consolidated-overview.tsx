@@ -99,6 +99,45 @@ export function ConsolidatedOverview() {
     }
   }, [txnsLoaded, computeAll]);
 
+  /* ---- Derived data (MUST be before all early returns — Rules of Hooks) ---- */
+  const heroStats: HeroStat[] = useMemo(
+    () => {
+      if (!consolidated) return [];
+      return [
+        {
+          label: "Total Penjualan",
+          icon: DollarSign,
+          value: formatCurrencyID(consolidated.totalSales),
+          subtext: `${consolidated.branchCount} cabang`,
+        },
+        {
+          label: "Total Transaksi",
+          icon: Receipt,
+          value: consolidated.totalTransactions,
+          subtext: consolidated.topSellingProduct
+            ? `Produk teratas: ${consolidated.topSellingProduct}`
+            : undefined,
+        },
+        {
+          label: "Rata-rata Harian",
+          icon: TrendingUp,
+          value: formatCurrencyID(consolidated.averageDailySales),
+          subtext: "Perkiraan berdasarkan rentang data",
+        },
+        {
+          label: "Cabang Aktif",
+          icon: Store,
+          value: `${consolidated.activeBranchCount} / ${consolidated.branchCount}`,
+          subtext:
+            consolidated.activeBranchCount < consolidated.branchCount
+              ? `${consolidated.branchCount - consolidated.activeBranchCount} cabang tidak aktif`
+              : "Semua cabang aktif",
+        },
+      ];
+    },
+    [consolidated],
+  );
+
   /* ---- Error state ---- */
   if (branchError) {
     return (
@@ -139,42 +178,6 @@ export function ConsolidatedOverview() {
       />
     );
   }
-
-  /* ---- Data state ---- */
-  const heroStats: HeroStat[] = useMemo(
-    () => [
-      {
-        label: "Total Penjualan",
-        icon: DollarSign,
-        value: formatCurrencyID(consolidated.totalSales),
-        subtext: `${consolidated.branchCount} cabang`,
-      },
-      {
-        label: "Total Transaksi",
-        icon: Receipt,
-        value: consolidated.totalTransactions,
-        subtext: consolidated.topSellingProduct
-          ? `Produk teratas: ${consolidated.topSellingProduct}`
-          : undefined,
-      },
-      {
-        label: "Rata-rata Harian",
-        icon: TrendingUp,
-        value: formatCurrencyID(consolidated.averageDailySales),
-        subtext: "Perkiraan berdasarkan rentang data",
-      },
-      {
-        label: "Cabang Aktif",
-        icon: Store,
-        value: `${consolidated.activeBranchCount} / ${consolidated.branchCount}`,
-        subtext:
-          consolidated.activeBranchCount < consolidated.branchCount
-            ? `${consolidated.branchCount - consolidated.activeBranchCount} cabang tidak aktif`
-            : "Semua cabang aktif",
-      },
-    ],
-    [consolidated],
-  );
 
   return (
     <div className="space-y-6">

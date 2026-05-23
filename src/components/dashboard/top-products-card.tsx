@@ -17,11 +17,11 @@ export function TopProductsCard() {
     if (!isLoaded) loadTxns();
   }, [isLoaded, loadTxns]);
 
+  const top = useMemo(() => getTopProducts(5), [getTopProducts, transactions]);
+
   if (isLoading) {
     return <TableSkeleton rows={5} />;
   }
-
-  const top = useMemo(() => getTopProducts(5), [getTopProducts, transactions]);
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">

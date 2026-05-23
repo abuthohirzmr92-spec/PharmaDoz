@@ -85,16 +85,6 @@ export function DashboardStatsGrid() {
   const lowStockCount = useMemo(() => getLowStock().length, [getLowStock, batches]);
   const nearExpiryCount = useMemo(() => getNearExpiry(30).length, [getNearExpiry, batches]);
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-        {Array.from({ length: 4 }).map((_, i) => (
-          <CardSkeleton key={i} />
-        ))}
-      </div>
-    );
-  }
-
   const cards = useMemo<StatCard[]>(
     () => [
       {
@@ -127,6 +117,16 @@ export function DashboardStatsGrid() {
     ],
     [todaySales, todayCount, lowStockCount, nearExpiryCount],
   );
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <CardSkeleton key={i} />
+        ))}
+      </div>
+    );
+  }
 
   return (
     <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
