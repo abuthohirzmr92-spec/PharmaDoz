@@ -8,7 +8,7 @@ import { isSuperAdmin } from "@/lib/auth/super-admin";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
-import { isDiagnosticsEnabled, authHydrationProbe } from "@/lib/diagnostics";
+import { isDiagnosticsEnabled, authHydrationProbe, checkProfileIntegrity } from "@/lib/diagnostics";
 import {
   authRepo,
   productRepo,
@@ -701,6 +701,14 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
           set({ isLoading: false });
           return false;
         }
+
+        checkProfileIntegrity({
+          id: profile.id,
+          role: profile.role,
+          tenantId: profile.tenantId,
+          pharmacyId: profile.pharmacyId,
+          isActive: profile.isActive,
+        });
 
         syncRepositoryContext(profile);
         set({

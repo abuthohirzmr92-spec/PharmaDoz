@@ -240,6 +240,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           hydratingRef.current = false;
         }
       }
+
+      if (isDiagnosticsEnabled()) {
+        const events = telemetryBus.getRecent(100);
+        const findings = runAllPatternMatchers(events);
+        for (const f of findings) diagnosticRepo.report(f);
+        reportFindings(diagnosticRepo.getFindings());
+      }
     }
 
     hydrate();

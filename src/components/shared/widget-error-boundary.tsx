@@ -25,6 +25,17 @@ export class WidgetErrorBoundary extends Component<Props, State> {
 
   componentDidCatch(error: Error) {
     console.error(`[WidgetErrorBoundary] "${this.props.title}":`, error.message);
+    try {
+      const { telemetryBus } = require("@/lib/observability/telemetry");
+      telemetryBus.emit({
+        source: "widget-error-boundary",
+        level: "error",
+        message: `Widget "${this.props.title}" crashed: ${error.message}`,
+        metadata: { widgetName: this.props.title, stack: error.stack?.slice(0, 500) },
+      });
+    } catch {
+      /* diagnostics may not be loaded */
+    }
   }
 
   render() {
