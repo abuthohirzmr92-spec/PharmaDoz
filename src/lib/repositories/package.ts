@@ -12,14 +12,14 @@ export interface PackageRow {
   id: string;
   name: string;
   label: string;
-  max_users: number;
-  max_branches: number;
-  max_products: number;
-  monthly_price: number;
-  is_active: boolean;
-  is_custom: boolean;
-  feature_flags: Record<string, boolean>;
-  sort_order: number;
+  maxUsers: number;
+  maxBranches: number;
+  maxProducts: number;
+  monthlyPrice: number;
+  isActive: boolean;
+  isCustom: boolean;
+  featureFlags: Record<string, boolean>;
+  sortOrder: number;
 }
 
 export interface CreatePackageInput {
@@ -172,7 +172,7 @@ export class PackageRepository extends BaseRepository {
     // Only custom packages can be deleted
     const pkg = await this.getPackageById(id);
     if (!pkg) throw new Error("Paket tidak ditemukan.");
-    if (!pkg.is_custom) throw new Error("Paket bawaan tidak dapat dihapus.");
+    if (!pkg.isCustom) throw new Error("Paket bawaan tidak dapat dihapus.");
 
     // Check if any tenants are using this package
     const { count, error: countError } = await this.client
@@ -394,6 +394,6 @@ export class PackageRepository extends BaseRepository {
 function normalizePackage(pkg: PackageRow): PackageRow {
   return {
     ...pkg,
-    feature_flags: pkg.feature_flags ?? {},
+    featureFlags: pkg.featureFlags ?? {},
   };
 }

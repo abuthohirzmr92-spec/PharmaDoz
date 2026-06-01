@@ -71,7 +71,7 @@ export default function TenantDetailPage() {
   }
 
   const currentPkg = packages.find((p) => p.id === (tenant as any)?.packageId || p.name === tenant?.packageName);
-  const enabledFeatures = Object.entries(currentPkg?.feature_flags ?? {}).filter(([, v]) => v).map(([k]) => k);
+  const enabledFeatures = Object.entries(currentPkg?.featureFlags ?? {}).filter(([, v]) => v).map(([k]) => k);
 
   const handleChange = async (newPackageId: string) => {
     setActioning("change");
@@ -143,7 +143,7 @@ export default function TenantDetailPage() {
               </div>
               <div><p className="text-xs text-neutral-500">Dibuat</p><p className="mt-1 text-sm font-medium text-neutral-900 dark:text-neutral-50">{formatDate(tenant?.createdAt)}</p></div>
               <div><p className="text-xs text-neutral-500">Owner</p><p className="mt-1 text-sm font-medium text-neutral-900 dark:text-neutral-50">{tenant?.ownerName ?? "—"}</p></div>
-              <div><p className="text-xs text-neutral-500">User</p><p className="mt-1 text-sm font-medium text-neutral-900 dark:text-neutral-50">{tenant?.userCount ?? 0} / {currentPkg?.max_users ?? "?"}</p></div>
+              <div><p className="text-xs text-neutral-500">User</p><p className="mt-1 text-sm font-medium text-neutral-900 dark:text-neutral-50">{tenant?.userCount ?? 0} / {currentPkg?.maxUsers ?? "?"}</p></div>
             </div>
           </div>
 
@@ -186,7 +186,7 @@ export default function TenantDetailPage() {
             {currentPkg ? (
               <>
                 <p className="text-lg font-bold text-neutral-900 dark:text-neutral-50">{currentPkg.label}</p>
-                <p className="text-sm text-neutral-500">{formatRupiah(currentPkg.monthly_price)} / bulan</p>
+                <p className="text-sm text-neutral-500">{formatRupiah(currentPkg.monthlyPrice)} / bulan</p>
                 <div className="mt-3 flex flex-wrap gap-1">
                   {enabledFeatures.map((key) => (
                     <span key={key} className="inline-flex items-center rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-950 dark:text-green-400">
@@ -230,10 +230,10 @@ export default function TenantDetailPage() {
             <h3 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50 mb-1">Ubah Paket Tenant</h3>
             <p className="text-sm text-neutral-500 mb-4">Pilih paket baru untuk {tenant?.pharmacyName}</p>
 
-            {packages.filter((p) => p.is_active).map((pkg) => {
+            {packages.filter((p) => p.isActive).map((pkg) => {
               const isCurrent = pkg.name === tenant?.packageName;
-              const isDowngrade = currentPkg && (pkg.max_users < (currentPkg.max_users ?? Infinity) || pkg.max_branches < (currentPkg.max_branches ?? Infinity));
-              const pkgFeatures = Object.entries(pkg.feature_flags ?? {}).filter(([, v]) => v).map(([k]) => k);
+              const isDowngrade = currentPkg && (pkg.maxUsers < (currentPkg.maxUsers ?? Infinity) || pkg.maxBranches < (currentPkg.maxBranches ?? Infinity));
+              const pkgFeatures = Object.entries(pkg.featureFlags ?? {}).filter(([, v]) => v).map(([k]) => k);
 
               return (
                 <div key={pkg.id}
@@ -243,7 +243,7 @@ export default function TenantDetailPage() {
                   <div className="flex items-center justify-between">
                     <div>
                       <p className="font-semibold text-neutral-900 dark:text-neutral-50">{pkg.label}</p>
-                      <p className="text-sm text-neutral-500">{formatRupiah(pkg.monthly_price)}/bulan</p>
+                      <p className="text-sm text-neutral-500">{formatRupiah(pkg.monthlyPrice)}/bulan</p>
                     </div>
                     {isCurrent ? (
                       <span className="text-xs font-medium text-brand-600 bg-brand-100 rounded-full px-2 py-0.5 dark:bg-brand-900 dark:text-brand-400">Saat Ini</span>

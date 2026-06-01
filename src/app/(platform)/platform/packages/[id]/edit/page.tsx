@@ -36,11 +36,11 @@ export default function EditPackagePage() {
     if (pkg) {
       setName(pkg.name);
       setLabel(pkg.label);
-      setMaxUsers(pkg.max_users);
-      setMaxBranches(pkg.max_branches);
-      setMaxProducts(pkg.max_products);
-      setMonthlyPrice(pkg.monthly_price);
-      setFeatures(pkg.feature_flags ?? {});
+      setMaxUsers(pkg.maxUsers);
+      setMaxBranches(pkg.maxBranches);
+      setMaxProducts(pkg.maxProducts);
+      setMonthlyPrice(pkg.monthlyPrice);
+      setFeatures(pkg.featureFlags ?? {});
     }
   }, [packages, pkgId]);
 

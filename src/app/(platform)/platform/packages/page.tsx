@@ -37,7 +37,7 @@ export default function PackagesPage() {
     setDeletingId(null);
   };
 
-  const featureCount = (pkg: PackageRow) => Object.values(pkg.feature_flags ?? {}).filter(Boolean).length;
+  const featureCount = (pkg: PackageRow) => Object.values(pkg.featureFlags ?? {}).filter(Boolean).length;
 
   return (
     <div>
@@ -92,17 +92,17 @@ export default function PackagesPage() {
                   </td>
                   <td className="px-4 py-3">
                     <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      pkg.is_custom ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
+                      pkg.isCustom ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
                     }`}>
-                      {pkg.is_custom ? "Custom" : "Standar"}
+                      {pkg.isCustom ? "Custom" : "Standar"}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center tabular-nums">{pkg.max_users}</td>
-                  <td className="px-4 py-3 text-center tabular-nums">{pkg.max_branches}</td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">{formatRupiah(pkg.monthly_price)}</td>
+                  <td className="px-4 py-3 text-center tabular-nums">{pkg.maxUsers}</td>
+                  <td className="px-4 py-3 text-center tabular-nums">{pkg.maxBranches}</td>
+                  <td className="px-4 py-3 text-right font-medium tabular-nums">{formatRupiah(pkg.monthlyPrice)}</td>
                   <td className="px-4 py-3 text-center tabular-nums">{featureCount(pkg)}</td>
                   <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex h-2 w-2 rounded-full ${pkg.is_active ? "bg-green-500" : "bg-neutral-300"}`} />
+                    <span className={`inline-flex h-2 w-2 rounded-full ${pkg.isActive ? "bg-green-500" : "bg-neutral-300"}`} />
                   </td>
                   <td className="px-4 py-3 text-right">
                     <div className="flex items-center justify-end gap-1">
@@ -112,7 +112,7 @@ export default function PackagesPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Link>
-                      {pkg.is_custom && (
+                      {pkg.isCustom && (
                         <button
                           onClick={() => handleDelete(pkg)}
                           disabled={deletingId === pkg.id}

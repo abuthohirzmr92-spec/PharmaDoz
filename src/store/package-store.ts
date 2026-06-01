@@ -31,13 +31,13 @@ const DEMO_PACKAGES: PackageRow[] = [
     id: "pkg-demo-basic",
     name: "basic",
     label: "Basic",
-    max_users: 3,
-    max_branches: 1,
-    max_products: 200,
-    monthly_price: 0,
-    is_active: true,
-    is_custom: false,
-    feature_flags: {
+    maxUsers: 3,
+    maxBranches: 1,
+    maxProducts: 200,
+    monthlyPrice: 0,
+    isActive: true,
+    isCustom: false,
+    featureFlags: {
       financial_wallet: false,
       cashflow_dashboard: false,
       ai_diagnostics: false,
@@ -45,19 +45,19 @@ const DEMO_PACKAGES: PackageRow[] = [
       stock_transfer: false,
       dashboard_analytics: false,
     },
-    sort_order: 1,
+    sortOrder: 1,
   },
   {
     id: "pkg-demo-professional",
     name: "professional",
     label: "Professional",
-    max_users: 20,
-    max_branches: 5,
-    max_products: 1000,
-    monthly_price: 299000,
-    is_active: true,
-    is_custom: false,
-    feature_flags: {
+    maxUsers: 20,
+    maxBranches: 5,
+    maxProducts: 1000,
+    monthlyPrice: 299000,
+    isActive: true,
+    isCustom: false,
+    featureFlags: {
       financial_wallet: true,
       cashflow_dashboard: false,
       ai_diagnostics: false,
@@ -65,19 +65,19 @@ const DEMO_PACKAGES: PackageRow[] = [
       stock_transfer: true,
       dashboard_analytics: true,
     },
-    sort_order: 2,
+    sortOrder: 2,
   },
   {
     id: "pkg-demo-enterprise",
     name: "enterprise",
     label: "Enterprise",
-    max_users: 50,
-    max_branches: 10,
-    max_products: 10000,
-    monthly_price: 999000,
-    is_active: true,
-    is_custom: false,
-    feature_flags: {
+    maxUsers: 50,
+    maxBranches: 10,
+    maxProducts: 10000,
+    monthlyPrice: 999000,
+    isActive: true,
+    isCustom: false,
+    featureFlags: {
       financial_wallet: true,
       cashflow_dashboard: true,
       ai_diagnostics: true,
@@ -89,7 +89,7 @@ const DEMO_PACKAGES: PackageRow[] = [
       api_access: true,
       priority_support: true,
     },
-    sort_order: 3,
+    sortOrder: 3,
   },
 ];
 
@@ -133,14 +133,14 @@ export const usePackageStore = create<PackageState>((set, get) => ({
         id: `pkg-demo-${Date.now()}`,
         name: data.name,
         label: data.label,
-        max_users: data.maxUsers ?? 5,
-        max_branches: data.maxBranches ?? 1,
-        max_products: data.maxProducts ?? 200,
-        monthly_price: data.monthlyPrice ?? 0,
-        is_active: data.isActive ?? true,
-        is_custom: true,
-        feature_flags: data.featureFlags ?? {},
-        sort_order: data.sortOrder ?? 99,
+        maxUsers: data.maxUsers ?? 5,
+        maxBranches: data.maxBranches ?? 1,
+        maxProducts: data.maxProducts ?? 200,
+        monthlyPrice: data.monthlyPrice ?? 0,
+        isActive: data.isActive ?? true,
+        isCustom: true,
+        featureFlags: data.featureFlags ?? {},
+        sortOrder: data.sortOrder ?? 99,
       };
       set((s) => ({ packages: [...s.packages, newPkg], isLoading: false }));
       return newPkg;
@@ -152,8 +152,20 @@ export const usePackageStore = create<PackageState>((set, get) => ({
       set({ isLoading: false });
       return pkg;
     } catch (err) {
+      // Surface FULL Supabase error to UI
+      const msg = err instanceof Error ? err.message : String(err);
+      const supabaseCode = (err as any)?.supabaseCode ?? null;
+      const supabaseDetails = (err as any)?.supabaseDetails ?? null;
+      const fullError = [
+        msg,
+        supabaseCode ? `Supabase code: ${supabaseCode}` : null,
+        supabaseDetails ? `Details: ${supabaseDetails}` : null,
+      ].filter(Boolean).join("\n");
+
+      console.error("[PackageStore.createPackage] ERROR:", { msg, supabaseCode, supabaseDetails, err });
+
       set({
-        error: err instanceof Error ? err.message : "Gagal membuat paket",
+        error: fullError,
         isLoading: false,
       });
       return null;
@@ -168,7 +180,7 @@ export const usePackageStore = create<PackageState>((set, get) => ({
     if (isDemo) {
       set((s) => ({
         packages: s.packages.map((p) =>
-          p.id === id ? { ...p, ...data, feature_flags: data.featureFlags ?? p.feature_flags } : p,
+          p.id === id ? { ...p, ...data, featureFlags: data.featureFlags ?? p.featureFlags } : p,
         ),
         isLoading: false,
       }));
