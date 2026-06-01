@@ -109,3 +109,56 @@ export function getQuotaLockMessage(resource: "users" | "branches", max: number)
   };
   return labels[resource] ?? "Batas tercapai. Hubungi Super Admin untuk upgrade.";
 }
+
+// ---------------------------------------------------------------------------
+// Server-side Quota Enforcement (Agent E)
+// ---------------------------------------------------------------------------
+// These functions should be called at the repository/store layer before
+// creating new resources. They throw descriptive errors when quota is exceeded.
+// ---------------------------------------------------------------------------
+
+export class QuotaExceededError extends Error {
+  constructor(
+    public resource: "users" | "branches" | "products",
+    public current: number,
+    public max: number,
+  ) {
+    const labels: Record<string, string> = {
+      users: `Batas pengguna tercapai (${current}/${max}).`,
+      branches: `Batas cabang tercapai (${current}/${max}).`,
+      products: `Batas produk tercapai (${current}/${max}).`,
+    };
+    super(`${labels[resource]} Hubungi Super Admin untuk upgrade paket.`);
+    this.name = "QuotaExceededError";
+  }
+}
+
+/**
+ * Check if a tenant can add a branch. Throws QuotaExceededError if not.
+ * Call before inserting into branches table.
+ */
+export function enforceBranchLimit(currentCount: number, maxBranches: number): void {
+  if (currentCount >= maxBranches) {
+    throw new QuotaExceededError("branches", currentCount, maxBranches);
+  }
+}
+
+/**
+ * Check if a tenant can add a user. Throws QuotaExceededError if not.
+ * Call before creating invitation or adding tenant_users.
+ */
+export function enforceUserLimit(currentCount: number, maxUsers: number): void {
+  if (currentCount >= maxUsers) {
+    throw new QuotaExceededError("users", currentCount, maxUsers);
+  }
+}
+
+/**
+ * Check if a tenant can add a product. Throws QuotaExceededError if not.
+ * Call before inserting into products table.
+ */
+export function enforceProductLimit(currentCount: number, maxProducts: number): void {
+  if (currentCount >= maxProducts) {
+    throw new QuotaExceededError("products", currentCount, maxProducts);
+  }
+}

@@ -9,6 +9,7 @@ export interface SalePayment {
   amount: number;
   method: PaymentMethod;
   ref?: string;
+  walletId?: string; // financial wallet destination (finance.wallet module)
 }
 
 export interface TransactionItem {

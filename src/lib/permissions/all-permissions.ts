@@ -24,6 +24,10 @@ export const ALL_PERMISSIONS: Permission[] = [
   "tenant.settings.edit",
   "logs.view",
   "billing.view",
+  "finance.wallet.view",
+  "finance.wallet.manage",
+  "finance.wallet.transfer",
+  "finance.wallet.reports",
 ];
 
 export interface PermissionGroup {
@@ -85,6 +89,16 @@ export const PERMISSION_GROUPS: PermissionGroup[] = [
     permissions: ["billing.view"],
   },
   {
+    key: "finance",
+    label: "Keuangan",
+    permissions: [
+      "finance.wallet.view",
+      "finance.wallet.manage",
+      "finance.wallet.transfer",
+      "finance.wallet.reports",
+    ],
+  },
+  {
     key: "logs",
     label: "Log",
     permissions: ["logs.view"],
@@ -121,4 +135,8 @@ export const PERMISSION_LABELS: Record<Permission, string> = {
   "platform.quotas.manage": "Kelola Kuota",
   "platform.maintenance.manage": "Kelola Maintenance",
   "platform.monitoring.view": "Lihat Monitoring",
+  "finance.wallet.view": "Lihat Wallet",
+  "finance.wallet.manage": "Kelola Wallet",
+  "finance.wallet.transfer": "Transfer Wallet",
+  "finance.wallet.reports": "Laporan Keuangan",
 };

@@ -248,13 +248,14 @@ export class SupplierRepository extends BaseRepository {
   async updatePurchaseInvoicePayment(
     id: string,
     paidAmount: number,
+    walletId?: string,
   ): Promise<PurchaseInvoice> {
     if (!this.isConnected) throw new Error("Not connected");
 
     // Fetch current invoice to determine new status
     let fetchQuery = this.client
       .from("purchase_invoices")
-      .select("total_amount")
+      .select("total_amount, paid_amount, wallet_id, invoice_number")
       .eq("id", id);
     fetchQuery = this.withTenantScope(fetchQuery);
 
@@ -262,7 +263,11 @@ export class SupplierRepository extends BaseRepository {
 
     if (fetchError) return this.handleError(fetchError, "updatePayment");
 
-    const totalAmount = (current as any).total_amount as number;
+    const row = current as any;
+    const totalAmount = row.total_amount as number;
+    const previousPaid = row.paid_amount as number;
+    const currentWalletId = walletId ?? row.wallet_id;
+
     let newStatus: string;
     if (paidAmount >= totalAmount) newStatus = "paid";
     else if (paidAmount > 0) newStatus = "partial";
@@ -279,11 +284,29 @@ export class SupplierRepository extends BaseRepository {
       .select(`*, supplier:supplier_id(name)`);
     updateQuery = this.withTenantScope(updateQuery);
 
-    const { data: row, error } = await updateQuery.single();
+    const { data: updated, error } = await updateQuery.single();
 
     if (error) return this.handleError(error, "updatePayment");
 
-    const inv = row as any;
+    // If a wallet is assigned, record the payment as a debit
+    if (currentWalletId && paidAmount > previousPaid) {
+      const incrementAmount = paidAmount - previousPaid;
+      try {
+        const { walletRepo } = await import("@/lib/repository-instances");
+        walletRepo.setTenantContext(this["tenantContext"], this["branchId"]);
+        await walletRepo.recordTransaction(currentWalletId, {
+          type: "debit",
+          amount: incrementAmount,
+          sourceType: "purchase",
+          sourceId: id,
+          description: `Pembayaran supplier ${row.invoice_number ?? id}`,
+        });
+      } catch (walletErr) {
+        console.warn("[SupplierRepo] Failed to record wallet transaction:", walletErr);
+      }
+    }
+
+    const inv = updated as any;
     return {
       id: inv.id,
       tenantId: this.pharmacyId ?? "",
@@ -308,6 +331,7 @@ export class SupplierRepository extends BaseRepository {
     status?: PurchaseStatus;
     totalAmount?: number;
     paidAmount?: number;
+    walletId?: string;
     items: {
       productId: string;
       productName?: string;
@@ -333,6 +357,9 @@ export class SupplierRepository extends BaseRepository {
     };
     if (this.getTenantId()) {
       invoiceInsert["tenant_id"] = this.getTenantId();
+    }
+    if (data.walletId) {
+      invoiceInsert["wallet_id"] = data.walletId;
     }
 
     const { data: inv, error: invError } = await this.client

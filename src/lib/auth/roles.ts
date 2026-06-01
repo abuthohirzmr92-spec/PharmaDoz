@@ -87,6 +87,10 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "expired.view",
     "expired.edit",
     "billing.view",
+    "finance.wallet.view",
+    "finance.wallet.manage",
+    "finance.wallet.transfer",
+    "finance.wallet.reports",
   ],
 
   admin: [
@@ -105,6 +109,8 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "expired.edit",
     "users.view",
     "tenant.users.invite",
+    "finance.wallet.view",
+    "finance.wallet.reports",
   ],
 
   pharmacist: [
@@ -121,6 +127,7 @@ export const ROLE_PERMISSIONS: Record<AppRole, readonly Permission[]> = {
     "purchases.view",
     "expired.view",
     "expired.edit",
+    "finance.wallet.view",
   ],
 
   cashier: [

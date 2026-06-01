@@ -4,6 +4,7 @@ import {
   Store,
   Activity,
   Brain,
+  Package,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Permission } from "@/types";
@@ -42,6 +43,12 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
         label: "Ekspansi Cabang",
         icon: Store,
         permission: "platform.expansions.approve",
+      },
+      {
+        href: "/platform/packages",
+        label: "Paket Langganan",
+        icon: Package,
+        permission: "platform.quotas.manage",
       },
     ],
   },

@@ -53,7 +53,114 @@ export type Permission =
   | "platform.expansions.approve"
   | "platform.quotas.manage"
   | "platform.maintenance.manage"
-  | "platform.monitoring.view";
+  | "platform.monitoring.view"
+  | "finance.wallet.view"
+  | "finance.wallet.manage"
+  | "finance.wallet.transfer"
+  | "finance.wallet.reports";
+
+// ---------------------------------------------------------------------------
+// Financial Wallet Types
+// ---------------------------------------------------------------------------
+export type WalletType = "cash" | "bank" | "digital";
+export type WalletTransactionType = "credit" | "debit";
+export type WalletSourceType =
+  | "sale"
+  | "purchase"
+  | "expense"
+  | "transfer_in"
+  | "transfer_out"
+  | "adjustment"
+  | "capital_in"
+  | "capital_out";
+export type WalletTransferStatus = "pending" | "completed" | "rejected";
+export type WalletCategoryType = "income" | "expense";
+
+export interface FinancialWallet {
+  id: string;
+  tenantId: string;
+  name: string;
+  type: WalletType;
+  branchId: string | null;
+  currency: string;
+  isActive: boolean;
+  isArchived: boolean;
+  allowOverdraft: boolean;
+  overdraftLimit: number;
+  balance: number; // computed
+  settings: Record<string, unknown>;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WalletTransaction {
+  id: string;
+  walletId: string;
+  type: WalletTransactionType;
+  amount: number;
+  runningBalance: number;
+  sourceType: WalletSourceType;
+  sourceId: string | null;
+  description: string | null;
+  branchId: string | null;
+  transactionDate: string;
+  accountCode: string | null;
+  isReconciled: boolean;
+  reconciledAt: string | null;
+  createdAt: string;
+}
+
+export interface WalletTransfer {
+  id: string;
+  fromWalletId: string;
+  toWalletId: string;
+  amount: number;
+  fee: number;
+  status: WalletTransferStatus;
+  notes: string | null;
+  completedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface WalletCategory {
+  id: string;
+  tenantId: string | null;
+  name: string;
+  type: WalletCategoryType;
+  icon: string | null;
+  color: string | null;
+  isSystem: boolean;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Financial Insight Types — Owner Capital
+// ---------------------------------------------------------------------------
+export interface CapitalTransaction {
+  id: string;
+  tenantId: string;
+  branchId: string | null;
+  walletId: string | null;
+  type: "deposit" | "withdrawal";
+  amount: number;
+  description: string | null;
+  transactionDate: string;
+  actorId: string | null;
+  createdAt: string;
+}
+
+export interface WalletAuditLog {
+  id: string;
+  tenantId: string;
+  walletId: string;
+  action: string;
+  actorId: string;
+  previousBalance: number | null;
+  newBalance: number | null;
+  metadata: Record<string, unknown>;
+  createdAt: string;
+}
 
 // ---------------------------------------------------------------------------
 // ---------------------------------------------------------------------------
@@ -151,6 +258,64 @@ export interface Payment {
   paymentMethod?: string | null;
   paidAt?: string | null;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Subscription events — lifecycle audit trail
+// ---------------------------------------------------------------------------
+export interface SubscriptionEvent {
+  id: string;
+  subscriptionId: string;
+  tenantId: string;
+  eventType:
+    | "trial_started"
+    | "trial_ended"
+    | "trial_converted"
+    | "subscription_created"
+    | "subscription_updated"
+    | "upgraded"
+    | "downgraded"
+    | "suspended"
+    | "reactivated"
+    | "canceled"
+    | "expired"
+    | "renewed"
+    | "package_changed";
+  previousPackageId?: string | null;
+  newPackageId?: string | null;
+  actorId?: string | null;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------------
+// Package Feature — feature-to-package mapping
+// ---------------------------------------------------------------------------
+export interface PackageFeature {
+  id: string;
+  packageId: string;
+  featureKey: string;
+  isEnabled: boolean;
+  config?: Record<string, unknown>;
+}
+
+// ---------------------------------------------------------------------------
+// Invoice — billing invoice
+// ---------------------------------------------------------------------------
+export interface Invoice {
+  id: string;
+  tenantId: string;
+  subscriptionId?: string | null;
+  invoiceNumber: string;
+  amount: number;
+  currency: string;
+  status: "draft" | "sent" | "paid" | "overdue" | "canceled" | "refunded";
+  dueDate?: string | null;
+  paidAt?: string | null;
+  paymentMethod?: string | null;
+  notes?: string | null;
+  createdAt: string;
+  updatedAt: string;
 }
 
 // ---------------------------------------------------------------------------

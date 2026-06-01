@@ -22,6 +22,13 @@ interface SuperAdminState {
   suspendTenant(tenantId: string): Promise<boolean>;
   activateTenant(tenantId: string): Promise<boolean>;
 
+  // Subscription lifecycle
+  changeSubscription(tenantId: string, newPackageId: string): Promise<boolean>;
+  suspendSubscription(tenantId: string): Promise<boolean>;
+  reactivateSubscription(tenantId: string): Promise<boolean>;
+  cancelSubscription(tenantId: string): Promise<boolean>;
+  getSubscriptionHistory(tenantId: string): Promise<any[]>;
+
   clear(): void;
 }
 
@@ -122,6 +129,47 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
     } catch {
       return false;
     }
+  },
+
+  // Subscription lifecycle
+  changeSubscription: async (tenantId, newPackageId) => {
+    const user = (await import("@/store/auth-store")).useAuthStore.getState().user;
+    if (!user) return false;
+    try {
+      const ok = await superAdminRepo.changeSubscription(tenantId, newPackageId, user.id);
+      if (ok) await get().loadTenants();
+      return ok;
+    } catch { return false; }
+  },
+
+  suspendSubscription: async (tenantId) => {
+    const user = (await import("@/store/auth-store")).useAuthStore.getState().user;
+    if (!user) return false;
+    try {
+      return await superAdminRepo.suspendSubscription(tenantId, user.id);
+    } catch { return false; }
+  },
+
+  reactivateSubscription: async (tenantId) => {
+    const user = (await import("@/store/auth-store")).useAuthStore.getState().user;
+    if (!user) return false;
+    try {
+      return await superAdminRepo.reactivateSubscription(tenantId, user.id);
+    } catch { return false; }
+  },
+
+  cancelSubscription: async (tenantId) => {
+    const user = (await import("@/store/auth-store")).useAuthStore.getState().user;
+    if (!user) return false;
+    try {
+      return await superAdminRepo.cancelSubscription(tenantId, user.id);
+    } catch { return false; }
+  },
+
+  getSubscriptionHistory: async (tenantId) => {
+    try {
+      return await superAdminRepo.getSubscriptionHistory(tenantId);
+    } catch { return []; }
   },
 
   clear() {

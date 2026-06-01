@@ -7,6 +7,8 @@ import {
   Users,
   Settings,
   Store,
+  Wallet,
+  TrendingUp,
 } from "lucide-react";
 import type { NavItem } from "./navigation";
 
@@ -40,6 +42,18 @@ export const TENANT_NAVIGATION: NavItem[] = [
     href: "/branches",
     icon: Store,
     permission: "settings.view",
+  },
+  {
+    label: "Keuangan",
+    href: "/finance",
+    icon: Wallet,
+    permission: "finance.wallet.view",
+  },
+  {
+    label: "Insight Bisnis",
+    href: "/finance/insight",
+    icon: TrendingUp,
+    permission: "finance.wallet.view",
   },
   {
     label: "Reports",

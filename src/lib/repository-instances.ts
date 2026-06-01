@@ -4,6 +4,9 @@ import { InventoryRepository } from "./repositories/inventory";
 import { TransactionRepository } from "./repositories/transaction";
 import { AuthRepository } from "./repositories/auth";
 import { SuperAdminRepository } from "./repositories/super-admin";
+import { WalletRepository } from "./repositories/wallet";
+import { PackageRepository } from "./repositories/package";
+import { CapitalRepository } from "./repositories/capital";
 
 export const productRepo = new ProductRepository();
 export const supplierRepo = new SupplierRepository();
@@ -11,3 +14,6 @@ export const inventoryRepo = new InventoryRepository();
 export const transactionRepo = new TransactionRepository();
 export const authRepo = new AuthRepository();
 export const superAdminRepo = new SuperAdminRepository();
+export const walletRepo = new WalletRepository();
+export const packageRepo = new PackageRepository();
+export const capitalRepo = new CapitalRepository();

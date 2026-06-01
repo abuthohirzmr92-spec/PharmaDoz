@@ -199,7 +199,7 @@ export class TransactionRepository extends BaseRepository {
       unitPrice: number;
       subtotal: number;
     }[];
-    payments: { amount: number; method: PaymentMethod; ref?: string }[];
+    payments: { amount: number; method: PaymentMethod; ref?: string; walletId?: string }[];
     subtotal: number;
     discount: number;
     tax: number;
@@ -255,7 +255,7 @@ export class TransactionRepository extends BaseRepository {
       if (itemsError) return this.handleError(itemsError, "createTransaction");
     }
 
-    // Insert payments
+    // Insert payments (with optional wallet_id for finance module)
     if (data.payments.length > 0) {
       const { error: paymentsError } = await this.client
         .from("transaction_payments")
@@ -266,6 +266,7 @@ export class TransactionRepository extends BaseRepository {
               amount: pmt.amount,
               method: pmt.method,
               ref: pmt.ref ?? null,
+              wallet_id: pmt.walletId ?? null,
             };
             if (this.getTenantId()) {
               row["tenant_id"] = this.getTenantId();
@@ -276,6 +277,32 @@ export class TransactionRepository extends BaseRepository {
 
       if (paymentsError)
         return this.handleError(paymentsError, "createTransaction");
+
+      // Record wallet transactions for each payment that has a wallet_id
+      try {
+        // Use dynamic import to avoid circular dependency; walletRepo is singleton
+        const { walletRepo } = await import("@/lib/repository-instances");
+
+        // Set same tenant context on walletRepo
+        walletRepo.setTenantContext(this["tenantContext"], this["branchId"]);
+
+        for (const pmt of data.payments) {
+          const walletId = pmt.walletId;
+          if (!walletId) continue; // Skip if no wallet assigned
+
+          await walletRepo.recordTransaction(walletId, {
+            type: "credit",
+            amount: pmt.amount,
+            sourceType: "sale",
+            sourceId: txn.id,
+            description: `Penjualan ${data.invoiceNumber} - ${pmt.method}`,
+            branchId: data.pharmacyId ?? this["branchId"] ?? null,
+          });
+        }
+      } catch (walletErr) {
+        // Wallet recording is best-effort — don't fail the transaction
+        console.warn("[TransactionRepo] Failed to record wallet transaction:", walletErr);
+      }
     }
 
     return {

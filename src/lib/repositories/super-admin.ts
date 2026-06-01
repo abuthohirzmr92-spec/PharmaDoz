@@ -282,15 +282,198 @@ export class SuperAdminRepository extends BaseRepository {
   }
 
   /* ------------------------------------------------------------------ */
+  /*  Subscription Lifecycle (package management)                           */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Change a tenant's subscription to a new package.
+   * Records subscription_event, updates tenant.package_id, subscription record.
+   */
+  async changeSubscription(
+    tenantId: string,
+    newPackageId: string,
+    actorId: string,
+  ): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const oldPkg = await this.client
+      .from("tenants")
+      .select("package_id")
+      .eq("id", tenantId)
+      .single();
+    const oldPackageId = (oldPkg.data as any)?.package_id ?? null;
+
+    // Determine event type
+    const eventType: string = oldPackageId ? "package_changed" : "subscription_created";
+
+    // Update tenant's package
+    const { error: tenantErr } = await this.client
+      .from("tenants")
+      .update({ package_id: newPackageId })
+      .eq("id", tenantId);
+
+    if (tenantErr) return this.handleError(tenantErr, "changeSubscription");
+
+    // Update active subscription
+    const { data: sub } = await this.client
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .in("status", ["active", "trialing"])
+      .maybeSingle();
+
+    if (sub) {
+      await this.client
+        .from("subscriptions")
+        .update({
+          previous_package_id: oldPackageId,
+          changed_at: new Date().toISOString(),
+          changed_by: actorId,
+        })
+        .eq("id", (sub as any).id);
+    }
+
+    // Log subscription event
+    await this.client.from("subscription_events").insert({
+      subscription_id: (sub as any)?.id ?? null,
+      tenant_id: tenantId,
+      event_type: eventType,
+      previous_package_id: oldPackageId,
+      new_package_id: newPackageId,
+      actor_id: actorId,
+    });
+
+    // Log activity
+    await this.client.from("activity_logs").insert({
+      tenant_id: tenantId,
+      actor_id: actorId,
+      action: "subscription.package_changed",
+      resource_type: "subscription",
+      resource_id: (sub as any)?.id ?? null,
+      metadata: {
+        previous_package_id: oldPackageId,
+        new_package_id: newPackageId,
+      },
+    });
+
+    return true;
+  }
+
+  /** Suspend a tenant's subscription (sets status to 'past_due' or marks inactive) */
+  async suspendSubscription(tenantId: string, actorId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const { data: sub } = await this.client
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .in("status", ["active", "trialing"])
+      .maybeSingle();
+
+    if (sub) {
+      await this.client
+        .from("subscriptions")
+        .update({ status: "past_due", changed_at: new Date().toISOString(), changed_by: actorId })
+        .eq("id", (sub as any).id);
+    }
+
+    // Log event
+    await this.client.from("subscription_events").insert({
+      subscription_id: (sub as any)?.id ?? null,
+      tenant_id: tenantId,
+      event_type: "suspended",
+      actor_id: actorId,
+    });
+
+    return true;
+  }
+
+  /** Reactivate a suspended subscription */
+  async reactivateSubscription(tenantId: string, actorId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const { data: sub } = await this.client
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .maybeSingle();
+
+    if (sub) {
+      await this.client
+        .from("subscriptions")
+        .update({ status: "active", changed_at: new Date().toISOString(), changed_by: actorId })
+        .eq("id", (sub as any).id);
+    }
+
+    await this.client.from("subscription_events").insert({
+      subscription_id: (sub as any)?.id ?? null,
+      tenant_id: tenantId,
+      event_type: "reactivated",
+      actor_id: actorId,
+    });
+
+    return true;
+  }
+
+  /** Cancel a subscription */
+  async cancelSubscription(tenantId: string, actorId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const { data: sub } = await this.client
+      .from("subscriptions")
+      .select("id")
+      .eq("tenant_id", tenantId)
+      .in("status", ["active", "trialing", "past_due"])
+      .maybeSingle();
+
+    if (sub) {
+      await this.client
+        .from("subscriptions")
+        .update({
+          status: "canceled",
+          canceled_at: new Date().toISOString(),
+          changed_at: new Date().toISOString(),
+          changed_by: actorId,
+        })
+        .eq("id", (sub as any).id);
+    }
+
+    await this.client.from("subscription_events").insert({
+      subscription_id: (sub as any)?.id ?? null,
+      tenant_id: tenantId,
+      event_type: "canceled",
+      actor_id: actorId,
+    });
+
+    return true;
+  }
+
+  /** Get subscription event history for a tenant */
+  async getSubscriptionHistory(tenantId: string): Promise<any[]> {
+    if (!this.isConnected) return [];
+
+    const { data, error } = await this.client
+      .from("subscription_events")
+      .select("*")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false });
+
+    if (error) return this.handleError(error, "getSubscriptionHistory");
+
+    return data || [];
+  }
+
+  /* ------------------------------------------------------------------ */
   /*  Helpers                                                             */
   /* ------------------------------------------------------------------ */
 
   private resolvePackageName(packageId: string | null | undefined): string {
     if (!packageId) return "basic";
+    // Map known package UUIDs to slug names (from migration 005 seed data)
     const map: Record<string, string> = {
-      "pkg_basic": "basic",
-      "pkg_professional": "professional",
-      "pkg_enterprise": "enterprise",
+      "00000000-0000-0000-0000-000000000101": "basic",
+      "00000000-0000-0000-0000-000000000102": "professional",
+      "00000000-0000-0000-0000-000000000103": "enterprise",
     };
     return map[packageId] ?? "basic";
   }
