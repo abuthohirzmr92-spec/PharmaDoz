@@ -37,7 +37,7 @@ export default function PackagesPage() {
     setDeletingId(null);
   };
 
-  const featureCount = (pkg: PackageRow) => Object.values(pkg.feature_flags).filter(Boolean).length;
+  const featureCount = (pkg: PackageRow) => Object.values(pkg.feature_flags ?? {}).filter(Boolean).length;
 
   return (
     <div>

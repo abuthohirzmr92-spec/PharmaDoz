@@ -62,7 +62,7 @@ export class PackageRepository extends BaseRepository {
 
     if (error) return this.handleError(error, "getAllPackages");
 
-    return mapRows<PackageRow>(data || []);
+    return (mapRows<PackageRow>(data || [])).map(normalizePackage);
   }
 
   async getPackageById(id: string): Promise<PackageRow | null> {
@@ -79,7 +79,7 @@ export class PackageRepository extends BaseRepository {
       return this.handleError(error, "getPackageById");
     }
 
-    return mapRow<PackageRow>(data as Record<string, unknown>);
+    return normalizePackage(mapRow<PackageRow>(data as Record<string, unknown>));
   }
 
   async getPackageByName(name: string): Promise<PackageRow | null> {
@@ -110,10 +110,14 @@ export class PackageRepository extends BaseRepository {
       max_products: data.maxProducts ?? 200,
       monthly_price: data.monthlyPrice ?? 0,
       is_active: data.isActive ?? true,
-      is_custom: true, // Only user-created packages are custom
+      is_custom: true,
       feature_flags: data.featureFlags ?? {},
       sort_order: data.sortOrder ?? 99,
     };
+
+    console.log("[PackageRepo.createPackage] INSERT payload:", JSON.stringify(insert, null, 2));
+    console.log("[PackageRepo.createPackage] Target table: tenant_packages");
+    console.log("[PackageRepo.createPackage] Columns:", Object.keys(insert).join(", "));
 
     const { data: row, error } = await this.client
       .from("tenant_packages")
@@ -121,8 +125,18 @@ export class PackageRepository extends BaseRepository {
       .select()
       .single();
 
-    if (error) return this.handleError(error, "createPackage");
+    if (error) {
+      console.error("[PackageRepo.createPackage] SUPABASE ERROR:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+        full: JSON.stringify(error),
+      });
+      return this.handleError(error, "createPackage");
+    }
 
+    console.log("[PackageRepo.createPackage] SUCCESS — row:", JSON.stringify(row));
     return mapRow<PackageRow>(row as Record<string, unknown>);
   }
 
@@ -368,4 +382,18 @@ export class PackageRepository extends BaseRepository {
 
     if (error) return this.handleError(error, "updateInvoiceStatus");
   }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: normalize null JSONB fields from database
+// ---------------------------------------------------------------------------
+// Migration 033 adds feature_flags with DEFAULT '{}', but existing rows
+// remain NULL. Normalize at the repository boundary so all consumers
+// receive {} instead of null.
+
+function normalizePackage(pkg: PackageRow): PackageRow {
+  return {
+    ...pkg,
+    feature_flags: pkg.feature_flags ?? {},
+  };
 }
