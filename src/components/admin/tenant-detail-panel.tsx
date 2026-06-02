@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useCallback } from "react";
-import { X, Building2, User, Users, Store, Activity } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { X, Building2, User, Users, Store, Activity, ExternalLink } from "lucide-react";
 import type { TenantSummary, TenantQuotaInfo, TenantPackage } from "@/types";
 import { cn } from "@/lib/cn";
 import { TenantQuotaPanel } from "@/components/admin/tenant-quota-panel";
@@ -76,6 +77,8 @@ export function TenantDetailPanel({
   open,
   onClose,
 }: TenantDetailPanelProps) {
+  const router = useRouter();
+
   /* Close on Escape key */
   const handleEscape = useCallback(
     (e: KeyboardEvent) => {
@@ -255,6 +258,15 @@ export function TenantDetailPanel({
                 packageName={tenant.packageName}
               />
             )}
+
+            {/* Navigate to full detail page with package management */}
+            <button
+              onClick={() => router.push(`/platform/tenants/${tenant.pharmacyId}`)}
+              className="mt-3 flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition-colors"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Kelola Tenant
+            </button>
           </div>
         </div>
       </div>
