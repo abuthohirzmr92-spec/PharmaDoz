@@ -383,6 +383,7 @@ export interface TenantBranding {
   customDomain?: string | null;
   faviconUrl?: string | null;
   companyName?: string | null;
+  receiptFooter?: string | null;
 }
 
 // ---------------------------------------------------------------------------

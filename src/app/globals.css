@@ -83,3 +83,60 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+/* ===================================================================
+   THERMAL RECEIPT PRINT STYLES (58mm default)
+   =================================================================== */
+@media print {
+  @page {
+    size: 58mm auto;
+    margin: 0;
+  }
+
+  html, body {
+    width: 58mm !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    overflow: visible !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /*
+   * SAFE HIDE STRATEGY:
+   * Use visibility:hidden to hide everything WITHOUT changing display values.
+   * This preserves flex, table, inline-block, etc. inside the receipt.
+   * Then use visibility:visible to selectively show only the receipt.
+   */
+  body > *:not(#receipt-print-root) {
+    visibility: hidden !important;
+    position: absolute !important;
+    width: 0 !important;
+    height: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* The receipt itself stays fully visible with its native display types */
+  #receipt-print-root {
+    visibility: visible !important;
+    position: static !important;
+    width: 58mm !important;
+    height: auto !important;
+    overflow: visible !important;
+    margin: 0 auto !important;
+    padding: 2mm !important;
+    background: white !important;
+  }
+
+  /* All descendants stay visible with their original display */
+  #receipt-print-root * {
+    visibility: visible !important;
+  }
+
+  /* Ensure images inside receipt are visible */
+  #receipt-print-root img {
+    display: block !important;
+  }
+}

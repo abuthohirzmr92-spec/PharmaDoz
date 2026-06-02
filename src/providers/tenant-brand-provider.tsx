@@ -28,6 +28,7 @@ const CSS_VAR_MAP: Record<keyof TenantBranding, string> = {
   customDomain: "",
   faviconUrl: "",
   companyName: "",
+  receiptFooter: "",
 };
 
 function applyBrandingCss(branding: TenantBranding) {
@@ -82,6 +83,7 @@ function extractBranding(tenant: any): TenantBranding {
     customDomain: s.domain ?? null,
     faviconUrl: s.favicon_url ?? null,
     companyName: s.company_name ?? null,
+    receiptFooter: s.receipt_footer ?? null,
   };
 }
 
