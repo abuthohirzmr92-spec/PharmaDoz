@@ -1,10 +1,12 @@
 "use client";
 
+import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { useCashierStore } from "@/store/cashier-store";
 import { useAuthStore } from "@/store/auth-store";
 import { useBranchStore } from "@/store/branch-store";
 import { useTenantBranding } from "@/providers/tenant-brand-provider";
+import { useWalletStore } from "@/store/wallet-store";
 
 export interface ReceiptPreviewProps {
   open: boolean;
@@ -29,6 +31,14 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
   const branches = useBranchStore((s) => s.branches);
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const { branding } = useTenantBranding();
+  const walletStore = useWalletStore();
+
+  // Resolve wallet name for transfer payments
+  const getWalletName = (walletId?: string) => {
+    if (!walletId) return null;
+    const w = walletStore.wallets.find((x) => x.id === walletId);
+    return w?.name ?? null;
+  };
 
   // Loading state
   if (isSubmitting) {
@@ -44,11 +54,11 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
 
   if (!open) return null;
 
-  // ---- Data ----
-  const pharmacyName = user?.pharmacyName ?? user?.tenantName ?? "Apotek";
+  // ---- Data (from tenant branding, with fallbacks) ----
+  const pharmacyName = branding?.companyName ?? user?.pharmacyName ?? user?.tenantName ?? "Apotek";
   const branch = activeBranch ?? branches[0];
-  const address = branch?.address ?? "";
-  const phone = user?.phone ?? branch?.phone ?? "";
+  const address = branding?.address ?? branch?.address ?? "";
+  const phone = branding?.phone ?? user?.phone ?? branch?.phone ?? "";
 
   // Logo — from tenant branding (tenants.settings.logo_url)
   const logoUrl: string | null = branding?.logoUrl ?? null;
@@ -114,11 +124,19 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
         <div style={{ display: "flex", justifyContent: "space-between" }}>
           <span>Subtotal</span><span>{Math.round(cartTotal).toLocaleString("id-ID")}</span>
         </div>
-        {payments.map((p, i) => (
-          <div key={i} style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>{getPaymentMethodLabel(p.method)}</span><span>{Math.round(p.amount).toLocaleString("id-ID")}</span>
-          </div>
-        ))}
+        {payments.map((p, i) => {
+          const walletName = p.method === "transfer" ? getWalletName(p.walletId) : null;
+          return (
+            <div key={i}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>{getPaymentMethodLabel(p.method)}</span><span>{Math.round(p.amount).toLocaleString("id-ID")}</span>
+              </div>
+              {walletName && (
+                <div style={{ fontSize: 7, textAlign: "right" }}>ke {walletName}</div>
+              )}
+            </div>
+          );
+        })}
         {change > 0 && (
           <div style={{ display: "flex", justifyContent: "space-between" }}>
             <span>Kembalian</span><span>{Math.round(change).toLocaleString("id-ID")}</span>
@@ -144,20 +162,24 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
 
   return (
     <>
-      {/* PRINT LAYER — rendered as #receipt-print-root, hidden on screen, visible on print */}
-      <div
-        id="receipt-print-root"
-        style={{
-          display: "none",
-          width: "58mm",
-          margin: "0 auto",
-          padding: "2mm",
-          background: "white",
-          color: "black",
-        }}
-      >
-        {receiptBody}
-      </div>
+      {/* PRINT LAYER — portal to document.body so it's a direct child */}
+      {typeof document !== "undefined" &&
+        createPortal(
+          <div
+            id="receipt-print-root"
+            style={{
+              display: "none",
+              width: "58mm",
+              margin: "0 auto",
+              padding: "2mm",
+              background: "white",
+              color: "black",
+            }}
+          >
+            {receiptBody}
+          </div>,
+          document.body,
+        )}
 
       {/* SCREEN LAYER — preview modal */}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden">

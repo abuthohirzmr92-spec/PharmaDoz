@@ -384,6 +384,8 @@ export interface TenantBranding {
   faviconUrl?: string | null;
   companyName?: string | null;
   receiptFooter?: string | null;
+  address?: string | null;
+  phone?: string | null;
 }
 
 // ---------------------------------------------------------------------------
