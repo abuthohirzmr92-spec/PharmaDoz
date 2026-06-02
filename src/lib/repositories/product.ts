@@ -85,6 +85,8 @@ export class ProductRepository extends BaseRepository {
         tenantId: this.pharmacyId ?? "",
         name: r.name,
         category: r.category?.name ?? "",
+        categoryId: r.category_id,
+        description: r.description ?? null,
         barcode: r.barcode ?? null,
         unit: r.unit ?? "",
         defaultPrice: r.default_price ?? 0,

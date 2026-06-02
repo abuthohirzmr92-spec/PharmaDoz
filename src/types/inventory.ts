@@ -131,6 +131,8 @@ export interface InventoryProduct {
   tenantId: string;
   name: string;
   category: string;
+  categoryId?: string;             // FK UUID — for edit forms
+  description?: string | null;     // product description — for edit forms
   barcode: string | null;
   unit: string;                   // "Tablet", "Botol", "Strip", etc.
   defaultPrice: number;           // default purchase price (cost)

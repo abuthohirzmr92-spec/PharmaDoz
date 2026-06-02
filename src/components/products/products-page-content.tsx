@@ -34,28 +34,23 @@ export function ProductsPageContent() {
       if (productRepo.isConnected) {
         setIsDemoMode(false);
 
-        const rawProducts = await productRepo.getRawProducts();
+        // Use getProducts() which JOINs product_batches and computes
+        // totalStock = SUM(batch.quantity) — same source as Inventory & Cashier.
+        const inventoryProducts = await productRepo.getProducts();
 
-        let categories: { id: string; name: string }[] = [];
-        try {
-          categories = await productRepo.getCategories();
-        } catch { /* ignore */ }
-
-        const catMap = new Map(categories.map((c) => [c.id, c.name]));
-
-        const mapped: ProductRow[] = rawProducts.map((p) => ({
+        const mapped: ProductRow[] = inventoryProducts.map((p) => ({
           id: p.id,
           name: p.name,
-          category: catMap.get(p.categoryId) ?? p.categoryId,
-          categoryId: p.categoryId,
-          unit: p.unit ?? "Pcs",
+          category: p.category,
+          categoryId: p.categoryId ?? p.category,
+          unit: p.unit,
           barcode: p.barcode,
-          defaultPrice: p.defaultPrice ?? 0,
-          defaultSellingPrice: p.defaultSellingPrice ?? 0,
-          description: p.description,
+          defaultPrice: p.defaultPrice,
+          defaultSellingPrice: p.defaultSellingPrice,
+          description: p.description ?? null,
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
-          totalStock: 0,
+          totalStock: p.totalStock,
           isActive: p.isActive,
         }));
 
@@ -74,12 +69,12 @@ export function ProductsPageContent() {
           id: p.id,
           name: p.name,
           category: p.category,
-          categoryId: p.category,
+          categoryId: p.categoryId ?? p.category,
           unit: p.unit,
           barcode: p.barcode,
           defaultPrice: p.defaultPrice,
           defaultSellingPrice: p.defaultSellingPrice,
-          description: null,
+          description: p.description ?? null,
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
           totalStock: p.totalStock,
