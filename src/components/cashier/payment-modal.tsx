@@ -1,8 +1,9 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
-import { X, Wallet, Banknote, CreditCard, Smartphone, Building2 } from "lucide-react";
+import { useState, useRef, useEffect, useMemo } from "react";
+import { X, Wallet, Banknote, CreditCard, Smartphone, Building2, Landmark, AlertCircle } from "lucide-react";
 import { useCashierStore, type PaymentMethod } from "@/store/cashier-store";
+import { useWalletStore } from "@/store/wallet-store";
 import { cn } from "@/lib/cn";
 
 export interface PaymentModalProps {
@@ -44,22 +45,40 @@ export function PaymentModal({ open, onClose, cartTotal }: PaymentModalProps) {
     submitError,
     clearSubmitError,
   } = useCashierStore();
+  const { wallets, loadWallets } = useWalletStore();
   const [amount, setAmount] = useState("");
   const [method, setMethod] = useState<PaymentMethod>("cash");
+  const [walletId, setWalletId] = useState("");
   const amountRef = useRef<HTMLInputElement>(null);
   const [localError, setLocalError] = useState("");
+
+  // Bank/digital wallets for transfer destination
+  const bankWallets = useMemo(
+    () => wallets.filter((w) => !w.isArchived && w.isActive && (w.type === "bank" || w.type === "digital")),
+    [wallets],
+  );
 
   // Reset state each time modal opens
   useEffect(() => {
     if (open) {
       setAmount("");
       setMethod("cash");
+      setWalletId("");
       setLocalError("");
       clearSubmitError();
+      loadWallets();
       const timer = setTimeout(() => amountRef.current?.focus(), 50);
       return () => clearTimeout(timer);
     }
-  }, [open, clearSubmitError]);
+  }, [open, clearSubmitError, loadWallets]);
+
+  // Auto-select first bank wallet when switching to transfer
+  useEffect(() => {
+    if (method === "transfer" && bankWallets.length > 0 && !walletId) {
+      const first = bankWallets[0];
+      if (first) setWalletId(first.id);
+    }
+  }, [method, bankWallets, walletId]);
 
   if (!open) return null;
 
@@ -79,12 +98,18 @@ export function PaymentModal({ open, onClose, cartTotal }: PaymentModalProps) {
     if (parsedAmount <= 0) return;
     setLocalError("");
 
+    // Validate: transfer must select a destination wallet
+    if (method === "transfer" && !walletId) {
+      setLocalError("Pilih rekening tujuan terlebih dahulu.");
+      return;
+    }
+
     // If payments from a previous (failed) attempt already cover the total,
     // skip addPayment to avoid duplicating payments on retry
     const { payments } = useCashierStore.getState();
     const existingTotal = payments.reduce((s, p) => s + p.amount, 0);
     if (existingTotal < cartTotal) {
-      addPayment({ amount: parsedAmount, method });
+      addPayment({ amount: parsedAmount, method, walletId: method === "transfer" ? walletId : undefined });
     }
 
     // Keep modal open during persistence so the spinner is visible
@@ -232,6 +257,33 @@ export function PaymentModal({ open, onClose, cartTotal }: PaymentModalProps) {
               })}
             </div>
           </div>
+
+          {/* Wallet selector — visible only for Transfer payments */}
+          {method === "transfer" && (
+            <div className="border-t border-neutral-100 px-5 py-3 dark:border-neutral-800">
+              <p className="mb-1.5 text-[10px] font-medium text-neutral-500">
+                Rekening Tujuan
+              </p>
+              {bankWallets.length === 0 ? (
+                <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 p-2.5 text-[11px] text-amber-700 dark:border-amber-800 dark:bg-amber-950 dark:text-amber-400">
+                  <AlertCircle className="h-3.5 w-3.5 shrink-0" />
+                  Belum ada rekening bank. Silakan tambahkan kantong bank terlebih dahulu.
+                </div>
+              ) : (
+                <select
+                  value={walletId}
+                  onChange={(e) => setWalletId(e.target.value)}
+                  className="w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm text-neutral-900 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50"
+                >
+                  {bankWallets.map((w) => (
+                    <option key={w.id} value={w.id}>
+                      {w.name} {w.type === "digital" ? "(Digital)" : ""}
+                    </option>
+                  ))}
+                </select>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Footer */}

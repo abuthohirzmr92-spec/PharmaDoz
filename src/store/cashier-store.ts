@@ -29,6 +29,7 @@ export interface Payment {
   amount: number;
   method: PaymentMethod;
   ref?: string;
+  walletId?: string;
 }
 
 /* ------------------------------------------------------------------ */
@@ -229,6 +230,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
         amount: p.amount,
         method: p.method,
         ref: p.ref,
+        walletId: p.walletId,
       })),
       subtotal,
       discount: 0,
