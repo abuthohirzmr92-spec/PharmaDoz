@@ -116,13 +116,33 @@ export class BaseRepository {
   }
 
   protected handleError(error: unknown, context: string): never {
-    console.error(`[${context}] Repository error:`, error);
-    if (error instanceof Error) throw error;
-    const msg =
-      (error as Record<string, unknown>)?.message ??
-      (error as Record<string, unknown>)?.error_description ??
-      (error as Record<string, unknown>)?.msg ??
-      JSON.stringify(error);
-    throw new Error(`Error in ${context}: ${msg}`);
+    const err = error as Record<string, unknown>;
+    // Extract Supabase error details
+    const code = err?.code as string | undefined;
+    const message = err?.message as string | undefined;
+    const details = err?.details as string | undefined;
+    const hint = err?.hint as string | undefined;
+
+    const diagnostic = {
+      context,
+      code: code ?? "UNKNOWN",
+      message: message ?? "No message",
+      details: details ?? null,
+      hint: hint ?? null,
+    };
+
+    console.error(`[${context}] Repository error:`, diagnostic);
+    console.error(`[${context}] Full error object:`, error);
+
+    // Throw enriched error with Supabase details
+    const enriched = new Error(
+      `[${context}] code=${diagnostic.code} message=${diagnostic.message}` +
+      (details ? ` details=${details}` : "") +
+      (hint ? ` hint=${hint}` : ""),
+    );
+    (enriched as any).supabaseCode = code;
+    (enriched as any).supabaseDetails = details;
+    (enriched as any).supabaseHint = hint;
+    throw enriched;
   }
 }

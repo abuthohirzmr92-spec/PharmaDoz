@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { usePackageStore } from "@/store/package-store";
@@ -12,7 +12,7 @@ import { Shield, ChevronLeft, Loader2 } from "lucide-react";
 export default function CreatePackagePage() {
   const router = useRouter();
   const { user } = useAuthStore();
-  const { createPackage, isLoading } = usePackageStore();
+  const { createPackage, isLoading, error: storeError, loadPackages } = usePackageStore();
 
   const [name, setName] = useState("");
   const [label, setLabel] = useState("");
@@ -22,6 +22,9 @@ export default function CreatePackagePage() {
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [features, setFeatures] = useState<Record<string, boolean>>({});
   const [error, setError] = useState("");
+
+  // Also check load error
+  useEffect(() => { loadPackages(); }, []);
 
   if (!user || !isSystemRole(user.role)) {
     return (
@@ -52,7 +55,10 @@ export default function CreatePackagePage() {
     });
 
     if (result) router.push("/platform/packages");
-    else setError("Gagal membuat paket. Silakan coba lagi.");
+    else {
+      // Error already set in store — also show detailed diagnostic
+      console.error("[CreatePackage] FAILED — check store error above");
+    }
   };
 
   return (
@@ -65,7 +71,14 @@ export default function CreatePackagePage() {
         <p className="mt-1 text-sm text-neutral-500">Tambahkan paket langganan custom untuk tenant</p>
       </div>
 
-      {error && <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-400">{error}</div>}
+      {(error || storeError) && (
+        <div className="mb-6 rounded-lg bg-red-50 p-4 text-sm text-red-700 dark:bg-red-950 dark:text-red-400">
+          <p className="font-semibold mb-1">❌ Error Details:</p>
+          <pre className="whitespace-pre-wrap text-xs mt-1 text-red-600 font-mono">
+            {error || storeError}
+          </pre>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="max-w-2xl space-y-6">
         <fieldset disabled={isLoading} className="space-y-6">
