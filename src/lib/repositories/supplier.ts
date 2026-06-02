@@ -385,7 +385,6 @@ export class SupplierRepository extends BaseRepository {
               quantity: item.quantity,
               unit_price: item.unitPrice,
               selling_price: item.sellingPrice,
-              subtotal: item.quantity * item.unitPrice,
             };
             if (this.getTenantId()) {
               row["tenant_id"] = this.getTenantId();
