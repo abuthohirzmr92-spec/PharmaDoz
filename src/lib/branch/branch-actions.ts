@@ -1,6 +1,7 @@
 "use server";
 
 import { createServerSupabase } from "@/lib/supabase/server";
+import { getPackageBranchLimit } from "@/lib/quota-guard";
 
 export async function createBranch(input: {
   tenantId: string;
@@ -17,6 +18,29 @@ export async function createBranch(input: {
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.user) {
     return { success: false, error: "Anda harus login terlebih dahulu." };
+  }
+
+  // Quota enforcement — check branch limit against tenant package
+  const { data: tenantPkg } = await db
+    .from("tenants")
+    .select("package_id, tenant_packages!inner(name)")
+    .eq("id", input.tenantId)
+    .single();
+
+  const packageName: string = (tenantPkg as any)?.tenant_packages?.name ?? "basic";
+  const maxBranches = getPackageBranchLimit(packageName);
+
+  const { count: currentBranches } = await db
+    .from("branches")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", input.tenantId)
+    .is("deleted_at", null);
+
+  if ((currentBranches ?? 0) >= maxBranches) {
+    return {
+      success: false,
+      error: `Paket ${packageName} hanya mendukung maksimal ${maxBranches} cabang. Silakan upgrade paket untuk menambah cabang.`,
+    };
   }
 
   // Generate branch code

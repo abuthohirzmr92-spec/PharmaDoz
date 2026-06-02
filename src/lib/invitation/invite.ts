@@ -2,6 +2,39 @@
 
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { TenantRole } from "@/types";
+import { getPackageUserLimit } from "@/lib/quota-guard";
+
+async function checkUserQuota(
+  db: any,
+  tenantId: string,
+): Promise<{ allowed: boolean; packageName: string; maxUsers: number; currentUsers: number; error?: string }> {
+  const { data: tp } = await db
+    .from("tenants")
+    .select("package_id, tenant_packages!inner(name)")
+    .eq("id", tenantId)
+    .single();
+
+  const packageName: string = (tp as any)?.tenant_packages?.name ?? "basic";
+  const maxUsers = getPackageUserLimit(packageName);
+
+  const { count: currentUsers } = await db
+    .from("tenant_users")
+    .select("*", { count: "exact", head: true })
+    .eq("tenant_id", tenantId)
+    .eq("is_active", true);
+
+  const current = currentUsers ?? 0;
+  if (current >= maxUsers) {
+    return {
+      allowed: false,
+      packageName,
+      maxUsers,
+      currentUsers: current,
+      error: `Paket ${packageName} hanya mendukung maksimal ${maxUsers} pengguna. Silakan upgrade paket untuk menambah pengguna.`,
+    };
+  }
+  return { allowed: true, packageName, maxUsers, currentUsers: current };
+}
 
 // ============================================================================
 // inviteUser — buat token undangan untuk user baru
@@ -39,6 +72,12 @@ export async function inviteUser(input: {
   // Tidak bisa invite tenant_owner (hanya satu owner per tenant)
   if (input.role === "tenant_owner") {
     return { success: false, error: "Tidak dapat mengundang dengan peran Pemilik. Hanya ada satu pemilik per tenant." };
+  }
+
+  // Quota enforcement — check user limit against tenant package
+  const quota = await checkUserQuota(db, input.tenantId);
+  if (!quota.allowed) {
+    return { success: false, error: quota.error };
   }
 
   // Cek apakah email sudah jadi anggota tenant
@@ -109,6 +148,12 @@ export async function acceptInvitation(input: {
 
   if (new Date(invite.expires_at) < new Date()) {
     return { success: false, error: "Link undangan sudah kadaluarsa (7 hari). Minta pemilik untuk mengirim ulang." };
+  }
+
+  // Quota enforcement — re-check before accepting (prevent race with concurrent invites)
+  const acceptQuota = await checkUserQuota(db, invite.tenant_id);
+  if (!acceptQuota.allowed) {
+    return { success: false, error: acceptQuota.error };
   }
 
   // 2. Buat akun Supabase Auth via signUp
