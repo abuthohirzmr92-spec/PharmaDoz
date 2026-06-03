@@ -4,8 +4,10 @@ import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { useTransactionStore } from "@/store/transaction-store";
+import { useWalletStore } from "@/store/wallet-store";
 import { applyFilters, defaultFilters } from "@/lib/report-filters";
 import { resolveDateRange, formatCurrencyID, formatDateID } from "@/lib/date-utils";
+import { cn } from "@/lib/cn";
 import { exportTableToPdf } from "@/lib/export-pdf";
 import { exportToExcel } from "@/lib/export-excel";
 import { ReportDateFilter } from "./report-date-filter";
@@ -32,6 +34,13 @@ export function SalesTable() {
   const isLoaded = useTransactionStore((s) => s.isLoaded);
   const isLoading = useTransactionStore((s) => s.isLoading);
   const transactions = useTransactionStore((s) => s.transactions);
+  const wallets = useWalletStore((s) => s.wallets);
+
+  const walletNames = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const w of wallets) map[w.id] = w.name;
+    return map;
+  }, [wallets]);
 
   useEffect(() => {
     if (!isLoaded) loadTxns();
@@ -165,97 +174,83 @@ export function SalesTable() {
         <table className="w-full table-fixed">
           <thead>
             <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-              <th
-                className="w-[18%] cursor-pointer px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500"
-                onClick={() => handleSort("invoiceNumber")}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Invoice <SortIcon sort={sort} column="invoiceNumber" />
-                </span>
+              <th className="w-[16%] cursor-pointer px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" onClick={() => handleSort("invoiceNumber")}>
+                <span className="inline-flex items-center gap-1">Invoice <SortIcon sort={sort} column="invoiceNumber" /></span>
               </th>
-              <th
-                className="w-[14%] hidden sm:table-cell cursor-pointer px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500"
-                onClick={() => handleSort("createdAt")}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Tanggal <SortIcon sort={sort} column="createdAt" />
-                </span>
+              <th className="w-[12%] hidden sm:table-cell cursor-pointer px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" onClick={() => handleSort("createdAt")}>
+                <span className="inline-flex items-center gap-1">Tanggal <SortIcon sort={sort} column="createdAt" /></span>
               </th>
-              <th className="w-[14%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Kasir
+              <th className="w-[10%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Kasir</th>
+              <th className="w-[6%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Item</th>
+              <th className="w-[11%] cursor-pointer px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500" onClick={() => handleSort("total")}>
+                <span className="inline-flex items-center gap-1">Total <SortIcon sort={sort} column="total" /></span>
               </th>
-              <th className="w-[10%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Item
-              </th>
-              <th className="w-[12%] hidden sm:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Subtotal
-              </th>
-              <th
-                className="w-[12%] cursor-pointer px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500"
-                onClick={() => handleSort("total")}
-              >
-                <span className="inline-flex items-center gap-1">
-                  Total <SortIcon sort={sort} column="total" />
-                </span>
-              </th>
-              <th className="w-[12%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Bayar
-              </th>
+              <th className="w-[10%] hidden md:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Bayar</th>
+              <th className="w-[8%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Jenis</th>
+              <th className="w-[12%] hidden lg:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Keterangan</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {result.length === 0 ? (
               <tr>
-                <td colSpan={7} className="px-4 py-12 text-center text-sm text-neutral-400">
+                <td colSpan={8} className="px-4 py-12 text-center text-sm text-neutral-400">
                   <ReceiptText className="mx-auto mb-2 h-6 w-6 opacity-40" />
                   Tidak ada transaksi untuk periode ini
                 </td>
               </tr>
             ) : (
               result.map((txn) => {
-                const methodLabel =
-                  METHOD_LABELS[txn.payments[0]?.method ?? ""] ?? "—";
+                const pmt = txn.payments[0];
+                const method = pmt?.method ?? "";
+                const methodLabel = METHOD_LABELS[method] ?? "—";
+                const walletId = pmt?.walletId;
+                const walletName = walletId ? (walletNames[walletId] ?? null) : null;
+                const ket =
+                  method === "transfer" ? (walletName ?? "—") :
+                  method === "qris" ? "QRIS" :
+                  "—";
                 const date = new Date(txn.createdAt);
 
                 return (
                   <tr key={txn.id} className="group">
                     <td className="px-3 py-2.5">
-                      <span className="text-xs font-mono font-medium text-neutral-900 dark:text-neutral-50">
-                        {txn.invoiceNumber}
-                      </span>
+                      <span className="text-xs font-mono font-medium text-neutral-900 dark:text-neutral-50">{txn.invoiceNumber}</span>
                     </td>
                     <td className="hidden sm:table-cell px-3 py-2.5">
                       <div className="text-xs text-neutral-500">
                         <div>{date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}</div>
-                        <div className="text-[10px] text-neutral-400">
-                          {date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}
-                        </div>
+                        <div className="text-[10px] text-neutral-400">{date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>
                       </div>
                     </td>
                     <td className="hidden md:table-cell px-3 py-2.5">
-                      <span className="text-xs text-neutral-600 dark:text-neutral-400">
-                        {txn.cashierName}
-                      </span>
+                      <span className="text-xs text-neutral-600 dark:text-neutral-400">{txn.cashierName}</span>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
-                        {txn.items.length}
-                      </span>
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5 text-right">
-                      <span className="text-xs tabular-nums text-neutral-500">
-                        {txn.subtotal.toLocaleString("id-ID")}
-                      </span>
+                      <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{txn.items.length}</span>
                     </td>
                     <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
-                        {formatCurrencyID(txn.total)}
-                      </span>
+                      <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">{formatCurrencyID(txn.total)}</span>
                     </td>
-                    <td className="hidden md:table-cell px-3 py-2.5">
-                      <span className="rounded bg-neutral-50 px-1.5 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-                        {methodLabel}
-                      </span>
+                    <td className="hidden md:table-cell px-3 py-2.5 text-right">
+                      {txn.payments.length === 1 && pmt ? (
+                        <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{formatCurrencyID(pmt.amount)}</span>
+                      ) : (
+                        <div className="text-[10px] text-neutral-400">
+                          {txn.payments.map((p, i) => <div key={i}>{formatCurrencyID(p.amount)}</div>)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="hidden sm:table-cell px-3 py-2.5">
+                      <span className={cn(
+                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                        method === "transfer" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" :
+                        method === "cash" ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" :
+                        method === "qris" ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" :
+                        "bg-neutral-50 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
+                      )}>{methodLabel}</span>
+                    </td>
+                    <td className="hidden lg:table-cell px-3 py-2.5">
+                      <span className="text-[10px] text-neutral-500">{ket}</span>
                     </td>
                   </tr>
                 );
