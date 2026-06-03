@@ -9,10 +9,12 @@ import {
   CheckCircle,
   Clock,
   Settings,
+  Plus,
 } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import type { OpnameStatus } from "@/types/inventory";
 import { cn } from "@/lib/cn";
+import { InventoryOpnameFormModal } from "./inventory-opname-form-modal";
 
 const STATUS_STYLE: Record<OpnameStatus, { icon: typeof CheckCircle; cls: string; label: string }> = {
   draft: { icon: Clock, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Draft" },
@@ -33,6 +35,7 @@ export function InventoryOpnamePanel() {
 
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reasonFilter, setReasonFilter] = useState<string>("");
+  const [showOpnameForm, setShowOpnameForm] = useState(false);
 
   const REASON_OPTIONS = ["Kadaluarsa", "Rusak", "Hilang", "Sistem", "Lainnya"] as const;
 
@@ -66,8 +69,8 @@ export function InventoryOpnamePanel() {
 
   return (
     <div>
-      {/* Search + Reason filter */}
-      <div className="mb-4 flex gap-3 flex-wrap">
+      {/* Search + Reason filter + Create button */}
+      <div className="mb-4 flex gap-3 flex-wrap items-center">
         <div className="relative flex-1 min-w-[180px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
           <input
@@ -88,7 +91,16 @@ export function InventoryOpnamePanel() {
             <option key={r} value={r}>{r}</option>
           ))}
         </select>
+        <button
+          onClick={() => setShowOpnameForm(true)}
+          className="ml-auto flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+        >
+          <Plus className="h-4 w-4" /> Buat Stock Opname
+        </button>
       </div>
+
+      {/* Opname Form Modal */}
+      <InventoryOpnameFormModal open={showOpnameForm} onClose={() => setShowOpnameForm(false)} />
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
