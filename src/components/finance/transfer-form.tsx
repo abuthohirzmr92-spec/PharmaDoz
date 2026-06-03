@@ -54,6 +54,18 @@ export function TransferForm({ wallets, preselectedFromId, onSubmit, isLoading }
       return;
     }
 
+    // Minimum balance warning (non-blocking)
+    const minBal = ((fromWallet?.settings as any)?.minimum_balance as number) ?? 0;
+    if (fromWallet && minBal > 0 && (fromWallet.balance - totalDeduct) < minBal) {
+      const proceed = window.confirm(
+        `⚠️ Peringatan: Saldo ${fromWallet.name} setelah transfer akan berada di bawah batas minimum ${formatRupiah(minBal)}.\n\n` +
+        `Saldo saat ini: ${formatRupiah(fromWallet.balance)}\n` +
+        `Setelah transfer: ${formatRupiah(fromWallet.balance - totalDeduct)}\n\n` +
+        `Tetap lanjutkan transfer?`,
+      );
+      if (!proceed) return;
+    }
+
     await onSubmit(fromId, toId, numAmount, { fee: numFee, notes: notes || undefined });
   };
 
