@@ -11,7 +11,7 @@ export class SuperAdminRepository extends BaseRepository {
 
     const { data, error } = await this.client
       .from("tenants")
-      .select("*, profiles:tenant_users(count), expansions:store_expansion_requests(count)")
+      .select("*, profiles:tenant_users(count), branches:branches(count), expansions:store_expansion_requests(count)")
       .is("deleted_at", null)
       .order("created_at", { ascending: false });
 
@@ -42,7 +42,7 @@ export class SuperAdminRepository extends BaseRepository {
       packageName: (t.package_id ? this.resolvePackageName(t.package_id) : "basic") as TenantPackage,
       ownerName: ownerMap.get(t.id) ?? "—",
       userCount: t.profiles?.[0]?.count ?? 0,
-      branchCount: t.expansions?.[0]?.count ?? 0,
+      branchCount: t.branches?.[0]?.count ?? 0,
       isActive: t.is_active ?? true,
       lastActiveAt: t.settings?.last_active_at ?? null,
       lastSyncAt: t.settings?.last_sync_at ?? null,
