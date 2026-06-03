@@ -232,9 +232,32 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           }
         }
 
-        // 3. Reload state from DB
-        await get().loadDemoData();
-        set({ isSubmitting: false });
+        // 3. Reload state from DB — bypass loadDemoData guard
+        try {
+          const [products, suppliers] = await Promise.all([
+            productRepo.getProducts(),
+            supplierRepo.getSuppliers(),
+          ]);
+          const allBatches: ProductBatch[] = [];
+          for (const p of products) {
+            for (const b of p.batches) {
+              allBatches.push({ ...b, productName: p.name });
+            }
+          }
+          const invoices = await supplierRepo.getPurchaseInvoices();
+          const movements = await inventoryRepo.getStockMovements();
+          set({
+            batches: allBatches,
+            suppliers,
+            purchaseInvoices: invoices,
+            stockMovements: movements,
+            dataSource: "database",
+            isDemoMode: false,
+            isSubmitting: false,
+          });
+        } catch {
+          set({ isSubmitting: false });
+        }
         return;
       } catch (e) {
         console.error('DB purchase failed, falling back to demo mode:', e);
