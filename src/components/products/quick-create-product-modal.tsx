@@ -1,11 +1,12 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
-import { X } from "lucide-react";
+import { X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { generateProductCode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
 import { isDemoMode as checkDemoMode } from "@/config/env";
+import { NumericInput } from "@/components/shared/numeric-input";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -55,6 +56,11 @@ export function QuickCreateProductModal({
   const [defaultSellingPrice, setDefaultSellingPrice] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+
+  // Inline category creation
+  const [showNewCategory, setShowNewCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [creatingCategory, setCreatingCategory] = useState(false);
 
   const [categories, setCategories] = useState<string[]>(
     checkDemoMode() ? DEMO_CATEGORIES : [],
@@ -108,6 +114,8 @@ export function QuickCreateProductModal({
     setDefaultSellingPrice(0);
     setIsSubmitting(false);
     setError("");
+    setShowNewCategory(false);
+    setNewCategoryName("");
 
     const timer = setTimeout(() => nameRef.current?.focus(), 100);
     return () => clearTimeout(timer);
@@ -256,7 +264,14 @@ export function QuickCreateProductModal({
             </label>
             <select
               value={category}
-              onChange={(e) => setCategory(e.target.value)}
+              onChange={(e) => {
+                if (e.target.value === "__new__") {
+                  setShowNewCategory(true);
+                } else {
+                  setCategory(e.target.value);
+                  setShowNewCategory(false);
+                }
+              }}
               className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
             >
               <option value="">Pilih kategori</option>
@@ -265,7 +280,66 @@ export function QuickCreateProductModal({
                   {cat}
                 </option>
               ))}
+              <option disabled>──────────</option>
+              <option value="__new__">+ Tambah Kategori</option>
             </select>
+
+            {/* Inline new category form */}
+            {showNewCategory && (
+              <div className="mt-2 flex items-center gap-2 rounded-lg border border-brand-200 bg-brand-50 p-2 dark:border-brand-800 dark:bg-brand-950">
+                <input
+                  type="text"
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  placeholder="Nama kategori baru"
+                  className="flex-1 rounded border border-brand-300 bg-white px-2 py-1 text-sm focus:border-brand-500 focus:outline-none dark:border-brand-700 dark:bg-neutral-900 dark:text-neutral-50"
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      (async () => {
+                        const name = newCategoryName.trim();
+                        if (!name) { toast.error("Nama kategori wajib diisi."); return; }
+                        if (categories.includes(name)) { toast.error("Kategori sudah ada."); return; }
+                        setCreatingCategory(true);
+                        try {
+                          if (productRepo.isConnected) await productRepo.createCategory(name);
+                          setCategories((prev) => [...prev, name]);
+                          setCategory(name);
+                          setShowNewCategory(false);
+                          setNewCategoryName("");
+                          toast.success(`Kategori "${name}" ditambahkan.`);
+                        } catch { toast.error("Gagal membuat kategori."); }
+                        finally { setCreatingCategory(false); }
+                      })();
+                    }
+                    if (e.key === "Escape") { setShowNewCategory(false); setNewCategoryName(""); }
+                  }}
+                  autoFocus
+                />
+                <button
+                  type="button"
+                  disabled={creatingCategory || !newCategoryName.trim()}
+                  onClick={async () => {
+                    const name = newCategoryName.trim();
+                    if (!name) { toast.error("Nama kategori wajib diisi."); return; }
+                    if (categories.includes(name)) { toast.error("Kategori sudah ada."); return; }
+                    setCreatingCategory(true);
+                    try {
+                      if (productRepo.isConnected) await productRepo.createCategory(name);
+                      setCategories((prev) => [...prev, name]);
+                      setCategory(name);
+                      setShowNewCategory(false);
+                      setNewCategoryName("");
+                      toast.success(`Kategori "${name}" ditambahkan.`);
+                    } catch { toast.error("Gagal membuat kategori."); }
+                    finally { setCreatingCategory(false); }
+                  }}
+                  className="shrink-0 rounded bg-brand-600 p-1.5 text-white hover:bg-brand-700 disabled:opacity-50"
+                >
+                  <Check className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            )}
           </div>
 
           {/* Satuan */}
@@ -316,30 +390,22 @@ export function QuickCreateProductModal({
               <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                 Harga Beli
               </label>
-              <input
-                type="number"
+              <NumericInput
+                value={defaultPrice}
+                onChange={setDefaultPrice}
                 min={0}
-                value={defaultPrice || ""}
-                onChange={(e) =>
-                  setDefaultPrice(Math.max(0, Number(e.target.value)))
-                }
                 placeholder="0"
-                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
             <div>
               <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
                 Harga Jual
               </label>
-              <input
-                type="number"
+              <NumericInput
+                value={defaultSellingPrice}
+                onChange={setDefaultSellingPrice}
                 min={0}
-                value={defaultSellingPrice || ""}
-                onChange={(e) =>
-                  setDefaultSellingPrice(Math.max(0, Number(e.target.value)))
-                }
                 placeholder="0"
-                className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </div>
           </div>
