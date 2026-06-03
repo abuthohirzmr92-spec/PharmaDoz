@@ -22,6 +22,8 @@ export interface CreateWalletInput {
   allowOverdraft?: boolean;
   overdraftLimit?: number;
   settings?: Record<string, unknown>;
+  category?: string;
+  minimumBalance?: number;
 }
 
 export interface UpdateWalletInput {
@@ -33,6 +35,8 @@ export interface UpdateWalletInput {
   allowOverdraft?: boolean;
   overdraftLimit?: number;
   settings?: Record<string, unknown>;
+  category?: string;
+  minimumBalance?: number;
 }
 
 export interface RecordTransactionInput {
@@ -154,6 +158,12 @@ export class WalletRepository extends BaseRepository {
     if (!this.isConnected) throw new Error("Not connected");
     this.requireTenantUser();
 
+    const baseSettings: Record<string, unknown> = {
+      ...(data.settings ?? {}),
+      category: data.category ?? "operasional",
+      minimum_balance: data.minimumBalance ?? 0,
+    };
+
     const insertData: Record<string, unknown> = {
       name: data.name,
       type: data.type,
@@ -161,7 +171,7 @@ export class WalletRepository extends BaseRepository {
       currency: data.currency ?? "IDR",
       allow_overdraft: data.allowOverdraft ?? false,
       overdraft_limit: data.overdraftLimit ?? 0,
-      settings: data.settings ?? {},
+      settings: baseSettings,
       tenant_id: this.requireTenant(),
     };
 
@@ -196,7 +206,13 @@ export class WalletRepository extends BaseRepository {
     if (data.isActive !== undefined) updateData["is_active"] = data.isActive;
     if (data.allowOverdraft !== undefined) updateData["allow_overdraft"] = data.allowOverdraft;
     if (data.overdraftLimit !== undefined) updateData["overdraft_limit"] = data.overdraftLimit;
-    if (data.settings !== undefined) updateData["settings"] = data.settings;
+    if (data.category !== undefined || data.minimumBalance !== undefined || data.settings !== undefined) {
+      // Merge category + minimum_balance into settings JSONB
+      const existingSettings = (data.settings ?? {}) as Record<string, unknown>;
+      if (data.category !== undefined) existingSettings["category"] = data.category;
+      if (data.minimumBalance !== undefined) existingSettings["minimum_balance"] = data.minimumBalance;
+      updateData["settings"] = existingSettings;
+    }
 
     const { data: row, error } = await this.client
       .from("financial_wallets")
