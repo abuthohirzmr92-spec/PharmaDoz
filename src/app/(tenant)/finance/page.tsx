@@ -18,6 +18,11 @@ const FundCategoryCards = dynamic(
   { loading: () => <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}</div> },
 );
 
+const CashflowSummary = dynamic(
+  () => import("@/components/finance/cashflow-summary").then((m) => m.CashflowSummary),
+  { loading: () => <CardSkeleton className="h-[120px]" /> },
+);
+
 const FinanceSummaryCards = dynamic(
   () => import("@/components/finance/finance-summary-cards").then((m) => m.FinanceSummaryCards),
   {
@@ -126,6 +131,11 @@ export default function FinanceDashboardPage() {
         {/* Summary Cards */}
         <WidgetErrorBoundary title="Ringkasan Keuangan">
           <FinanceSummaryCards />
+        </WidgetErrorBoundary>
+
+        {/* Cashflow Summary */}
+        <WidgetErrorBoundary title="Arus Kas">
+          <CashflowSummary />
         </WidgetErrorBoundary>
 
         {/* Fund Category Cards */}
