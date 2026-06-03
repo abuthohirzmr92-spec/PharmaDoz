@@ -85,7 +85,7 @@ interface InventoryState {
   writeOffExpiredBatches: (batchIds: string[], note?: string) => Promise<void>;
 
   /* Actions — payment */
-  recordPayment: (invoiceId: string, amount: number) => Promise<void>;
+  recordPayment: (invoiceId: string, amount: number, walletId?: string, paymentMethod?: string) => Promise<void>;
 
   /* Actions — sale deduction */
   deductForSale: (cart: { productId: string; quantity: number }[], transactionId: string) => Promise<void>;
@@ -554,7 +554,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   /* ---- payment ---- */
 
-  recordPayment: async (invoiceId, amount) => {
+  recordPayment: async (invoiceId, amount, walletId, paymentMethod) => {
     const state = get();
 
     if (state.dataSource === 'database') {
@@ -569,8 +569,39 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       if (invoice) {
         const newPaid = invoice.paidAmount + amount;
         try {
-          await supplierRepo.updatePurchaseInvoicePayment(invoiceId, newPaid);
-          await get().loadDemoData();
+          await supplierRepo.updatePurchaseInvoicePayment(invoiceId, newPaid, walletId);
+
+          // Record purchase_payments row for history
+          if (walletId) {
+            const { supabase } = await import("@/lib/supabase/client");
+            if (supabase) {
+              const wallet = (get() as any).wallets?.find?.((w: any) => w.id === walletId);
+              await supabase.from("purchase_payments").insert({
+                invoice_id: invoiceId,
+                wallet_id: walletId,
+                amount,
+                payment_method: paymentMethod ?? "transfer",
+                wallet_name: wallet?.name ?? null,
+              });
+            }
+          }
+
+          // Reload invoices + batch data
+          try {
+            const invoices = await supplierRepo.getPurchaseInvoices();
+            const products = await productRepo.getProducts();
+            const allBatches: ProductBatch[] = [];
+            for (const p of products) {
+              for (const b of p.batches) {
+                allBatches.push({ ...b, productName: p.name });
+              }
+            }
+            set({
+              purchaseInvoices: invoices,
+              batches: allBatches,
+              dataSource: "database",
+            });
+          } catch { /* best-effort reload */ }
           return;
         } catch (e) {
           console.error('DB payment failed, falling back to demo:', e);
