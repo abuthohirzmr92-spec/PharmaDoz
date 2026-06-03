@@ -9,6 +9,7 @@ import {
   Store,
   Wallet,
   TrendingUp,
+  BookOpen,
 } from "lucide-react";
 import type { NavItem } from "./navigation";
 
@@ -53,6 +54,12 @@ export const TENANT_NAVIGATION: NavItem[] = [
     label: "Insight Bisnis",
     href: "/finance/insight",
     icon: TrendingUp,
+    permission: "finance.wallet.view",
+  },
+  {
+    label: "Ledger",
+    href: "/finance/ledger",
+    icon: BookOpen,
     permission: "finance.wallet.view",
   },
   {
