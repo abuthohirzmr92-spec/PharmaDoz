@@ -13,6 +13,11 @@ import { hasPermission } from "@/lib/auth/permissions";
 import { Plus, ArrowRightLeft } from "lucide-react";
 
 // Lazy-loaded widgets
+const FundCategoryCards = dynamic(
+  () => import("@/components/finance/fund-category-cards").then((m) => m.FundCategoryCards),
+  { loading: () => <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">{Array.from({ length: 4 }).map((_, i) => <CardSkeleton key={i} />)}</div> },
+);
+
 const FinanceSummaryCards = dynamic(
   () => import("@/components/finance/finance-summary-cards").then((m) => m.FinanceSummaryCards),
   {
@@ -121,6 +126,11 @@ export default function FinanceDashboardPage() {
         {/* Summary Cards */}
         <WidgetErrorBoundary title="Ringkasan Keuangan">
           <FinanceSummaryCards />
+        </WidgetErrorBoundary>
+
+        {/* Fund Category Cards */}
+        <WidgetErrorBoundary title="Alokasi Dana">
+          <FundCategoryCards />
         </WidgetErrorBoundary>
 
         {/* Wallet Balance Cards */}
