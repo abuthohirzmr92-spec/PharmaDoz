@@ -416,8 +416,36 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           });
         }
 
-        await get().loadDemoData();
-        set({ isSubmitting: false });
+        // Reload state directly (bypass loadDemoData guard — same pattern as addPurchase)
+        try {
+          const [products, suppliers] = await Promise.all([
+            productRepo.getProducts(),
+            supplierRepo.getSuppliers(),
+          ]);
+          const allBatches: ProductBatch[] = [];
+          for (const p of products) {
+            for (const b of p.batches) {
+              allBatches.push({ ...b, productName: p.name });
+            }
+          }
+          const [invoices, movements, opnames] = await Promise.all([
+            supplierRepo.getPurchaseInvoices(),
+            inventoryRepo.getStockMovements(),
+            inventoryRepo.getStockOpnames(),
+          ]);
+          set({
+            batches: allBatches,
+            suppliers,
+            purchaseInvoices: invoices,
+            stockMovements: movements,
+            stockOpnames: opnames,
+            dataSource: "database",
+            isDemoMode: false,
+            isSubmitting: false,
+          });
+        } catch {
+          set({ isSubmitting: false });
+        }
         return;
       } catch (e) {
         console.error('DB opname failed, falling back to demo:', e);
@@ -789,17 +817,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           }
         }
 
-        // Load purchase invoices and stock movements from inventory repo
-        const purchaseInvoices =
-          await supplierRepo.getPurchaseInvoices();
-        const stockMovements =
-          await inventoryRepo.getStockMovements();
+        // Load purchase invoices, stock movements, and opnames from repos
+        const [purchaseInvoices, stockMovements, stockOpnames] = await Promise.all([
+          supplierRepo.getPurchaseInvoices(),
+          inventoryRepo.getStockMovements(),
+          inventoryRepo.getStockOpnames(),
+        ]);
 
         set({
           batches: allBatches,
           suppliers,
           purchaseInvoices,
           stockMovements,
+          stockOpnames,
           dataSource: "database",
           isDemoMode: false,
           isLoading: false,
