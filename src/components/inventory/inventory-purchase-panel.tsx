@@ -19,7 +19,9 @@ import type { PurchaseStatus, PurchaseItem, PurchaseInvoice } from "@/types/inve
 import { cn } from "@/lib/cn";
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo, supplierRepo } from "@/lib/repository-instances";
+import { useWalletStore } from "@/store/wallet-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
+import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
 
 const STATUS_FILTERS: { label: string; value: PurchaseStatus | "all" }[] = [
@@ -47,6 +49,7 @@ export function InventoryPurchasePanel() {
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
   const [creatingSupplier, setCreatingSupplier] = useState(false);
+  const [payingInvoice, setPayingInvoice] = useState<{ id: string; remaining: number } | null>(null);
 
   useEffect(() => {
     if (productRepo.isConnected) {
@@ -622,16 +625,7 @@ export function InventoryPurchasePanel() {
                           <button
                             onClick={(e) => {
                               e.stopPropagation();
-                              const raw = window.prompt("Jumlah pembayaran:", String(remaining));
-                              if (raw) {
-                                const amount = parseFloat(raw.replace(/\./g, ""));
-                                if (!isNaN(amount) && amount > 0) {
-                                  useInventoryStore.getState().recordPayment(
-                                    inv.id,
-                                    Math.min(amount, remaining),
-                                  );
-                                }
-                              }
+                              setPayingInvoice({ id: inv.id, remaining });
                             }}
                             className="text-[10px] font-medium text-brand-600 hover:text-brand-700 hover:underline whitespace-nowrap"
                           >
@@ -675,6 +669,15 @@ export function InventoryPurchasePanel() {
           }
         }}
       />
+
+    {/* Purchase Payment Modal */}
+    <InventoryPayInvoiceModal
+      open={payingInvoice !== null}
+      invoiceId={payingInvoice?.id ?? ""}
+      remaining={payingInvoice?.remaining ?? 0}
+      onClose={() => setPayingInvoice(null)}
+    />
+
     </div>
   );
 }

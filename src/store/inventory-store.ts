@@ -576,7 +576,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             const { supabase } = await import("@/lib/supabase/client");
             if (supabase) {
               const wallet = (get() as any).wallets?.find?.((w: any) => w.id === walletId);
-              await supabase.from("purchase_payments").insert({
+              await (supabase as any).from("purchase_payments").insert({
                 invoice_id: invoiceId,
                 wallet_id: walletId,
                 amount,
