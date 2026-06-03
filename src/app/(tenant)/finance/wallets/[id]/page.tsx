@@ -186,6 +186,33 @@ export default function WalletDetailPage() {
             </div>
           </WidgetErrorBoundary>
 
+          {/* Wallet Analytics */}
+          <WidgetErrorBoundary title="Analytics Wallet">
+            {(() => {
+              const now = new Date();
+              const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+              const monthTxs = transactions.filter((t) => new Date(t.transactionDate) >= monthStart);
+              const inflow = monthTxs.filter((t) => t.type === "credit").reduce((s, t) => s + t.amount, 0);
+              const outflow = monthTxs.filter((t) => t.type === "debit").reduce((s, t) => s + t.amount, 0);
+              return (
+                <div className="mb-8 grid grid-cols-3 gap-3">
+                  <div className="rounded-lg border border-green-200 bg-green-50 p-3 dark:border-green-800 dark:bg-green-950">
+                    <p className="text-[10px] text-green-600">Masuk Bulan Ini</p>
+                    <p className="text-sm font-bold text-green-800 dark:text-green-200">{formatRupiah(inflow)}</p>
+                  </div>
+                  <div className="rounded-lg border border-red-200 bg-red-50 p-3 dark:border-red-800 dark:bg-red-950">
+                    <p className="text-[10px] text-red-600">Keluar Bulan Ini</p>
+                    <p className="text-sm font-bold text-red-800 dark:text-red-200">{formatRupiah(outflow)}</p>
+                  </div>
+                  <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-800 dark:bg-neutral-900">
+                    <p className="text-[10px] text-neutral-500">Total Transaksi</p>
+                    <p className="text-sm font-bold text-neutral-800 dark:text-neutral-200">{monthTxs.length}</p>
+                  </div>
+                </div>
+              );
+            })()}
+          </WidgetErrorBoundary>
+
           {/* Transactions */}
           <WidgetErrorBoundary title="Riwayat Transaksi">
             <div>
