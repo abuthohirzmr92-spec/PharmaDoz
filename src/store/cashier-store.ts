@@ -218,7 +218,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
     const transaction: Transaction = {
       id: transactionId,
       tenantId: auth.user?.tenantId ?? auth.user?.pharmacyId ?? "",
-      invoiceNumber: get().invoiceNumber ?? `INV-${Date.now()}`,
+      invoiceNumber: get().invoiceNumber ?? `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
       items: cart.map((item) => ({
         productId: item.productId,
         productName: item.productName,
@@ -260,7 +260,9 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
           });
           // Use the DB-returned ID if available
         } catch (dbErr) {
-          console.error("DB transaction persist failed, using demo fallback:", dbErr);
+          console.error("DB transaction persist failed:", dbErr);
+          set({ isSubmitting: false, submitError: dbErr instanceof Error ? dbErr.message : "Gagal menyimpan transaksi ke database." });
+          return { success: false, error: "Gagal menyimpan transaksi ke database. Silakan coba lagi." };
         }
       }
 
