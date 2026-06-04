@@ -756,10 +756,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         // Record sale_batch_allocations for HPP tracking
         const { supabase } = await import("@/lib/supabase/client");
         if (supabase) {
-          const tenantId = (get() as any).batches?.[0]?.tenantId ?? null;
+          const stateNow = get();
+          const tenantId = (stateNow as any).batches?.[0]?.tenantId ?? (this as any).getTenantId?.() ?? null;
+          console.log("[FEFO-ALLOC] Recording allocations for txn:", transactionId, "items:", cartWithAllocations.length, "tenant:", tenantId);
           for (const { item, allocations } of cartWithAllocations) {
             for (const alloc of allocations) {
-              await (supabase as any).from("sale_batch_allocations").insert({
+              const row = {
                 transaction_id: transactionId,
                 transaction_item_id: (item as any).id ?? transactionId,
                 batch_id: alloc.batchId,
@@ -768,9 +770,17 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
                 cost_price: alloc.costPrice,
                 subtotal_cost: alloc.take * alloc.costPrice,
                 tenant_id: tenantId,
-              });
+              };
+              console.log("[FEFO-ALLOC] Inserting:", JSON.stringify(row));
+              const { error: allocErr } = await (supabase as any).from("sale_batch_allocations").insert(row);
+              if (allocErr) {
+                console.error("[FEFO-ALLOC] INSERT FAILED:", allocErr.code, allocErr.message, allocErr.details);
+              }
             }
           }
+          console.log("[FEFO-ALLOC] Done. Check sale_batch_allocations for txn:", transactionId);
+        } else {
+          console.warn("[FEFO-ALLOC] Supabase client not available — allocations NOT saved");
         }
 
         await get().loadDemoData();
