@@ -264,9 +264,16 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
         }
       }
 
-      // Hook point: deduct inventory (Agent 2 fills real implementation)
+      // Hook point: deduct inventory with real item IDs
       try {
-        await invStore.deductForSale?.(cart, transactionId);
+        // Pass item IDs from the created transaction for accurate batch allocation
+        const saleItems = transaction.items.map((item) => ({
+          id: item.id ?? transactionId,
+          productId: item.productId,
+          productName: item.productName,
+          quantity: item.quantity,
+        }));
+        await invStore.deductForSale?.(saleItems, transactionId);
       } catch {
         // deduction not yet wired — safe to continue
       }

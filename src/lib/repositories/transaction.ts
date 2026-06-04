@@ -231,9 +231,10 @@ export class TransactionRepository extends BaseRepository {
 
     if (txnError) return this.handleError(txnError, "createTransaction");
 
-    // Insert items
+    // Insert items — return inserted rows to get DB-generated IDs
+    let insertedItems: Array<{ id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }> = [];
     if (data.items.length > 0) {
-      const { error: itemsError } = await this.client
+      const { data: itemRows, error: itemsError } = await this.client
         .from("transaction_items")
         .insert(
           data.items.map((item) => {
@@ -250,9 +251,11 @@ export class TransactionRepository extends BaseRepository {
             }
             return row;
           }),
-        );
+        )
+        .select("id, product_id, product_name, quantity, unit_price, subtotal");
 
       if (itemsError) return this.handleError(itemsError, "createTransaction");
+      insertedItems = (itemRows as any[]) ?? [];
     }
 
     // Insert payments (with optional wallet_id for finance module)
@@ -309,13 +312,14 @@ export class TransactionRepository extends BaseRepository {
       id: txn.id,
       tenantId: this.pharmacyId ?? "",
       invoiceNumber: txn.invoice_number,
-      items: data.items.map(
+      items: insertedItems.map(
         (item) =>
           ({
-            productId: item.productId,
-            productName: item.productName,
+            id: item.id,
+            productId: item.product_id,
+            productName: item.product_name,
             quantity: item.quantity,
-            unitPrice: item.unitPrice,
+            unitPrice: item.unit_price,
             subtotal: item.subtotal,
           }) as TransactionItem,
       ),

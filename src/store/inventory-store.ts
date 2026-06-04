@@ -88,7 +88,7 @@ interface InventoryState {
   recordPayment: (invoiceId: string, amount: number, walletId?: string, paymentMethod?: string) => Promise<void>;
 
   /* Actions — sale deduction */
-  deductForSale: (cart: { productId: string; quantity: number }[], transactionId: string) => Promise<void>;
+  deductForSale: (cart: { id?: string; productId: string; productName?: string; quantity: number }[], transactionId: string) => Promise<void>;
 
   /* Actions — computed */
   getInventoryProducts: () => InventoryProduct[];
@@ -759,7 +759,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             for (const alloc of allocations) {
               await (supabase as any).from("sale_batch_allocations").insert({
                 transaction_id: transactionId,
-                transaction_item_id: transactionId, // linked via transaction_id
+                transaction_item_id: (item as any).id ?? transactionId,
                 batch_id: alloc.batchId,
                 product_id: item.productId,
                 quantity: alloc.take,

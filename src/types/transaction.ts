@@ -13,6 +13,7 @@ export interface SalePayment {
 }
 
 export interface TransactionItem {
+  id?: string;
   tenantId?: string;
   productId: string;
   productName: string;
