@@ -758,7 +758,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           for (const { item, allocations } of cartWithAllocations) {
             for (const alloc of allocations) {
               await (supabase as any).from("sale_batch_allocations").insert({
-                sale_id: transactionId,
+                transaction_id: transactionId,
                 transaction_item_id: transactionId, // linked via transaction_id
                 batch_id: alloc.batchId,
                 product_id: item.productId,

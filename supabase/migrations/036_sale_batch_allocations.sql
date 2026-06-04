@@ -13,7 +13,7 @@ BEGIN;
 
 CREATE TABLE IF NOT EXISTS sale_batch_allocations (
     id                  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    sale_id             UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
+    transaction_id      UUID NOT NULL REFERENCES transactions(id) ON DELETE CASCADE,
     transaction_item_id UUID NOT NULL REFERENCES transaction_items(id) ON DELETE CASCADE,
     batch_id            UUID NOT NULL REFERENCES product_batches(id) ON DELETE RESTRICT,
     product_id          UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
@@ -29,7 +29,7 @@ COMMENT ON COLUMN sale_batch_allocations.cost_price IS 'Snapshot of product_batc
 COMMENT ON COLUMN sale_batch_allocations.subtotal_cost IS 'quantity × cost_price';
 
 -- Indexes
-CREATE INDEX IF NOT EXISTS idx_sba_sale ON sale_batch_allocations (sale_id);
+CREATE INDEX IF NOT EXISTS idx_sba_sale ON sale_batch_allocations (transaction_id);
 CREATE INDEX IF NOT EXISTS idx_sba_batch ON sale_batch_allocations (batch_id);
 CREATE INDEX IF NOT EXISTS idx_sba_product ON sale_batch_allocations (product_id);
 CREATE INDEX IF NOT EXISTS idx_sba_tenant ON sale_batch_allocations (tenant_id);

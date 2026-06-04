@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npx eslint *)",
+      "Bash(npx vitest *)",
+      "PowerShell(npm run *)",
+      "PowerShell(npx tsc --noEmit 2>&1)",
+      "PowerShell(npx eslint . 2>&1)",
+      "PowerShell(npx vitest run 2>&1)",
+      "PowerShell(npx next build 2>&1)"
+    ]
+  }
+}
