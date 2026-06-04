@@ -31,6 +31,11 @@ const CapitalHistory = dynamic(
   { loading: () => <CardSkeleton className="h-[200px]" /> },
 );
 
+const NetProfitCards = dynamic(
+  () => import("@/components/finance/net-profit-cards").then((m) => m.NetProfitCards),
+  { loading: () => <CardSkeleton className="h-[180px]" /> },
+);
+
 export default function InsightPage() {
   const { user } = useAuthStore();
   const { balance: capitalBalance, transactions: capitalTxns, loadTransactions: loadCapital, deposit, withdraw, isLoading } = useCapitalStore();
@@ -107,6 +112,13 @@ export default function InsightPage() {
         <div className="mb-6">
           <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Performa Bisnis</h2>
           <ProfitSummaryCards capitalBalance={capitalBalance} />
+        </div>
+      </WidgetErrorBoundary>
+
+      {/* Net Profit */}
+      <WidgetErrorBoundary title="Net Profit">
+        <div className="mb-6">
+          <NetProfitCards />
         </div>
       </WidgetErrorBoundary>
 
