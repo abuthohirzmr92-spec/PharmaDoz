@@ -116,9 +116,9 @@ export function computeDailyNetProfit(
  * Requires sale_batch_allocations records created during checkout.
  */
 export function computeHppFromAllocations(
-  allocations: Array<{ quantity: number; cost_price: number }>,
+  allocations: Array<{ quantity: number; costPrice?: number; cost_price?: number }>,
 ): number {
-  return allocations.reduce((sum, a) => sum + a.quantity * a.cost_price, 0);
+  return allocations.reduce((sum, a) => sum + a.quantity * (a.costPrice ?? a.cost_price ?? 0), 0);
 }
 
 /**

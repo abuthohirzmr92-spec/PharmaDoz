@@ -338,6 +338,28 @@ export class InventoryRepository extends BaseRepository {
     return { id: opnameId };
   }
 
+  async getSaleAllocations(
+    dateFrom?: string,
+  ): Promise<Array<{ transactionId: string; quantity: number; costPrice: number }>> {
+    if (!this.isConnected) return [];
+
+    let query = this.client
+      .from("sale_batch_allocations")
+      .select("transaction_id, quantity, cost_price");
+
+    query = this.withTenantScope(query);
+    if (dateFrom) query = query.gte("created_at", dateFrom);
+
+    const { data, error } = await query;
+    if (error) return this.handleError(error, "getSaleAllocations");
+
+    return ((data as any[]) ?? []).map((r) => ({
+      transactionId: r.transaction_id,
+      quantity: r.quantity,
+      costPrice: r.cost_price,
+    }));
+  }
+
   async getStockOpnames(): Promise<StockOpname[]> {
     if (!this.isConnected) return [];
 

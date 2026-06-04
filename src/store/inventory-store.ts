@@ -47,6 +47,7 @@ interface InventoryState {
   purchaseInvoices: PurchaseInvoice[];
   stockMovements: StockMovement[];
   stockOpnames: StockOpname[];
+  saleAllocations: Array<{ transactionId: string; quantity: number; costPrice: number }>;
 
   /* Branch context */
   branchId: string | null;
@@ -123,6 +124,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   purchaseInvoices: [],
   stockMovements: [],
   stockOpnames: [],
+  saleAllocations: [],
   branchId: null,
   activeTab: "dashboard",
   searchQuery: "",
@@ -835,10 +837,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         }
 
         // Load purchase invoices, stock movements, and opnames from repos
-        const [purchaseInvoices, stockMovements, stockOpnames] = await Promise.all([
+        const [purchaseInvoices, stockMovements, stockOpnames, saleAllocations] = await Promise.all([
           supplierRepo.getPurchaseInvoices(),
           inventoryRepo.getStockMovements(),
           inventoryRepo.getStockOpnames(),
+          inventoryRepo.getSaleAllocations(),
         ]);
 
         set({
@@ -847,6 +850,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           purchaseInvoices,
           stockMovements,
           stockOpnames,
+          saleAllocations,
           dataSource: "database",
           isDemoMode: false,
           isLoading: false,
