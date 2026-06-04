@@ -82,7 +82,7 @@ export const useHoldCartStore = create<HoldCartState>()((set, get) => ({
     cashier.clearCart();
     cashier.setCurrentSale(
       `sale-${Date.now()}`,
-      `INV-${Date.now()}`,
+      `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
     );
 
     for (const item of entry.cart) {

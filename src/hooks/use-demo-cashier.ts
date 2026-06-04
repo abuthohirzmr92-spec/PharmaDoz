@@ -126,7 +126,8 @@ function generateDemoInvoice(): string {
     _demoInvoiceSeq = 0;
   }
   _demoInvoiceSeq++;
-  return `INV-${today}-${String(_demoInvoiceSeq).padStart(3, "0")}`;
+  const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
+  return `INV-${today}-${String(_demoInvoiceSeq).padStart(3, "0")}-${rand}`;
 }
 
 /* ------------------------------------------------------------------ */
