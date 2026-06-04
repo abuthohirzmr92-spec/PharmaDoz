@@ -110,6 +110,50 @@ export interface WalletTransaction {
   createdAt: string;
 }
 
+// ---------------------------------------------------------------------------
+// Sales Return Types
+// ---------------------------------------------------------------------------
+export interface SalesReturn {
+  id: string;
+  tenantId: string;
+  originalTransactionId: string;
+  referenceNumber: string;
+  returnDate: string;
+  reason: string | null;
+  refundMethod: string;
+  refundWalletId: string | null;
+  refundAmount: number;
+  status: "confirmed" | "refunded";
+  conductedBy: string | null;
+  notes: string | null;
+  items: SalesReturnItem[];
+  allocations: SalesReturnAllocation[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface SalesReturnItem {
+  id: string;
+  returnId: string;
+  originalTransactionItemId: string;
+  quantity: number;
+  unitPrice: number;
+  subtotal: number;
+  createdAt: string;
+}
+
+export interface SalesReturnAllocation {
+  id: string;
+  returnId: string;
+  saleAllocationId: string;
+  batchId: string;
+  quantity: number;
+  costPrice: number;
+  subtotalCost: number;
+  tenantId: string | null;
+  createdAt: string;
+}
+
 export interface WalletTransfer {
   id: string;
   fromWalletId: string;
