@@ -735,23 +735,40 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       }
 
       try {
+        // Recalculate allocations to get cost prices
+        const cartWithAllocations = cart.map((item) => {
+          const allocations = allocateFefo(updatedBatches, item.productId, item.quantity);
+          return { item, allocations };
+        });
+
         for (const movement of newMovements) {
-          await inventoryRepo.updateBatchQuantity(
-            movement.batchId,
-            movement.qtyAfter,
-          );
+          await inventoryRepo.updateBatchQuantity(movement.batchId, movement.qtyAfter);
           await inventoryRepo.createStockMovement({
-            type: "sale",
-            productId: movement.productId,
-            productName: movement.productName,
-            batchId: movement.batchId,
-            batchNumber: movement.batchNumber,
-            qtyBefore: movement.qtyBefore,
-            qtyChange: movement.qtyChange,
-            qtyAfter: movement.qtyAfter,
-            referenceNumber: transactionId,
-            note: `Penjualan transaksi ${transactionId}`,
+            type: "sale", productId: movement.productId, productName: movement.productName,
+            batchId: movement.batchId, batchNumber: movement.batchNumber,
+            qtyBefore: movement.qtyBefore, qtyChange: movement.qtyChange, qtyAfter: movement.qtyAfter,
+            referenceNumber: transactionId, note: `Penjualan transaksi ${transactionId}`,
           });
+        }
+
+        // Record sale_batch_allocations for HPP tracking
+        const { supabase } = await import("@/lib/supabase/client");
+        if (supabase) {
+          const tenantId = (get() as any).batches?.[0]?.tenantId ?? null;
+          for (const { item, allocations } of cartWithAllocations) {
+            for (const alloc of allocations) {
+              await (supabase as any).from("sale_batch_allocations").insert({
+                sale_id: transactionId,
+                transaction_item_id: transactionId, // linked via transaction_id
+                batch_id: alloc.batchId,
+                product_id: item.productId,
+                quantity: alloc.take,
+                cost_price: alloc.costPrice,
+                subtotal_cost: alloc.take * alloc.costPrice,
+                tenant_id: tenantId,
+              });
+            }
+          }
         }
 
         await get().loadDemoData();

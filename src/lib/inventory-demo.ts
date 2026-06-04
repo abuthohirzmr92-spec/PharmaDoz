@@ -801,6 +801,7 @@ export interface FefoAllocation {
   batchNumber: string;
   take: number;
   remainingAfter: number;
+  costPrice: number;
 }
 
 export function allocateFefo(
@@ -820,6 +821,7 @@ export function allocateFefo(
       batchNumber: batch.batchNumber,
       take,
       remainingAfter: batch.quantity - take,
+      costPrice: batch.unitPrice,
     });
     remaining -= take;
   }
