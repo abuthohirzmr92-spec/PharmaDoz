@@ -102,7 +102,15 @@ export default function CashierPage() {
     demoProducts,
     startDemoSale,
     addDemoProductToCart,
+    refreshProducts,
   } = useDemoCashier();
+
+  // Refresh product stock + inventory after checkout completes
+  const handleCloseReceipt = useCallback(() => {
+    closeReceipt();
+    refreshProducts();
+    loadInventory();
+  }, [closeReceipt, refreshProducts, loadInventory]);
 
   /* ---- local UI state ---- */
   const [mobileView, setMobileView] = useState<"products" | "cart">("products");
@@ -910,7 +918,9 @@ export default function CashierPage() {
       <ReceiptPreview
         open={isReceiptOpen}
         onClose={() => {
-          closeReceipt();
+          handleCloseReceipt();
+          // Refresh stock from latest batch quantities
+          loadInventory();
           refocusSearch();
         }}
         invoiceNumber={invoiceNumber}

@@ -219,6 +219,27 @@ export function useDemoCashier() {
   /** Stable all-demo-products array reference. */
   const allDemoProducts = useMemo(() => [...DEMO_PRODUCTS], []);
 
+  /** Reload products from Supabase — call after checkout to refresh stock counts. */
+  const refreshProducts = useCallback(() => {
+    if (productRepo.isConnected) {
+      setDbLoading(true);
+      productRepo.getProducts()
+        .then((products) => {
+          setDbProducts(products.map((p) => ({
+            productId: p.id,
+            productName: p.name,
+            unitPrice: p.batches[0]?.sellingPrice ?? 0,
+            stockAvailable: p.totalStock,
+            category: p.category,
+            batchNumber: p.batches[0]?.batchNumber ?? "",
+            expiredDate: p.batches[0]?.expiredDate ?? "",
+          })));
+        })
+        .catch(() => setDbProducts(null))
+        .finally(() => setDbLoading(false));
+    }
+  }, []);
+
   return {
     isDemoMode,
     demoProducts: filteredProducts,
@@ -226,5 +247,6 @@ export function useDemoCashier() {
     categories,
     startDemoSale,
     addDemoProductToCart,
+    refreshProducts,
   } as const;
 }
