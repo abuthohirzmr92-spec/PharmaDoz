@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { useTransactionStore } from "@/store/transaction-store";
@@ -12,6 +12,7 @@ import { exportTableToPdf } from "@/lib/export-pdf";
 import { exportToExcel } from "@/lib/export-excel";
 import { ReportDateFilter } from "./report-date-filter";
 import { ExportBar } from "./export-bar";
+import { InvoiceDetailPanel } from "./invoice-detail-panel";
 import type { DateRange, SortConfig, ExportFormat } from "@/types/report";
 
 const METHOD_LABELS: Record<string, string> = {
@@ -51,6 +52,7 @@ export function SalesTable() {
   const [sort, setSort] = useState<SortConfig>({ key: "createdAt", direction: "desc" });
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [expandedId, setExpandedId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const handleDateChange = (range: DateRange) => {
@@ -187,13 +189,14 @@ export function SalesTable() {
               </th>
               <th className="w-[10%] hidden md:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Bayar</th>
               <th className="w-[8%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Jenis</th>
-              <th className="w-[12%] hidden lg:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Keterangan</th>
+              <th className="w-[6%] hidden lg:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Ktrgn</th>
+              <th className="w-[6%] px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Det</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
             {result.length === 0 ? (
               <tr>
-                <td colSpan={8} className="px-4 py-12 text-center text-sm text-neutral-400">
+                <td colSpan={9} className="px-4 py-12 text-center text-sm text-neutral-400">
                   <ReceiptText className="mx-auto mb-2 h-6 w-6 opacity-40" />
                   Tidak ada transaksi untuk periode ini
                 </td>
@@ -211,8 +214,10 @@ export function SalesTable() {
                   "—";
                 const date = new Date(txn.createdAt);
 
+                const isExpanded = expandedId === txn.id;
                 return (
-                  <tr key={txn.id} className="group">
+                  <React.Fragment key={txn.id}>
+                    <tr className="group">
                     <td className="px-3 py-2.5">
                       <span className="text-xs font-mono font-medium text-neutral-900 dark:text-neutral-50">{txn.invoiceNumber}</span>
                     </td>
@@ -252,7 +257,19 @@ export function SalesTable() {
                     <td className="hidden lg:table-cell px-3 py-2.5">
                       <span className="text-[10px] text-neutral-500">{ket}</span>
                     </td>
+                    <td className="px-3 py-2.5 text-center">
+                      <button
+                        onClick={() => setExpandedId(expandedId === txn.id ? null : txn.id)}
+                        className="text-xs text-neutral-400 hover:text-neutral-600 font-mono"
+                      >
+                        {expandedId === txn.id ? "▲" : "▼"}
+                      </button>
+                    </td>
                   </tr>
+                  {isExpanded && (
+                    <InvoiceDetailPanel items={txn.items} transactionId={txn.id} />
+                  )}
+                  </React.Fragment>
                 );
               })
             )}
