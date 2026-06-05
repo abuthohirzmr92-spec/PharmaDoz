@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { useInventoryStore } from "@/store/inventory-store";
+import { BatchAllocationPanel } from "./batch-allocation-panel";
 import type { TransactionItem } from "@/types/transaction";
 
 interface ItemColumn {
@@ -13,13 +14,14 @@ interface ItemColumn {
 }
 
 const COLUMNS: ItemColumn[] = [
-  { key: "productName", label: "Product",     width: "32%", align: "left",   render: (i) => i.productName },
+  { key: "productName", label: "Product",     width: "28%", align: "left",   render: (i) => i.productName },
   { key: "quantity",    label: "Qty",          width: "8%",  align: "center", render: (i) => String(i.quantity) },
   { key: "unitPrice",   label: "Unit Price",   width: "14%", align: "right",  render: (i) => i.unitPrice.toLocaleString("id-ID") },
   { key: "subtotal",    label: "Revenue",      width: "15%", align: "right",  render: (i) => i.subtotal.toLocaleString("id-ID") },
-  { key: "hpp",         label: "HPP",           width: "15%", align: "right",  render: (_, hpp) => hpp > 0 ? hpp.toLocaleString("id-ID") : "—" },
+  { key: "hpp",         label: "HPP",           width: "14%", align: "right",  render: (_, hpp) => hpp > 0 ? hpp.toLocaleString("id-ID") : "—" },
   { key: "profit",      label: "Profit",        width: "10%", align: "right",  render: (i, hpp) => { const p = i.subtotal - hpp; return hpp > 0 ? (p >= 0 ? "+" : "") + p.toLocaleString("id-ID") : "—"; }},
-  { key: "margin",      label: "Margin",        width: "6%",  align: "center", render: (i, hpp) => hpp > 0 ? Math.round(((i.subtotal - hpp) / i.subtotal) * 100) + "%" : "—" },
+  { key: "margin",      label: "M%",            width: "5%",  align: "center", render: (i, hpp) => hpp > 0 ? Math.round(((i.subtotal - hpp) / i.subtotal) * 100) + "%" : "—" },
+  { key: "expand",      label: "",              width: "6%",  align: "center", render: () => "" },
 ];
 
 interface Props {
@@ -29,6 +31,7 @@ interface Props {
 
 export function InvoiceDetailPanel({ items, transactionId }: Props) {
   const allocations = useInventoryStore((s) => s.saleAllocations);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   // Build per-item HPP map from allocations
   const hppMap = useMemo(() => {
@@ -56,6 +59,14 @@ export function InvoiceDetailPanel({ items, transactionId }: Props) {
     return { sku: items.length, qty, revenue, hpp, profit, margin, hasAllocations };
   }, [items, hppMap, hasAllocations]);
 
+  const toggleItem = (id: string) => {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+
   if (!items.length) return null;
 
   return (
@@ -68,26 +79,50 @@ export function InvoiceDetailPanel({ items, transactionId }: Props) {
                 {COLUMNS.map((col) => (
                   <th key={col.key} className="px-2 py-1.5 font-medium text-neutral-500 whitespace-nowrap"
                     style={{ width: col.width, textAlign: col.align }}>
-                    {col.label}
+                    {col.key === "expand" ? "" : col.label}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
               {items.map((item, idx) => {
-                const itemHpp = hppMap.get(item.id ?? "") ?? 0;
+                const itemId = item.id ?? item.productId ?? String(idx);
+                const itemHpp = hppMap.get(itemId) ?? 0;
+                const isExpanded = expandedItems.has(itemId);
+                const hasBatches = hasAllocations && itemHpp > 0;
                 return (
-                  <tr key={item.productId ?? idx}
-                    data-product-id={item.productId}
-                    data-item-id={item.id}
-                    className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
-                    {COLUMNS.map((col) => (
-                      <td key={col.key} className="px-2 py-1 text-neutral-700 dark:text-neutral-300 whitespace-nowrap"
-                        style={{ textAlign: col.align }}>
-                        {col.render(item, itemHpp)}
-                      </td>
-                    ))}
-                  </tr>
+                  <React.Fragment key={itemId}>
+                    <tr data-product-id={item.productId} data-item-id={item.id}
+                      className="hover:bg-neutral-50 dark:hover:bg-neutral-800/50">
+                      {COLUMNS.map((col) => {
+                        if (col.key === "expand") {
+                          return (
+                            <td key={col.key} className="px-2 py-1 text-center">
+                              {hasBatches && (
+                                <button onClick={() => toggleItem(itemId)}
+                                  className="text-[9px] text-neutral-400 hover:text-neutral-600 font-mono">
+                                  {isExpanded ? "▲" : "▼"}
+                                </button>
+                              )}
+                            </td>
+                          );
+                        }
+                        return (
+                          <td key={col.key} className="px-2 py-1 text-neutral-700 dark:text-neutral-300 whitespace-nowrap"
+                            style={{ textAlign: col.align }}>
+                            {col.render(item, itemHpp)}
+                          </td>
+                        );
+                      })}
+                    </tr>
+                    {isExpanded && (
+                      <BatchAllocationPanel
+                        transactionId={transactionId}
+                        itemId={itemId}
+                        itemHpp={itemHpp}
+                      />
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -104,6 +139,7 @@ export function InvoiceDetailPanel({ items, transactionId }: Props) {
                 <td className="px-2 py-1.5 text-center font-semibold" style={{ color: totals.margin >= 30 ? "#16a34a" : totals.margin >= 10 ? "#d97706" : "#dc2626" }}>
                   {totals.hasAllocations ? totals.margin + "%" : "—"}
                 </td>
+                <td />
               </tr>
             </tfoot>
           </table>

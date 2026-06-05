@@ -47,7 +47,7 @@ interface InventoryState {
   purchaseInvoices: PurchaseInvoice[];
   stockMovements: StockMovement[];
   stockOpnames: StockOpname[];
-  saleAllocations: Array<{ transactionId: string; transactionItemId: string; quantity: number; costPrice: number }>;
+  saleAllocations: Array<{ transactionId: string; transactionItemId: string; batchId: string; batchNumber: string; expiredDate: string | null; quantity: number; costPrice: number }>;
 
   /* Branch context */
   branchId: string | null;
