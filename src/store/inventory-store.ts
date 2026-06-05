@@ -676,9 +676,31 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const newMovements: StockMovement[] = [];
     let updatedBatches = [...state.batches];
 
+    console.log("[DEDUCT-TRACE] deductForSale called. state.batches.length:", state.batches.length);
+    console.log("[DEDUCT-TRACE] state.dataSource:", state.dataSource);
+    console.log("[DEDUCT-TRACE] state.isDemoMode:", state.isDemoMode);
+    if (state.batches.length > 0) {
+      const first = state.batches[0];
+      if (first) {
+        console.log("[DEDUCT-TRACE] First batch sample:", JSON.stringify({
+          id: first.id, productId: first.productId,
+          productName: first.productName, quantity: first.quantity,
+          tenantId: (first as any).tenantId,
+        }));
+      }
+    } else {
+      console.warn("[DEDUCT-TRACE] ⚠️ state.batches is EMPTY! Load demo data first.");
+    }
+
     // Process each cart item
     for (const item of cart) {
       const { productId, quantity } = item;
+      const matchingBatches = updatedBatches.filter((b) => b.productId === productId && b.quantity > 0);
+      console.log("[DEDUCT-TRACE] productId:", productId, "requestedQty:", quantity);
+      console.log("[DEDUCT-TRACE] matchingBatches:", matchingBatches.length, "| all batches:", updatedBatches.length);
+      if (matchingBatches.length === 0 && updatedBatches.length > 0) {
+        console.warn("[DEDUCT-TRACE] ⚠️ No match! Available productIds:", [...new Set(updatedBatches.map(b => b.productId))]);
+      }
 
       // 1. FEFO allocation — which batches to draw from
       const allocations = allocateFefo(updatedBatches, productId, quantity);
