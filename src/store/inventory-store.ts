@@ -27,6 +27,7 @@ import {
 } from "@/lib/inventory-demo";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
+import { logActivity } from "@/lib/audit/activity-logger";
 
 /* ------------------------------------------------------------------ */
 /*  State                                                              */
@@ -257,6 +258,11 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             isDemoMode: false,
             isSubmitting: false,
           });
+          logActivity({
+            action: "purchase.created", resourceType: "purchase_invoice", resourceId: invoice.id,
+            reference: invoice.invoiceNumber,
+            metadata: { totalAmount: invoice.totalAmount, itemCount: invoice.items.length, supplierName: invoice.supplierName },
+          }).catch(() => {});
         } catch {
           set({ isSubmitting: false });
         }
@@ -445,6 +451,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             isDemoMode: false,
             isSubmitting: false,
           });
+          logActivity({
+            action: "opname.created", resourceType: "stock_opname", resourceId: opname.id,
+            reference: `OPN-${opname.id.slice(0, 8)}`,
+            severity: "warning",
+            metadata: { itemCount: opname.items.length, diffCount: opname.items.filter((i: any) => i.difference !== 0).length },
+          }).catch(() => {});
         } catch {
           set({ isSubmitting: false });
         }

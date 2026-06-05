@@ -9,6 +9,7 @@ import { transactionRepo } from "@/lib/repository-instances";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 import { localPersistence } from "@/lib/local-persistence";
 import { getBusinessDayKey } from "@/lib/business-day";
+import { logActivity } from "@/lib/audit/activity-logger";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -296,6 +297,12 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       }
 
       set({ isSubmitting: false, submitError: null });
+      // Log to activity trail (non-blocking)
+      logActivity({
+        action: "sale.created", resourceType: "transaction", resourceId: transactionId,
+        reference: transaction.invoiceNumber,
+        metadata: { total: transaction.subtotal, itemCount: cart.length, paymentMethod: payments[0]?.method, cashierName: transaction.cashierName },
+      }).catch(() => {});
       return { success: true, transactionId };
     } catch (err) {
       const message = err instanceof Error ? err.message : "Gagal menyimpan transaksi.";

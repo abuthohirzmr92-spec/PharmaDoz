@@ -17,7 +17,7 @@ export interface DateRange {
   preset: DatePreset;
 }
 
-export type ReportTab = "sales" | "inventory" | "expired" | "purchase" | "pl" | "products";
+export type ReportTab = "sales" | "inventory" | "expired" | "purchase" | "pl" | "products" | "activity";
 
 export type SortDirection = "asc" | "desc";
 

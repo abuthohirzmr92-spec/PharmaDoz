@@ -8,6 +8,7 @@ import { WalletRepository } from "./repositories/wallet";
 import { PackageRepository } from "./repositories/package";
 import { CapitalRepository } from "./repositories/capital";
 import { SalesReturnRepository } from "./repositories/sales-return";
+import { ActivityLogRepository } from "./repositories/activity-log";
 
 export const productRepo = new ProductRepository();
 export const supplierRepo = new SupplierRepository();
@@ -19,3 +20,4 @@ export const walletRepo = new WalletRepository();
 export const packageRepo = new PackageRepository();
 export const capitalRepo = new CapitalRepository();
 export const salesReturnRepo = new SalesReturnRepository();
+export const activityLogRepo = new ActivityLogRepository();
