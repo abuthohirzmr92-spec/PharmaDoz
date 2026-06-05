@@ -18,6 +18,11 @@ const DashboardStatsGrid = dynamic(
   },
 );
 
+const OwnerKpiCards = dynamic(
+  () => import("@/components/dashboard/owner-kpi-cards").then((m) => m.OwnerKpiCards),
+  { loading: () => <CardSkeleton className="h-[200px]" /> },
+);
+
 const SalesChartCard = dynamic(
   () => import("@/components/dashboard/sales-chart-card").then((m) => m.SalesChartCard),
   {
@@ -77,6 +82,11 @@ export default function DashboardPage() {
       {/* Row 1: Stat cards */}
       <WidgetErrorBoundary title="Ringkasan">
         <DashboardStatsGrid />
+      </WidgetErrorBoundary>
+
+      {/* Row 1b: Owner KPI Cards */}
+      <WidgetErrorBoundary title="Ringkasan Bisnis">
+        <OwnerKpiCards />
       </WidgetErrorBoundary>
 
       {/* Row 2: Sales chart + Top products */}
