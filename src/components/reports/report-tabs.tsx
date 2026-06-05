@@ -1,6 +1,6 @@
 "use client";
 
-import { ReceiptText, Package, AlertTriangle, ShoppingCart, TrendingUp } from "lucide-react";
+import { ReceiptText, Package, AlertTriangle, ShoppingCart, TrendingUp, BarChart3 } from "lucide-react";
 import type { ReportTab } from "@/types/report";
 import { cn } from "@/lib/cn";
 
@@ -10,6 +10,7 @@ const TABS: { key: ReportTab; label: string; icon: typeof ReceiptText }[] = [
   { key: "expired", label: "Kadaluarsa", icon: AlertTriangle },
   { key: "purchase", label: "Pembelian", icon: ShoppingCart },
   { key: "pl", label: "Laba/Rugi", icon: TrendingUp },
+  { key: "products", label: "Produk Analytics", icon: BarChart3 },
 ];
 
 interface ReportTabsProps {

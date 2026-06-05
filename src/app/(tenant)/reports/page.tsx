@@ -8,6 +8,7 @@ import { InventoryReportTable } from "@/components/reports/inventory-report-tabl
 import { ExpiredReportTable } from "@/components/reports/expired-report-table";
 import { PurchaseReportTable } from "@/components/reports/purchase-report-table";
 import { ProfitLossTable } from "@/components/reports/profit-loss-table";
+import { ProductAnalyticsPanel } from "@/components/reports/product-analytics-panel";
 import type { ReportTab } from "@/types/report";
 
 export default function ReportsPage() {
@@ -35,6 +36,7 @@ export default function ReportsPage() {
       {activeTab === "expired" && <ExpiredReportTable />}
       {activeTab === "purchase" && <PurchaseReportTable />}
       {activeTab === "pl" && <ProfitLossTable />}
+      {activeTab === "products" && <ProductAnalyticsPanel />}
     </Container>
   );
 }
