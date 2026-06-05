@@ -244,10 +244,11 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
     };
 
     try {
-      // Persist transaction
+      // Persist transaction — capture DB-returned object with real IDs
+      let dbTransaction: Transaction | null = null;
       if (isSupabaseConnected()) {
         try {
-          await transactionRepo.createTransaction({
+          dbTransaction = await transactionRepo.createTransaction({
             invoiceNumber: transaction.invoiceNumber,
             items: transaction.items,
             payments: transaction.payments,
@@ -258,7 +259,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
             cashierName: transaction.cashierName,
             pharmacyId: transaction.pharmacyId,
           });
-          // Use the DB-returned ID if available
+          // Use the DB-returned ID (dbTransaction.id) for subsequent operations
         } catch (dbErr) {
           console.error("DB transaction persist failed:", dbErr);
           set({ isSubmitting: false, submitError: dbErr instanceof Error ? dbErr.message : "Gagal menyimpan transaksi ke database." });
@@ -266,16 +267,17 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
         }
       }
 
-      // Hook point: deduct inventory with real item IDs
+      // Hook point: deduct inventory with REAL DB transaction + item IDs
       try {
-        console.log("[TXN-TRACE] STEP 7: deductForSale called, items:", transaction.items.length, "ids:", transaction.items.map(i => i.id).join(","));
-        const saleItems = transaction.items.map((item) => ({
-          id: item.id ?? transactionId,
+        const realTxnId = dbTransaction?.id ?? transactionId;
+        const realItems = (dbTransaction?.items ?? transaction.items).map((item) => ({
+          id: item.id ?? realTxnId,
           productId: item.productId,
           productName: item.productName,
           quantity: item.quantity,
         }));
-        await invStore.deductForSale?.(saleItems, transactionId);
+        console.log("[TXN-TRACE] STEP 7: deductForSale called, realTxnId:", realTxnId, "items:", realItems.length);
+        await invStore.deductForSale?.(realItems, realTxnId);
         console.log("[TXN-TRACE] STEP 8: deductForSale completed");
       } catch (err) {
         console.error("[TXN-TRACE] STEP 8 FAILED:", err);
