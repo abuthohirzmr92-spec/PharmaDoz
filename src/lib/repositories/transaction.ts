@@ -95,6 +95,7 @@ export class TransactionRepository extends BaseRepository {
         items: (itemsResult.data || []).map(
           (item: Record<string, unknown>) =>
             ({
+              id: (item as any).id,
               productId: (item as any).product_id,
               productName: (item as any).product_name,
               quantity: (item as any).quantity,
@@ -162,6 +163,7 @@ export class TransactionRepository extends BaseRepository {
       items: (itemsResult.data || []).map(
         (item: Record<string, unknown>) =>
           ({
+            id: (item as any).id,
             productId: (item as any).product_id,
             productName: (item as any).product_name,
             quantity: (item as any).quantity,

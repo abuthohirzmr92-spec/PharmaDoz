@@ -340,12 +340,12 @@ export class InventoryRepository extends BaseRepository {
 
   async getSaleAllocations(
     dateFrom?: string,
-  ): Promise<Array<{ transactionId: string; quantity: number; costPrice: number }>> {
+  ): Promise<Array<{ transactionId: string; transactionItemId: string; quantity: number; costPrice: number }>> {
     if (!this.isConnected) return [];
 
     let query = this.client
       .from("sale_batch_allocations")
-      .select("transaction_id, quantity, cost_price");
+      .select("transaction_id, transaction_item_id, quantity, cost_price");
 
     query = this.withTenantScope(query);
     if (dateFrom) query = query.gte("created_at", dateFrom);
@@ -355,6 +355,7 @@ export class InventoryRepository extends BaseRepository {
 
     return ((data as any[]) ?? []).map((r) => ({
       transactionId: r.transaction_id,
+      transactionItemId: r.transaction_item_id,
       quantity: r.quantity,
       costPrice: r.cost_price,
     }));
