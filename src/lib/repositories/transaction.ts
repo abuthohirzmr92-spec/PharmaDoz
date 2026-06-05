@@ -246,9 +246,8 @@ export class TransactionRepository extends BaseRepository {
               unit_price: item.unitPrice,
               subtotal: item.subtotal,
             };
-            if (this.getTenantId()) {
-              row["tenant_id"] = this.getTenantId();
-            }
+            // NOTE: transaction_items inherits tenant scope from parent
+            // transactions.tenant_id — no separate tenant_id column exists.
             return row;
           }),
         )
@@ -271,9 +270,8 @@ export class TransactionRepository extends BaseRepository {
               ref: pmt.ref ?? null,
               wallet_id: pmt.walletId ?? null,
             };
-            if (this.getTenantId()) {
-              row["tenant_id"] = this.getTenantId();
-            }
+            // NOTE: transaction_payments inherits tenant scope from parent
+            // transactions.tenant_id — no separate tenant_id column exists.
             return row;
           }),
         );
