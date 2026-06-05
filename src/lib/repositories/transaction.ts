@@ -209,6 +209,8 @@ export class TransactionRepository extends BaseRepository {
   }): Promise<Transaction> {
     if (!this.isConnected) throw new Error("Not connected");
 
+    console.log("[TXN-TRACE] STEP 1: begin createTransaction, items:", data.items.length, "payments:", data.payments.length);
+
     // Insert transaction header
     const txnInsert: Record<string, unknown> = {
       pharmacy_id: data.pharmacyId ?? this.branchId,
@@ -223,68 +225,75 @@ export class TransactionRepository extends BaseRepository {
       txnInsert["tenant_id"] = this.getTenantId();
     }
 
+    console.log("[TXN-TRACE] STEP 2: inserting transactions header, payload:", JSON.stringify(txnInsert));
     const { data: txn, error: txnError } = await this.client
       .from("transactions")
       .insert(txnInsert)
       .select()
       .single();
 
-    if (txnError) return this.handleError(txnError, "createTransaction");
+    if (txnError) {
+      console.error("[TXN-TRACE] STEP 2 FAILED:", txnError.code, txnError.message);
+      return this.handleError(txnError, "createTransaction");
+    }
+    console.log("[TXN-TRACE] STEP 2 OK: transaction.id =", (txn as any).id);
 
     // Insert items — return inserted rows to get DB-generated IDs
     let insertedItems: Array<{ id: string; product_id: string; product_name: string; quantity: number; unit_price: number; subtotal: number }> = [];
     if (data.items.length > 0) {
+      const itemsPayload = data.items.map((item) => {
+        const row: Record<string, unknown> = {
+          transaction_id: (txn as any).id,
+          product_id: item.productId,
+          product_name: item.productName,
+          quantity: item.quantity,
+          unit_price: item.unitPrice,
+          subtotal: item.subtotal,
+        };
+        return row;
+      });
+      console.log("[TXN-TRACE] STEP 3: inserting", itemsPayload.length, "items, first:", JSON.stringify(itemsPayload[0]));
       const { data: itemRows, error: itemsError } = await this.client
         .from("transaction_items")
-        .insert(
-          data.items.map((item) => {
-            const row: Record<string, unknown> = {
-              transaction_id: txn.id,
-              product_id: item.productId,
-              product_name: item.productName,
-              quantity: item.quantity,
-              unit_price: item.unitPrice,
-              subtotal: item.subtotal,
-            };
-            // NOTE: transaction_items inherits tenant scope from parent
-            // transactions.tenant_id — no separate tenant_id column exists.
-            return row;
-          }),
-        )
+        .insert(itemsPayload)
         .select("id, product_id, product_name, quantity, unit_price, subtotal");
 
-      if (itemsError) return this.handleError(itemsError, "createTransaction");
+      if (itemsError) {
+        console.error("[TXN-TRACE] STEP 4 FAILED:", itemsError.code, itemsError.message, itemsError.details);
+        return this.handleError(itemsError, "createTransaction");
+      }
+      console.log("[TXN-TRACE] STEP 4 OK:", (itemRows as any[])?.length, "items inserted, IDs:", (itemRows as any[])?.map((i: any) => i.id).join(", "));
       insertedItems = (itemRows as any[]) ?? [];
+    } else {
+      console.warn("[TXN-TRACE] STEP 3 SKIPPED: data.items.length === 0");
     }
 
-    // Insert payments (with optional wallet_id for finance module)
+    // Insert payments
     if (data.payments.length > 0) {
+      const pmtPayload = data.payments.map((pmt) => {
+        const row: Record<string, unknown> = {
+          transaction_id: (txn as any).id,
+          amount: pmt.amount,
+          method: pmt.method,
+          ref: pmt.ref ?? null,
+          wallet_id: pmt.walletId ?? null,
+        };
+        return row;
+      });
+      console.log("[TXN-TRACE] STEP 5: inserting", pmtPayload.length, "payments, first:", JSON.stringify(pmtPayload[0]));
       const { error: paymentsError } = await this.client
         .from("transaction_payments")
-        .insert(
-          data.payments.map((pmt) => {
-            const row: Record<string, unknown> = {
-              transaction_id: txn.id,
-              amount: pmt.amount,
-              method: pmt.method,
-              ref: pmt.ref ?? null,
-              wallet_id: pmt.walletId ?? null,
-            };
-            // NOTE: transaction_payments inherits tenant scope from parent
-            // transactions.tenant_id — no separate tenant_id column exists.
-            return row;
-          }),
-        );
+        .insert(pmtPayload);
 
-      if (paymentsError)
+      if (paymentsError) {
+        console.error("[TXN-TRACE] STEP 6 FAILED:", paymentsError.code, paymentsError.message);
         return this.handleError(paymentsError, "createTransaction");
+      }
+      console.log("[TXN-TRACE] STEP 6 OK: payments inserted");
 
-      // Record wallet transactions for each payment that has a wallet_id
+      // Record wallet transactions
       try {
-        // Use dynamic import to avoid circular dependency; walletRepo is singleton
         const { walletRepo } = await import("@/lib/repository-instances");
-
-        // Set same tenant context on walletRepo
         walletRepo.setTenantContext(this["tenantContext"], this["branchId"]);
 
         for (const pmt of data.payments) {

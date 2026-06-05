@@ -268,7 +268,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
 
       // Hook point: deduct inventory with real item IDs
       try {
-        // Pass item IDs from the created transaction for accurate batch allocation
+        console.log("[TXN-TRACE] STEP 7: deductForSale called, items:", transaction.items.length, "ids:", transaction.items.map(i => i.id).join(","));
         const saleItems = transaction.items.map((item) => ({
           id: item.id ?? transactionId,
           productId: item.productId,
@@ -276,8 +276,9 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
           quantity: item.quantity,
         }));
         await invStore.deductForSale?.(saleItems, transactionId);
-      } catch {
-        // deduction not yet wired — safe to continue
+        console.log("[TXN-TRACE] STEP 8: deductForSale completed");
+      } catch (err) {
+        console.error("[TXN-TRACE] STEP 8 FAILED:", err);
       }
 
       // Add to transaction store
