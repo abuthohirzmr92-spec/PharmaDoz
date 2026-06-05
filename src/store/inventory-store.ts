@@ -672,9 +672,21 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   deductForSale: async (cart, transactionId) => {
     const state = get();
+
+    // Guard: wait for inventory to load if still loading
+    if (state.dataSource === "loading" || state.dataSource === "demo") {
+      console.log("[DEDUCT-TRACE] Inventory not loaded (dataSource:", state.dataSource, "). Loading now...");
+      await get().loadDemoData();
+      // Re-read state after load
+      const loaded = get();
+      if (loaded.batches.length === 0) {
+        throw new Error("Inventory gagal dimuat. Tidak dapat melanjutkan transaksi. Silakan coba lagi.");
+      }
+    }
+
     const now = new Date().toISOString();
     const newMovements: StockMovement[] = [];
-    let updatedBatches = [...state.batches];
+    let updatedBatches = [...get().batches];
 
     console.log("[DEDUCT-TRACE] deductForSale called. state.batches.length:", state.batches.length);
     console.log("[DEDUCT-TRACE] state.dataSource:", state.dataSource);

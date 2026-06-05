@@ -4,9 +4,10 @@
 /*  Imports                                                           */
 /* ------------------------------------------------------------------ */
 
-import { useState, useMemo, useRef, useCallback } from "react";
+import { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useCashierStore, type PaymentMethod } from "@/store/cashier-store";
 import { useHoldCartStore } from "@/store/hold-cart-store";
+import { useInventoryStore } from "@/store/inventory-store";
 import { useDemoCashier, type DemoProduct } from "@/hooks/use-demo-cashier";
 import { useCashierHotkeys, HOTKEY_HINTS } from "@/hooks/use-cashier-hotkeys";
 import { TransactionStatus } from "@/components/cashier/transaction-status";
@@ -67,6 +68,10 @@ function isNearExpiry(dateStr: string): boolean {
 /* ------------------------------------------------------------------ */
 
 export default function CashierPage() {
+  /* ---- preload inventory for checkout ---- */
+  const loadInventory = useInventoryStore((s) => s.loadDemoData);
+  useEffect(() => { loadInventory(); }, []);
+
   /* ---- store ---- */
   const {
     cart,
