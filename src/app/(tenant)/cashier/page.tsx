@@ -70,7 +70,7 @@ function isNearExpiry(dateStr: string): boolean {
 export default function CashierPage() {
   /* ---- preload inventory for checkout ---- */
   const loadInventory = useInventoryStore((s) => s.loadDemoData);
-  useEffect(() => { loadInventory(); }, []);
+  useEffect(() => { console.log("[VERIFY] Cashier mounted — calling loadInventory()"); loadInventory(); }, []);
 
   /* ---- store ---- */
   const {

@@ -841,12 +841,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   loadDemoData: async () => {
     const state = get();
+    console.log("[VERIFY] loadDemoData() called. isLoading:", state.isLoading, "dataSource:", state.dataSource, "batches.length:", state.batches.length);
     // Prevent concurrent parallel loads from multiple components
-    if (state.isLoading) return;
+    if (state.isLoading) { console.log("[VERIFY] loadDemoData SKIP: isLoading"); return; }
     // Skip if already loaded from database
-    if (state.dataSource === "database" && state.batches.length > 0) return;
+    if (state.dataSource === "database" && state.batches.length > 0) { console.log("[VERIFY] loadDemoData SKIP: already loaded"); return; }
     // Skip if already loaded demo data
-    if (state.dataSource === "demo" && state.batches.length > 0) return;
+    if (state.dataSource === "demo" && state.batches.length > 0) { console.log("[VERIFY] loadDemoData SKIP: demo already loaded"); return; }
 
     // No tenant context — skip Supabase query (e.g. super admin with no tenant).
     // Without tenant_id the query is unfiltered and may hit RLS blocks.
@@ -887,6 +888,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           inventoryRepo.getStockOpnames(),
           inventoryRepo.getSaleAllocations(),
         ]);
+
+        console.log("[VERIFY] loadDemoData() DB LOAD COMPLETE — products:", products.length, "batches:", allBatches.length, "invoices:", purchaseInvoices.length);
 
         set({
           batches: allBatches,
