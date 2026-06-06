@@ -1,8 +1,12 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, ShoppingCart } from "lucide-react";
+import { toast } from "sonner";
 import { useInventoryStore } from "@/store/inventory-store";
+import { exportTableToPdf } from "@/lib/export-pdf";
+import { ExportBar } from "./export-bar";
+import { useReportExport } from "@/hooks/use-report-export";
 import type { PurchaseStatus } from "@/types/inventory";
 import { cn } from "@/lib/cn";
 import { formatCurrencyID } from "@/lib/date-utils";
@@ -25,6 +29,11 @@ export function PurchaseReportTable() {
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
   const invoices = useInventoryStore((s) => s.purchaseInvoices);
+  const { tableRef, isExporting, handleExport } = useReportExport({
+    title: "Laporan Pembelian",
+    getExcelData: () => invoices.map((inv) => ({ supplier: inv.supplierName, invoice: inv.invoiceNumber, status: inv.status, total: inv.totalAmount, paid: inv.paidAmount })),
+    getExcelColumns: () => [{ key: "supplier", label: "Supplier" }, { key: "invoice", label: "Invoice" }, { key: "status", label: "Status" }, { key: "total", label: "Total" }, { key: "paid", label: "Dibayar" }],
+  });
 
   useEffect(() => {
     if (batches.length === 0) load();
@@ -65,7 +74,7 @@ export function PurchaseReportTable() {
   }
 
   return (
-    <div>
+    <div ref={tableRef}>
       {/* Summary */}
       <div className="mb-4 rounded-xl border border-red-200 bg-red-50 px-3 py-2 dark:border-red-900 dark:bg-red-950/30">
         <span className="text-[10px] font-medium text-red-600">

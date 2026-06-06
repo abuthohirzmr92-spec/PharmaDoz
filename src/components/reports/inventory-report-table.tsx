@@ -1,9 +1,13 @@
 "use client";
 
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { Search, Package } from "lucide-react";
+import { toast } from "sonner";
 import { useInventoryStore } from "@/store/inventory-store";
 import { buildInventoryProducts } from "@/lib/inventory-demo";
+import { exportTableToPdf } from "@/lib/export-pdf";
+import { exportToExcel } from "@/lib/export-excel";
+import { ExportBar } from "./export-bar";
 import { cn } from "@/lib/cn";
 
 export function InventoryReportTable() {
@@ -11,6 +15,18 @@ export function InventoryReportTable() {
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
   const products = useMemo(() => buildInventoryProducts(batches), [batches]);
+  const tableRef = useRef<HTMLDivElement>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async (format: "pdf" | "excel") => {
+    setIsExporting(true);
+    try {
+      if (format === "pdf" && tableRef.current) await exportTableToPdf(tableRef.current, "Laporan Inventory");
+      else exportToExcel(products as any, [{ key: "name", label: "Produk" }, { key: "category", label: "Kategori" }, { key: "totalStock", label: "Stok" }, { key: "minStock", label: "Min" }], "Laporan_Inventory");
+      toast.success(`${format.toUpperCase()} berhasil`);
+    } catch (e: any) { toast.error(e?.message ?? "Gagal ekspor"); }
+    finally { setIsExporting(false); }
+  };
 
   useEffect(() => {
     if (batches.length === 0) load();
@@ -56,8 +72,8 @@ export function InventoryReportTable() {
   };
 
   return (
-    <div>
-      {/* Filters */}
+    <div ref={tableRef}>
+      {/* Filters + Export */}
       <div className="mb-4 flex flex-wrap items-center gap-3">
         <div className="relative flex-1 min-w-[200px]">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400" />
