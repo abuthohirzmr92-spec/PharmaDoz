@@ -7,6 +7,8 @@ import { useInventoryStore } from "@/store/inventory-store";
 import { computeHppFromAllocations } from "@/lib/finance/hpp-engine";
 import { resolveDateRange, formatCurrencyID } from "@/lib/date-utils";
 import { ReportDateFilter } from "./report-date-filter";
+import { ExportBar } from "./export-bar";
+import { useReportExport } from "@/hooks/use-report-export";
 import type { DateRange } from "@/types/report";
 import { cn } from "@/lib/cn";
 
@@ -27,6 +29,8 @@ export function ProfitLossTable() {
 
   useEffect(() => { if (!isLoaded) loadTxns(); }, [isLoaded, loadTxns]);
   useEffect(() => { if (batches.length === 0) loadInv(); }, [batches.length, loadInv]);
+
+  const { tableRef, isExporting, handleExport } = useReportExport({ title: "Laporan Laba Rugi" });
 
   const [dateRange, setDateRange] = useState<DateRange>(() => resolveDateRange("thisMonth"));
   const [groupBy, setGroupBy] = useState<GroupBy>("day");
@@ -93,7 +97,7 @@ export function ProfitLossTable() {
   }
 
   return (
-    <div>
+    <div ref={tableRef}>
       {/* Summary */}
       <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
         {([
@@ -125,6 +129,8 @@ export function ProfitLossTable() {
           ))}
         </div>
       </div>
+
+      <ExportBar onExport={handleExport} isExporting={isExporting} />
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">

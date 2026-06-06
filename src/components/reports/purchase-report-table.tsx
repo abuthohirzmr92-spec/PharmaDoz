@@ -110,6 +110,7 @@ export function PurchaseReportTable() {
             className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-9 pr-3 text-sm placeholder-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
           />
         </div>
+        <ExportBar onExport={handleExport} isExporting={isExporting} />
       </div>
 
       {/* Table */}

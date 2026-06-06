@@ -4,6 +4,8 @@ import { useState, useMemo, useEffect } from "react";
 import { Search } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { getDaysUntilExpiry, getExpiredBatches, getNearExpiryBatches } from "@/lib/inventory-demo";
+import { ExportBar } from "./export-bar";
+import { useReportExport } from "@/hooks/use-report-export";
 import { cn } from "@/lib/cn";
 
 type ViewMode = "expired" | "h30" | "h14" | "all";
@@ -23,6 +25,8 @@ export function ExpiredReportTable() {
   useEffect(() => {
     if (batches.length === 0) load();
   }, [batches.length, load]);
+
+  const { tableRef, isExporting, handleExport } = useReportExport({ title: "Laporan Kadaluarsa" });
 
   const [viewMode, setViewMode] = useState<ViewMode>("all");
   const [searchQuery, setSearchQuery] = useState("");
@@ -87,7 +91,7 @@ export function ExpiredReportTable() {
   }
 
   return (
-    <div>
+    <div ref={tableRef}>
       {/* Summary bar */}
       <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {([
@@ -136,6 +140,8 @@ export function ExpiredReportTable() {
           />
         </div>
       </div>
+
+      <ExportBar onExport={handleExport} isExporting={isExporting} />
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
