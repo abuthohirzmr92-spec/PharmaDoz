@@ -3,6 +3,8 @@
 import { useState, useMemo } from "react";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
+import { ExportBar } from "./export-bar";
+import { useReportExport } from "@/hooks/use-report-export";
 import { cn } from "@/lib/cn";
 import { TrendingUp, DollarSign, Clock, AlertTriangle, Package, Skull } from "lucide-react";
 
@@ -20,6 +22,7 @@ export function ProductAnalyticsPanel() {
   const { transactions } = useTransactionStore();
   const { batches, saleAllocations } = useInventoryStore();
   const [period, setPeriod] = useState<Period>("30d");
+  const { tableRef, isExporting, handleExport } = useReportExport({ title: "Analytics Produk" });
 
   const cutoff = useMemo(() => {
     if (period === "all") return new Date(0);
@@ -148,9 +151,10 @@ export function ProductAnalyticsPanel() {
   ];
 
   return (
-    <div className="space-y-6">
+    <div ref={tableRef} className="space-y-6">
       {/* Date Filter */}
       <div className="flex items-center gap-2">
+        <ExportBar onExport={handleExport} isExporting={isExporting} />
         <span className="text-xs text-neutral-500">Filter (Penjualan):</span>
         <div className="flex rounded-lg border border-neutral-200 p-0.5 dark:border-neutral-700">
           {periods.map((p) => (

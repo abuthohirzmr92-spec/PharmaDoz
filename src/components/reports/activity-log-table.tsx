@@ -1,7 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { activityLogRepo } from "@/lib/repository-instances";
+import { ExportBar } from "./export-bar";
+import { exportTableToPdf } from "@/lib/export-pdf";
+import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import type { ActivityLogEntry } from "@/lib/repositories/activity-log";
 
@@ -24,6 +27,8 @@ const SEVERITIES = ["", "info", "warning", "critical"];
 export function ActivityLogTable() {
   const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isExporting, setIsExporting] = useState(false);
+  const tableRef = useRef<HTMLDivElement>(null);
   const [page, setPage] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
   const [actionFilter, setActionFilter] = useState("");
@@ -51,10 +56,20 @@ export function ActivityLogTable() {
 
   const totalPages = Math.max(1, Math.ceil(totalCount / limit));
 
+  const handleExport = async (format: "pdf" | "excel") => {
+    setIsExporting(true);
+    try {
+      if (format === "pdf" && tableRef.current) await exportTableToPdf(tableRef.current, "Log Aktivitas");
+      toast.success(`${format.toUpperCase()} berhasil`);
+    } catch (e: any) { toast.error(e?.message ?? "Gagal ekspor"); }
+    finally { setIsExporting(false); }
+  };
+
   return (
-    <div>
-      {/* Filters */}
+    <div ref={tableRef}>
+      {/* Filters + Export */}
       <div className="mb-4 flex flex-wrap gap-2 items-center">
+        <ExportBar onExport={handleExport} isExporting={isExporting} />
         <select value={actionFilter} onChange={(e) => { setActionFilter(e.target.value); setPage(1); }}
           className="rounded-lg border border-neutral-200 bg-white px-2 py-1 text-xs dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50">
           {ACTIONS.map((a) => <option key={a} value={a}>{a ? ACTION_LABELS[a] ?? a : "Semua Tipe"}</option>)}
