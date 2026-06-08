@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   LayoutDashboard,
   Package,
@@ -13,6 +13,7 @@ import { useInventoryStore, type InventoryTab } from "@/store/inventory-store";
 import { buildInventoryProducts } from "@/lib/inventory-demo";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { Container } from "@/components/shared/container";
+import { BranchContextSelector } from "@/components/shared/branch-context-selector";
 import { InventoryDashboardCards } from "@/components/inventory/inventory-dashboard-cards";
 import { InventoryStockTable } from "@/components/inventory/inventory-stock-table";
 import { InventoryPurchasePanel } from "@/components/inventory/inventory-purchase-panel";
@@ -36,6 +37,7 @@ export function InventoryPageContent() {
   const setActiveTab = useInventoryStore((s) => s.setActiveTab);
   const searchQuery = useInventoryStore((s) => s.searchQuery);
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
+  const [branchId, setBranchId] = useState<string>("all");
 
   useEffect(() => {
     if (checkDemoMode()) {
@@ -45,13 +47,16 @@ export function InventoryPageContent() {
 
   return (
     <Container>
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-          Inventory
-        </h1>
-        <p className="mt-1 text-sm text-neutral-500">
-          Kelola stok, batch FEFO, pembelian, mutasi, monitoring kadaluarsa, dan stock opname.
-        </p>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+            Inventory
+          </h1>
+          <p className="mt-1 text-sm text-neutral-500">
+            Kelola stok, batch FEFO, pembelian, mutasi, monitoring kadaluarsa, dan stock opname.
+          </p>
+        </div>
+        <BranchContextSelector value={branchId} onChange={setBranchId} />
       </div>
 
       <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-800 dark:bg-neutral-900">
@@ -118,6 +123,7 @@ export function InventoryPageContent() {
   );
 }
 
+// TODO: pass branchId to sub-components when schema supports pharmacy_id on batches
 function TabContent({ tab }: { tab: InventoryTab }) {
   switch (tab) {
     case "dashboard":

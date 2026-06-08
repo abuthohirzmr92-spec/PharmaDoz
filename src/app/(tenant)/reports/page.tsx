@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Container } from "@/components/shared/container";
 import { ReportTabs } from "@/components/reports/report-tabs";
-import { ReportBranchFilter } from "@/components/reports/report-branch-filter";
+import { BranchContextSelector } from "@/components/shared/branch-context-selector";
 import { SalesTable } from "@/components/reports/sales-table";
 import { InventoryReportTable } from "@/components/reports/inventory-report-table";
 import { ExpiredReportTable } from "@/components/reports/expired-report-table";
@@ -30,7 +30,7 @@ export default function ReportsPage() {
 
       {/* Branch filter — shared across all report tabs */}
       <div className="mb-4">
-        <ReportBranchFilter selectedBranchId={branchId} onChange={setBranchId} />
+        <BranchContextSelector value={branchId} onChange={setBranchId} />
       </div>
 
       {/* Tab bar */}

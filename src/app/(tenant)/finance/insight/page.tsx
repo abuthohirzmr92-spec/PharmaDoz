@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import { Container } from "@/components/shared/container";
+import { BranchContextSelector } from "@/components/shared/branch-context-selector";
 import { WidgetErrorBoundary } from "@/components/shared/widget-error-boundary";
 import { CardSkeleton } from "@/components/shared/card-skeleton";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
@@ -42,6 +43,7 @@ export default function InsightPage() {
   const { wallets, loadWallets } = useWalletStore();
   const loadInventory = useInventoryStore((s) => (s as any).loadBatches);
 
+  const [branchId, setBranchId] = useState<string>("all");
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<"deposit" | "withdrawal">("deposit");
 
@@ -69,11 +71,12 @@ export default function InsightPage() {
   return (
     <Container>
       <div className="mb-6">
-        <div className="flex items-center justify-between">
+        <div className="flex items-start justify-between gap-4">
           <div>
             <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">Insight Bisnis</h1>
             <p className="mt-1 text-sm text-neutral-500">Modal, profit, dan performa bisnis Anda</p>
           </div>
+          <BranchContextSelector value={branchId} onChange={setBranchId} />
           {canManage && (
             <div className="flex items-center gap-2">
               <button onClick={() => { setModalType("withdrawal"); setModalOpen(true); }}
