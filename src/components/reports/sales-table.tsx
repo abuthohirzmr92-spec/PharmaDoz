@@ -68,8 +68,8 @@ function buildFlatRows(
     txn.items.forEach((item, i) => {
       const itemId = item.id ?? "";
       const hpp = itemHppMap?.get(itemId) ?? 0;
-      const profit = hasAllocs ? item.subtotal - hpp : 0;
-      const margin = item.subtotal > 0 && hasAllocs ? Math.round((profit / item.subtotal) * 100) : 0;
+      const profit = item.subtotal - hpp; // hpp=0 when no allocation → profit=revenue correctly
+      const margin = item.subtotal > 0 && hpp > 0 ? Math.round((profit / item.subtotal) * 100) : 0;
 
       rows.push({
         invoiceNumber: txn.invoiceNumber,
@@ -229,8 +229,8 @@ export function SalesTable({ branchId = "all" }: { branchId?: string }) {
           qty: r.quantity,
           unitPrice: r.unitPrice,
           revenue: r.revenue,
-          hpp: r.hasAllocations ? r.hpp : 0,
-          profit: r.hasAllocations ? r.profit : 0,
+          hpp: r.hpp,
+          profit: r.profit,
           margin: r.hasAllocations ? `${r.margin}%` : "—",
           totalInvoice: r.totalInvoice,
         }));
