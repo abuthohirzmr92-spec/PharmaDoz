@@ -10,7 +10,8 @@ import { exportToExcel } from "@/lib/export-excel";
 import { ExportBar } from "./export-bar";
 import { cn } from "@/lib/cn";
 
-export function InventoryReportTable() {
+// TODO: inventory branch isolation pending schema support — product_batches has no pharmacy_id column
+export function InventoryReportTable({ branchId: _branchId = "all" }: { branchId?: string }) {
   const isLoading = useInventoryStore((s) => s.isLoading);
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);

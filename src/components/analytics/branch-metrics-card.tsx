@@ -6,10 +6,11 @@
 /* ------------------------------------------------------------------ */
 
 import { useEffect, useMemo } from "react";
-import { DollarSign, Receipt, TrendingUp, Store } from "lucide-react";
+import { DollarSign, Receipt, TrendingUp, Store, ArrowRight } from "lucide-react";
 import { useAnalyticsStore } from "@/store/analytics-store";
 import { useBranchStore } from "@/store/branch-store";
 import { useTransactionStore } from "@/store/transaction-store";
+import { useInventoryStore } from "@/store/inventory-store";
 import { cn } from "@/lib/cn";
 import { formatCurrencyID } from "@/lib/date-utils";
 import { CardSkeleton } from "@/components/shared/card-skeleton";
@@ -21,6 +22,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 
 interface BranchMetricsCardProps {
   branchId: string;
+  onDetail?: (branchId: string) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -56,13 +58,15 @@ function MetricRow({ item }: { item: MetricItem }) {
 /*  Main Component                                                     */
 /* ------------------------------------------------------------------ */
 
-export function BranchMetricsCard({ branchId }: BranchMetricsCardProps) {
+export function BranchMetricsCard({ branchId, onDetail }: BranchMetricsCardProps) {
   const branchMetrics = useAnalyticsStore((s) => s.branchMetrics);
   const computeBranchMetrics = useAnalyticsStore((s) => s.computeBranchMetrics);
   const isLoading = useAnalyticsStore((s) => s.isLoading);
 
   const txnsLoaded = useTransactionStore((s) => s.isLoaded);
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
+  const transactions = useTransactionStore((s) => s.transactions);
+  const saleAllocations = useInventoryStore((s) => s.saleAllocations);
 
   const branches = useBranchStore((s) => s.branches);
 
@@ -88,6 +92,24 @@ export function BranchMetricsCard({ branchId }: BranchMetricsCardProps) {
     () => branchMetrics.find((m) => m.branchId === branchId),
     [branchMetrics, branchId],
   );
+
+  /* ---- Per-branch profit from allocations ---- */
+  const profit = useMemo(() => {
+    const branchTxns = transactions.filter((t) => t.pharmacyId === branchId);
+    const branchTxnIds = new Set(branchTxns.map((t) => t.id));
+    const allocMap = new Map<string, number>();
+    for (const a of saleAllocations) {
+      if (branchTxnIds.has(a.transactionId)) {
+        allocMap.set(
+          a.transactionId,
+          (allocMap.get(a.transactionId) ?? 0) + a.quantity * a.costPrice,
+        );
+      }
+    }
+    const totalHpp = Array.from(allocMap.values()).reduce((s, v) => s + v, 0);
+    const revenue = branchTxns.reduce((s, t) => s + t.total, 0);
+    return revenue - totalHpp;
+  }, [transactions, saleAllocations, branchId]);
 
   /* ---- Loading state ---- */
   if (isLoading || !txnsLoaded) {
@@ -119,14 +141,14 @@ export function BranchMetricsCard({ branchId }: BranchMetricsCardProps) {
       value: formatCurrencyID(metric.totalSales),
     },
     {
+      label: "Profit",
+      icon: TrendingUp,
+      value: profit > 0 || metric.totalSales > 0 ? formatCurrencyID(profit) : "—",
+    },
+    {
       label: "Jumlah Transaksi",
       icon: Receipt,
       value: metric.transactionCount,
-    },
-    {
-      label: "Rata-rata Transaksi",
-      icon: TrendingUp,
-      value: formatCurrencyID(metric.averageTransactionValue),
     },
     {
       label: "Nilai Stok",
@@ -150,6 +172,19 @@ export function BranchMetricsCard({ branchId }: BranchMetricsCardProps) {
           <MetricRow key={item.label} item={item} />
         ))}
       </div>
+
+      {/* Detail button (optional) */}
+      {onDetail && (
+        <div className="border-t border-neutral-100 px-4 py-3 dark:border-neutral-800">
+          <button
+            onClick={() => onDetail(branchId)}
+            className="flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 py-2 text-xs font-medium text-brand-700 hover:bg-brand-100 transition-colors dark:border-brand-800 dark:bg-brand-950 dark:text-brand-300 dark:hover:bg-brand-900"
+          >
+            Detail
+            <ArrowRight className="h-3.5 w-3.5" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

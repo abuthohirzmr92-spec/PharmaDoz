@@ -5,7 +5,13 @@ import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useWalletStore } from "@/store/wallet-store";
 
-export type MetricPeriod = "today" | "week" | "month";
+export type MetricPeriod = "today" | "week" | "month" | "custom";
+
+export interface MetricFilter {
+  period: MetricPeriod;
+  customFrom?: string; // ISO date string
+  customTo?: string;   // ISO date string
+}
 
 export interface OwnerMetrics {
   // Financial (period-filtered)
@@ -33,17 +39,26 @@ export interface OwnerMetrics {
   alerts: Array<{ type: "expiry" | "reorder" | "slow" | "dead"; message: string }>;
 }
 
-export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
+export function useOwnerMetrics(filter: MetricPeriod | MetricFilter = "today", branchId?: string): OwnerMetrics {
   const { transactions } = useTransactionStore();
   const { batches, saleAllocations } = useInventoryStore();
   const { wallets } = useWalletStore();
 
+  // Normalize filter to { period, customFrom?, customTo? }
+  const f: MetricFilter = typeof filter === "string" ? { period: filter } : filter;
+
   const cutoff = useMemo(() => {
     const now = new Date();
-    if (period === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    if (period === "week") return new Date(now.getTime() - 7 * 86400000);
+    if (f.period === "today") return new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    if (f.period === "week") return new Date(now.getTime() - 7 * 86400000);
+    if (f.period === "custom" && f.customFrom) return new Date(f.customFrom);
     return new Date(now.getFullYear(), now.getMonth(), 1);
-  }, [period]);
+  }, [f.period, f.customFrom]);
+
+  const cutoffEnd = useMemo(() => {
+    if (f.period === "custom" && f.customTo) return new Date(f.customTo + "T23:59:59.999");
+    return new Date(); // now for preset periods
+  }, [f.period, f.customTo]);
 
   // ---- Financial KPIs ----
   const { revenue, profit, hpp, txnCount, topSelling, topProfitable } = useMemo(() => {
@@ -58,9 +73,17 @@ export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
       allocMap.set(a.transactionId, m);
     }
 
+    // Track branch product IDs for inventory filtering
+    const branchProductIds = new Set<string>();
+
     for (const txn of transactions) {
       if (new Date(txn.createdAt) < cutoff) continue;
+      if (new Date(txn.createdAt) > cutoffEnd) continue;
+      if (branchId && txn.pharmacyId !== branchId) continue;
       cnt++;
+      for (const item of txn.items) {
+        branchProductIds.add(item.productId);
+      }
       rev += txn.total;
       const itemMap = allocMap.get(txn.id);
       let txnHpp = 0;
@@ -86,7 +109,7 @@ export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
       .sort((a, b) => b.profit - a.profit).slice(0, 5);
 
     return { revenue: rev, profit: pft, hpp: cost, txnCount: cnt, topSelling: topS, topProfitable: topP };
-  }, [transactions, saleAllocations, cutoff]);
+  }, [transactions, saleAllocations, cutoff, cutoffEnd, branchId]);
 
   // ---- Wallet KPIs ----
   const { cashBalance, bankBalance, totalFunds } = useMemo(() => {
@@ -99,6 +122,8 @@ export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
   }, [wallets]);
 
   // ---- Inventory KPIs ----
+  // When branchId is set, approximate branch-scoped inventory by filtering
+  // to products that appear in that branch\'s transactions.
   const inventoryStats = useMemo(() => {
     const now = new Date();
     const nearCutoff = new Date(now.getTime() + 90 * 86400000);
@@ -112,6 +137,7 @@ export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
     const soldProductIds = new Set<string>();
     const lastSaleMap = new Map<string, Date>();
     for (const txn of transactions) {
+      if (branchId && txn.pharmacyId !== branchId) continue;
       for (const item of txn.items) {
         soldProductIds.add(item.productId);
         const cur = lastSaleMap.get(item.productId);
@@ -122,6 +148,8 @@ export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
 
     for (const b of batches) {
       if (b.quantity <= 0) continue;
+      // Approximate branch filter: only count products sold in this branch
+      if (branchId && !soldProductIds.has(b.productId)) continue;
       const val = b.quantity * b.unitPrice;
       invVal += val;
 
@@ -144,7 +172,7 @@ export function useOwnerMetrics(period: MetricPeriod = "today"): OwnerMetrics {
       deadStockCount: deadCnt, deadStockValue: deadVal,
       reorderNeededCount: reorderCnt,
     };
-  }, [batches, transactions]);
+  }, [batches, transactions, branchId]);
 
   const inv = inventoryStats;
 

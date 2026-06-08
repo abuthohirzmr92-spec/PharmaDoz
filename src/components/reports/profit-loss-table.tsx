@@ -18,17 +18,23 @@ function periodKey(date: string, groupBy: GroupBy): string {
   return groupBy === "month" ? date.slice(0, 7) : date.slice(0, 10);
 }
 
-export function ProfitLossTable() {
+export function ProfitLossTable({ branchId = "all" }: { branchId?: string }) {
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isLoaded = useTransactionStore((s) => s.isLoaded);
   const isLoading = useTransactionStore((s) => s.isLoading);
-  const transactions = useTransactionStore((s) => s.transactions);
+  const allTransactions = useTransactionStore((s) => s.transactions);
   const loadInv = useInventoryStore((s) => s.loadDemoData);
   const allocations = useInventoryStore((s) => s.saleAllocations);
   const batches = useInventoryStore((s) => s.batches);
 
   useEffect(() => { if (!isLoaded) loadTxns(); }, [isLoaded, loadTxns]);
   useEffect(() => { if (batches.length === 0) loadInv(); }, [batches.length, loadInv]);
+
+  // Branch filter
+  const transactions = useMemo(
+    () => branchId !== "all" ? allTransactions.filter((t) => t.pharmacyId === branchId) : allTransactions,
+    [allTransactions, branchId],
+  );
 
   const { tableRef, isExporting, handleExport } = useReportExport({ title: "Laporan Laba Rugi" });
 

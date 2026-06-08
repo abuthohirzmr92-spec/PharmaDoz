@@ -14,7 +14,7 @@ const METHOD_LABELS: Record<string, string> = {
   transfer: "Transfer",
 };
 
-export function RecentTransactionsCard() {
+export function RecentTransactionsCard({ branchId }: { branchId?: string }) {
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isLoaded = useTransactionStore((s) => s.isLoaded);
   const isLoading = useTransactionStore((s) => s.isLoading);
@@ -24,7 +24,13 @@ export function RecentTransactionsCard() {
     if (!isLoaded) loadTxns();
   }, [isLoaded, loadTxns]);
 
-  const recent = useMemo(() => transactions.slice(0, 5), [transactions]);
+  // Filter by branch when branchId is set
+  const filteredTxns = useMemo(
+    () => branchId ? transactions.filter((t) => t.pharmacyId === branchId) : transactions,
+    [transactions, branchId],
+  );
+
+  const recent = useMemo(() => filteredTxns.slice(0, 5), [filteredTxns]);
 
   if (isLoading) {
     return <TableSkeleton rows={5} />;

@@ -7,7 +7,9 @@ import { cn } from "@/lib/cn";
 import { formatCurrencyID } from "@/lib/date-utils";
 import { CardSkeleton } from "@/components/shared/card-skeleton";
 
-export function SupplierDebtCard() {
+// Note: branchId filtering is not yet supported for purchase invoices
+// as PurchaseInvoice has no pharmacyId field in the current data model.
+export function SupplierDebtCard({ branchId: _branchId }: { branchId?: string }) {
   const isLoading = useInventoryStore((s) => s.isLoading);
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);

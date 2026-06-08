@@ -1,10 +1,10 @@
 "use client";
 
 import React, { useState, useMemo, useEffect, useRef } from "react";
-import { Search, ChevronUp, ChevronDown, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
+import { Search, ChevronLeft, ChevronRight, ReceiptText } from "lucide-react";
 import { toast } from "sonner";
 import { useTransactionStore } from "@/store/transaction-store";
-import { useWalletStore } from "@/store/wallet-store";
+import { useInventoryStore } from "@/store/inventory-store";
 import { applyFilters, defaultFilters } from "@/lib/report-filters";
 import { resolveDateRange, formatCurrencyID, formatDateID } from "@/lib/date-utils";
 import { cn } from "@/lib/cn";
@@ -12,36 +12,116 @@ import { exportTableToPdf } from "@/lib/export-pdf";
 import { exportToExcel } from "@/lib/export-excel";
 import { ReportDateFilter } from "./report-date-filter";
 import { ExportBar } from "./export-bar";
-import { InvoiceDetailPanel } from "./invoice-detail-panel";
 import type { DateRange, SortConfig, ExportFormat } from "@/types/report";
+import type { Transaction, TransactionItem } from "@/types/transaction";
+
+/* ------------------------------------------------------------------ */
+/*  Types                                                              */
+/* ------------------------------------------------------------------ */
+
+interface FlatSalesRow {
+  // Invoice metadata (set only on first row of each invoice)
+  invoiceNumber: string;
+  tanggal: string;
+  waktu: string;
+  kasir: string;
+  metodeBayar: string;
+  totalInvoice: number;
+  itemCount: number;
+  isFirst: boolean; // true = render rowSpan cells
+
+  // Product data (every row)
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  revenue: number;
+  hpp: number;
+  profit: number;
+  margin: number;
+  hasAllocations: boolean;
+
+  // needed for export/pagination
+  txnId: string;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
 
 const METHOD_LABELS: Record<string, string> = {
   cash: "Tunai", debit: "Debit", credit: "Kredit", qris: "QRIS", transfer: "Transfer",
 };
 
-const PAGE_SIZE = 25;
+const INVOICE_PAGE_SIZE = 5; // invoices per page
 
-function SortIcon({ column, sort }: { column: string; sort: SortConfig }) {
-  if (sort.key !== column) return <ChevronDown className="h-3 w-3 text-neutral-300" />;
-  return sort.direction === "asc" ? (
-    <ChevronUp className="h-3 w-3 text-brand-600" />
-  ) : (
-    <ChevronDown className="h-3 w-3 text-brand-600" />
-  );
+function buildFlatRows(
+  transactions: Transaction[],
+  hppMap: Map<string, Map<string, number>>,
+): FlatSalesRow[] {
+  const rows: FlatSalesRow[] = [];
+  for (const txn of transactions) {
+    const date = new Date(txn.createdAt);
+    const methods = txn.payments.map((p) => METHOD_LABELS[p.method] ?? "—").join(", ");
+    const itemHppMap = hppMap.get(txn.id);
+    const hasAllocs = itemHppMap && itemHppMap.size > 0;
+
+    txn.items.forEach((item, i) => {
+      const itemId = item.id ?? "";
+      const hpp = itemHppMap?.get(itemId) ?? 0;
+      const profit = hasAllocs ? item.subtotal - hpp : 0;
+      const margin = item.subtotal > 0 && hasAllocs ? Math.round((profit / item.subtotal) * 100) : 0;
+
+      rows.push({
+        invoiceNumber: txn.invoiceNumber,
+        tanggal: date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" }),
+        waktu: date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" }),
+        kasir: txn.cashierName,
+        metodeBayar: methods || "—",
+        totalInvoice: txn.total,
+        itemCount: txn.items.length,
+        isFirst: i === 0,
+        productName: item.productName,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        revenue: item.subtotal,
+        hpp,
+        profit,
+        margin,
+        hasAllocations: hasAllocs ?? false,
+        txnId: txn.id,
+      });
+    });
+  }
+  return rows;
 }
 
-export function SalesTable() {
+/* ------------------------------------------------------------------ */
+/*  Profit color helper                                                 */
+/* ------------------------------------------------------------------ */
+
+function profitColor(profit: number, hasAllocs: boolean): string {
+  if (!hasAllocs) return "text-neutral-400";
+  if (profit > 0) return "text-green-600 dark:text-green-400";
+  if (profit < 0) return "text-red-600 dark:text-red-400";
+  return "text-neutral-500";
+}
+
+function profitBg(profit: number): string {
+  if (profit > 0) return "bg-green-50 dark:bg-green-950/30";
+  if (profit < 0) return "bg-red-50 dark:bg-red-950/30";
+  return "";
+}
+
+/* ------------------------------------------------------------------ */
+/*  Main Component                                                      */
+/* ------------------------------------------------------------------ */
+
+export function SalesTable({ branchId = "all" }: { branchId?: string }) {
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isLoaded = useTransactionStore((s) => s.isLoaded);
   const isLoading = useTransactionStore((s) => s.isLoading);
   const transactions = useTransactionStore((s) => s.transactions);
-  const wallets = useWalletStore((s) => s.wallets);
-
-  const walletNames = useMemo(() => {
-    const map: Record<string, string> = {};
-    for (const w of wallets) map[w.id] = w.name;
-    return map;
-  }, [wallets]);
+  const saleAllocations = useInventoryStore((s) => s.saleAllocations);
 
   useEffect(() => {
     if (!isLoaded) loadTxns();
@@ -52,9 +132,21 @@ export function SalesTable() {
   const [sort, setSort] = useState<SortConfig>({ key: "createdAt", direction: "desc" });
   const [page, setPage] = useState(1);
   const [isExporting, setIsExporting] = useState(false);
-  const [expandedId, setExpandedId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
+  /* ---- Build per-item HPP map from allocations ---- */
+  const hppMap = useMemo(() => {
+    const map = new Map<string, Map<string, number>>();
+    for (const a of saleAllocations) {
+      if (!a.transactionItemId) continue;
+      const inner = map.get(a.transactionId) ?? new Map<string, number>();
+      inner.set(a.transactionItemId, (inner.get(a.transactionItemId) ?? 0) + a.quantity * a.costPrice);
+      map.set(a.transactionId, inner);
+    }
+    return map;
+  }, [saleAllocations]);
+
+  /* ---- Filter transactions ---- */
   const handleDateChange = (range: DateRange) => {
     setDateRange(range);
     setPage(1);
@@ -65,53 +157,61 @@ export function SalesTable() {
     setPage(1);
   };
 
-  const filters = useMemo(
-    () => ({
-      ...defaultFilters(dateRange),
-      searchQuery,
-      sort,
-      page,
-      pageSize: PAGE_SIZE,
-    }),
-    [dateRange, searchQuery, sort, page],
-  );
-
-  const { result, totalCount } = useMemo(
-    () => applyFilters(transactions, filters),
-    [transactions, filters],
-  );
-
-  // Full filtered data (all pages) for export
-  const allFiltered = useMemo(() => {
-    const all = applyFilters(transactions, {
+  // Get all filtered transactions (no pagination — we paginate invoices ourselves)
+  const allFilteredTxns = useMemo(() => {
+    let source = transactions;
+    // Branch filter — transactions have pharmacyId
+    if (branchId !== "all") {
+      source = source.filter((t) => t.pharmacyId === branchId);
+    }
+    const all = applyFilters(source, {
       ...defaultFilters(dateRange),
       searchQuery,
       sort,
       page: 1,
-      pageSize: totalCount,
+      pageSize: source.length,  // get ALL matches
     });
     return all.result;
-  }, [transactions, dateRange, searchQuery, sort, totalCount]);
+  }, [transactions, dateRange, searchQuery, sort, branchId]);
 
-  const totalPages = Math.max(1, Math.ceil(totalCount / PAGE_SIZE));
+  /* ---- Build flat rows from filtered transactions ---- */
+  const allFlatRows = useMemo(
+    () => buildFlatRows(allFilteredTxns, hppMap),
+    [allFilteredTxns, hppMap],
+  );
 
-  if (isLoading) {
-    return (
-      <div className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
-        <div className="flex items-center justify-center py-12">
-          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-        </div>
-      </div>
-    );
-  }
+  /* ---- Paginate at invoice level (keep invoices together) ---- */
+  const paginatedRows = useMemo(() => {
+    // Group by invoice
+    const invoiceGroups: FlatSalesRow[][] = [];
+    let currentGroup: FlatSalesRow[] = [];
+    for (const row of allFlatRows) {
+      if (row.isFirst && currentGroup.length > 0) {
+        invoiceGroups.push(currentGroup);
+        currentGroup = [];
+      }
+      currentGroup.push(row);
+    }
+    if (currentGroup.length > 0) invoiceGroups.push(currentGroup);
 
-  const handleSort = (key: string) => {
-    setSort((prev) =>
-      prev.key === key
-        ? { key, direction: prev.direction === "asc" ? "desc" : "asc" }
-        : { key, direction: "desc" },
-    );
-  };
+    // Paginate invoice groups
+    const totalInvoices = invoiceGroups.length;
+    const totalInvoicePages = Math.max(1, Math.ceil(totalInvoices / INVOICE_PAGE_SIZE));
+    const startIdx = (page - 1) * INVOICE_PAGE_SIZE;
+    const endIdx = Math.min(startIdx + INVOICE_PAGE_SIZE, totalInvoices);
+
+    return {
+      rows: invoiceGroups.slice(startIdx, endIdx).flat(),
+      totalInvoices,
+      totalInvoicePages,
+    };
+  }, [allFlatRows, page]);
+
+  /* ---- Export: full data (all invoices, all items) ---- */
+  const allExportRows = useMemo(
+    () => buildFlatRows(allFilteredTxns, hppMap),
+    [allFilteredTxns, hppMap],
+  );
 
   const handleExport = async (format: ExportFormat) => {
     setIsExporting(true);
@@ -120,27 +220,33 @@ export function SalesTable() {
         await exportTableToPdf(tableRef.current, "Laporan Penjualan");
         toast.success("PDF berhasil diunduh");
       } else if (format === "excel") {
-        const excelData = allFiltered.map((t) => ({
-          invoiceNumber: t.invoiceNumber,
-          tanggal: formatDateID(t.createdAt),
-          kasir: t.cashierName,
-          item: t.items.reduce((s, i) => s + i.quantity, 0),
-          subtotal: t.subtotal,
-          diskon: t.discount,
-          pajak: t.tax,
-          total: t.total,
-          metode: t.payments.map((p) => p.method).join(", "),
+        const excelData = allExportRows.map((r) => ({
+          invoiceNumber: r.invoiceNumber,
+          tanggal: r.tanggal,
+          kasir: r.kasir,
+          metodeBayar: r.metodeBayar,
+          product: r.productName,
+          qty: r.quantity,
+          unitPrice: r.unitPrice,
+          revenue: r.revenue,
+          hpp: r.hasAllocations ? r.hpp : 0,
+          profit: r.hasAllocations ? r.profit : 0,
+          margin: r.hasAllocations ? `${r.margin}%` : "—",
+          totalInvoice: r.totalInvoice,
         }));
         exportToExcel(excelData, [
           { key: "invoiceNumber", label: "Invoice" },
           { key: "tanggal", label: "Tanggal" },
           { key: "kasir", label: "Kasir" },
-          { key: "item", label: "Item" },
-          { key: "subtotal", label: "Subtotal" },
-          { key: "diskon", label: "Diskon" },
-          { key: "pajak", label: "Pajak" },
-          { key: "total", label: "Total" },
-          { key: "metode", label: "Metode Bayar" },
+          { key: "metodeBayar", label: "Metode Bayar" },
+          { key: "product", label: "Produk" },
+          { key: "qty", label: "Qty" },
+          { key: "unitPrice", label: "Harga Satuan" },
+          { key: "revenue", label: "Revenue" },
+          { key: "hpp", label: "HPP" },
+          { key: "profit", label: "Profit" },
+          { key: "margin", label: "Margin %" },
+          { key: "totalInvoice", label: "Total Invoice" },
         ], "Laporan_Penjualan");
         toast.success("Excel berhasil diunduh");
       }
@@ -150,6 +256,17 @@ export function SalesTable() {
       setIsExporting(false);
     }
   };
+
+  /* ---- Loading state ---- */
+  if (isLoading) {
+    return (
+      <div className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-900">
+        <div className="flex items-center justify-center py-12">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -172,106 +289,164 @@ export function SalesTable() {
       </div>
 
       {/* Table */}
-      <div ref={tableRef} className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
-        <table className="w-full table-fixed">
+      <div
+        ref={tableRef}
+        className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800"
+      >
+        <table className="w-full min-w-[1100px]">
           <thead>
             <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-              <th className="w-[16%] cursor-pointer px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" onClick={() => handleSort("invoiceNumber")}>
-                <span className="inline-flex items-center gap-1">Invoice <SortIcon sort={sort} column="invoiceNumber" /></span>
+              <th className="w-[10%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Invoice
               </th>
-              <th className="w-[12%] hidden sm:table-cell cursor-pointer px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" onClick={() => handleSort("createdAt")}>
-                <span className="inline-flex items-center gap-1">Tanggal <SortIcon sort={sort} column="createdAt" /></span>
+              <th className="w-[9%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Tanggal
               </th>
-              <th className="w-[10%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Kasir</th>
-              <th className="w-[6%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Item</th>
-              <th className="w-[11%] cursor-pointer px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500" onClick={() => handleSort("total")}>
-                <span className="inline-flex items-center gap-1">Total <SortIcon sort={sort} column="total" /></span>
+              <th className="w-[8%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Kasir
               </th>
-              <th className="w-[10%] hidden md:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Bayar</th>
-              <th className="w-[8%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Jenis</th>
-              <th className="w-[6%] hidden lg:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Ktrgn</th>
-              <th className="w-[6%] px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500">Det</th>
+              <th className="w-[8%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Bayar
+              </th>
+              <th className="w-[12%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Produk
+              </th>
+              <th className="w-[5%] px-2 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Qty
+              </th>
+              <th className="w-[10%] px-2 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Harga
+              </th>
+              <th className="w-[10%] px-2 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Revenue
+              </th>
+              <th className="w-[9%] px-2 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                HPP
+              </th>
+              <th className="w-[9%] px-2 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Profit
+              </th>
+              <th className="w-[4%] px-1 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                M%
+              </th>
+              <th className="w-[9%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Total Inv
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {result.length === 0 ? (
+            {paginatedRows.rows.length === 0 ? (
               <tr>
-                <td colSpan={9} className="px-4 py-12 text-center text-sm text-neutral-400">
+                <td colSpan={12} className="px-4 py-12 text-center text-sm text-neutral-400">
                   <ReceiptText className="mx-auto mb-2 h-6 w-6 opacity-40" />
                   Tidak ada transaksi untuk periode ini
                 </td>
               </tr>
             ) : (
-              result.map((txn) => {
-                const pmt = txn.payments[0];
-                const method = pmt?.method ?? "";
-                const methodLabel = METHOD_LABELS[method] ?? "—";
-                const walletId = pmt?.walletId;
-                const walletName = walletId ? (walletNames[walletId] ?? null) : null;
-                const ket =
-                  method === "transfer" ? (walletName ?? "—") :
-                  method === "qris" ? "QRIS" :
-                  "—";
-                const date = new Date(txn.createdAt);
-
-                const isExpanded = expandedId === txn.id;
-                return (
-                  <React.Fragment key={txn.id}>
-                    <tr className="group">
-                    <td className="px-3 py-2.5">
-                      <span className="text-xs font-mono font-medium text-neutral-900 dark:text-neutral-50">{txn.invoiceNumber}</span>
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5">
-                      <div className="text-xs text-neutral-500">
-                        <div>{date.toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}</div>
-                        <div className="text-[10px] text-neutral-400">{date.toLocaleTimeString("id-ID", { hour: "2-digit", minute: "2-digit" })}</div>
-                      </div>
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-2.5">
-                      <span className="text-xs text-neutral-600 dark:text-neutral-400">{txn.cashierName}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{txn.items.length}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-right">
-                      <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">{formatCurrencyID(txn.total)}</span>
-                    </td>
-                    <td className="hidden md:table-cell px-3 py-2.5 text-right">
-                      {txn.payments.length === 1 && pmt ? (
-                        <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">{formatCurrencyID(pmt.amount)}</span>
-                      ) : (
-                        <div className="text-[10px] text-neutral-400">
-                          {txn.payments.map((p, i) => <div key={i}>{formatCurrencyID(p.amount)}</div>)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="hidden sm:table-cell px-3 py-2.5">
-                      <span className={cn(
-                        "rounded px-1.5 py-0.5 text-[10px] font-medium",
-                        method === "transfer" ? "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" :
-                        method === "cash" ? "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" :
-                        method === "qris" ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" :
-                        "bg-neutral-50 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400"
-                      )}>{methodLabel}</span>
-                    </td>
-                    <td className="hidden lg:table-cell px-3 py-2.5">
-                      <span className="text-[10px] text-neutral-500">{ket}</span>
-                    </td>
-                    <td className="px-3 py-2.5 text-center">
-                      <button
-                        onClick={() => setExpandedId(expandedId === txn.id ? null : txn.id)}
-                        className="text-xs text-neutral-400 hover:text-neutral-600 font-mono"
-                      >
-                        {expandedId === txn.id ? "▲" : "▼"}
-                      </button>
-                    </td>
-                  </tr>
-                  {isExpanded && (
-                    <InvoiceDetailPanel items={txn.items} transactionId={txn.id} />
+              paginatedRows.rows.map((row, idx) => (
+                <tr
+                  key={`${row.txnId}-${row.productName}-${idx}`}
+                  className={cn(
+                    "group",
+                    !row.isFirst && "border-neutral-50 dark:border-neutral-800/50",
                   )}
-                  </React.Fragment>
-                );
-              })
+                >
+                  {/* Invoice metadata — rowSpan on first row */}
+                  {row.isFirst && (
+                    <>
+                      <td
+                        rowSpan={row.itemCount}
+                        className="px-3 py-2.5 align-top border-r border-neutral-100 dark:border-neutral-800"
+                      >
+                        <span className="text-xs font-mono font-medium text-neutral-900 dark:text-neutral-50">
+                          {row.invoiceNumber}
+                        </span>
+                      </td>
+                      <td
+                        rowSpan={row.itemCount}
+                        className="px-3 py-2.5 align-top border-r border-neutral-100 dark:border-neutral-800"
+                      >
+                        <div className="text-xs text-neutral-600 dark:text-neutral-400">
+                          <div>{row.tanggal}</div>
+                          <div className="text-[10px] text-neutral-400">{row.waktu}</div>
+                        </div>
+                      </td>
+                      <td
+                        rowSpan={row.itemCount}
+                        className="px-3 py-2.5 align-top border-r border-neutral-100 dark:border-neutral-800"
+                      >
+                        <span className="text-xs text-neutral-600 dark:text-neutral-400">
+                          {row.kasir}
+                        </span>
+                      </td>
+                      <td
+                        rowSpan={row.itemCount}
+                        className="px-3 py-2.5 align-top border-r border-neutral-100 dark:border-neutral-800"
+                      >
+                        <span className="text-[10px] text-neutral-500">{row.metodeBayar}</span>
+                      </td>
+                    </>
+                  )}
+
+                  {/* Product data — every row */}
+                  <td className="px-3 py-2.5">
+                    <span className="text-xs text-neutral-800 dark:text-neutral-200">
+                      {row.productName}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2.5 text-right">
+                    <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+                      {row.quantity}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2.5 text-right">
+                    <span className="text-xs tabular-nums text-neutral-600 dark:text-neutral-400">
+                      {row.unitPrice.toLocaleString("id-ID")}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2.5 text-right">
+                    <span className="text-xs font-medium tabular-nums text-neutral-700 dark:text-neutral-300">
+                      {formatCurrencyID(row.revenue)}
+                    </span>
+                  </td>
+                  <td className="px-2 py-2.5 text-right">
+                    <span className="text-xs tabular-nums text-neutral-500">
+                      {row.hasAllocations ? formatCurrencyID(row.hpp) : "—"}
+                    </span>
+                  </td>
+                  <td className={cn("px-2 py-2.5 text-right", profitBg(row.profit))}>
+                    <span
+                      className={cn(
+                        "text-xs font-semibold tabular-nums",
+                        profitColor(row.profit, row.hasAllocations),
+                      )}
+                    >
+                      {row.hasAllocations
+                        ? (row.profit >= 0 ? "+" : "") + formatCurrencyID(row.profit)
+                        : "—"}
+                    </span>
+                  </td>
+                  <td className={cn("px-1 py-2.5 text-center", profitBg(row.profit))}>
+                    <span
+                      className={cn("text-xs font-medium tabular-nums", profitColor(row.profit, row.hasAllocations))}
+                    >
+                      {row.hasAllocations ? row.margin + "%" : "—"}
+                    </span>
+                  </td>
+
+                  {/* Total Invoice — rowSpan on first row */}
+                  {row.isFirst && (
+                    <td
+                      rowSpan={row.itemCount}
+                      className="px-3 py-2.5 align-top text-right border-l border-neutral-100 dark:border-neutral-800"
+                    >
+                      <span className="text-xs font-semibold tabular-nums text-neutral-900 dark:text-neutral-50">
+                        {formatCurrencyID(row.totalInvoice)}
+                      </span>
+                    </td>
+                  )}
+                </tr>
+              ))
             )}
           </tbody>
         </table>
@@ -280,7 +455,9 @@ export function SalesTable() {
       {/* Pagination */}
       <div className="mt-3 flex items-center justify-between text-xs text-neutral-500">
         <span>
-          Menampilkan {Math.min((page - 1) * PAGE_SIZE + 1, totalCount)}–{Math.min(page * PAGE_SIZE, totalCount)} dari {totalCount}
+          Menampilkan {Math.min((page - 1) * INVOICE_PAGE_SIZE + 1, paginatedRows.totalInvoices)}–
+          {Math.min(page * INVOICE_PAGE_SIZE, paginatedRows.totalInvoices)} dari{" "}
+          {paginatedRows.totalInvoices} invoice
         </span>
         <div className="flex items-center gap-2">
           <button
@@ -291,11 +468,11 @@ export function SalesTable() {
             <ChevronLeft className="h-3.5 w-3.5" />
           </button>
           <span className="tabular-nums">
-            {page} / {totalPages}
+            {page} / {paginatedRows.totalInvoicePages}
           </span>
           <button
-            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-            disabled={page >= totalPages}
+            onClick={() => setPage((p) => Math.min(paginatedRows.totalInvoicePages, p + 1))}
+            disabled={page >= paginatedRows.totalInvoicePages}
             className="rounded-lg border border-neutral-200 p-1.5 disabled:opacity-30 dark:border-neutral-700"
           >
             <ChevronRight className="h-3.5 w-3.5" />

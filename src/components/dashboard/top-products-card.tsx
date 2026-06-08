@@ -2,22 +2,28 @@
 
 import { useEffect, useMemo } from "react";
 import { useTransactionStore } from "@/store/transaction-store";
+import { computeTopProducts } from "@/lib/report-aggregate";
 import { formatCurrencyID } from "@/lib/date-utils";
 import { cn } from "@/lib/cn";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
 
-export function TopProductsCard() {
+export function TopProductsCard({ branchId }: { branchId?: string }) {
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isLoaded = useTransactionStore((s) => s.isLoaded);
   const isLoading = useTransactionStore((s) => s.isLoading);
   const transactions = useTransactionStore((s) => s.transactions);
-  const getTopProducts = useTransactionStore((s) => s.getTopProducts);
 
   useEffect(() => {
     if (!isLoaded) loadTxns();
   }, [isLoaded, loadTxns]);
 
-  const top = useMemo(() => getTopProducts(5), [getTopProducts, transactions]);
+  // Filter by branch when branchId is set
+  const filteredTxns = useMemo(
+    () => branchId ? transactions.filter((t) => t.pharmacyId === branchId) : transactions,
+    [transactions, branchId],
+  );
+
+  const top = useMemo(() => computeTopProducts(filteredTxns, 5), [filteredTxns]);
 
   if (isLoading) {
     return <TableSkeleton rows={5} />;

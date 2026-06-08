@@ -7,7 +7,7 @@ import { computeSalesTrend } from "@/lib/report-aggregate";
 import { resolveDateRange } from "@/lib/date-utils";
 import { CardSkeleton } from "@/components/shared/card-skeleton";
 
-export function SalesChartCard() {
+export function SalesChartCard({ branchId }: { branchId?: string }) {
   const [mounted, setMounted] = useState(false);
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isLoaded = useTransactionStore((s) => s.isLoaded);
@@ -22,8 +22,14 @@ export function SalesChartCard() {
     if (!isLoaded) loadTxns();
   }, [isLoaded, loadTxns]);
 
+  // Filter by branch when branchId is set
+  const filteredTxns = useMemo(
+    () => branchId ? transactions.filter((t) => t.pharmacyId === branchId) : transactions,
+    [transactions, branchId],
+  );
+
   const range = useMemo(() => resolveDateRange("last7"), []);
-  const trend = useMemo(() => computeSalesTrend(transactions, range), [transactions, range]);
+  const trend = useMemo(() => computeSalesTrend(filteredTxns, range), [filteredTxns, range]);
   const hasData = useMemo(() => trend.some((d) => d.total > 0), [trend]);
 
   if (!mounted || isLoading) {

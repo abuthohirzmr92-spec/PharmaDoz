@@ -18,10 +18,16 @@ function formatDate(iso: string | null): string {
   return new Date(iso).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" });
 }
 
-export function ProductAnalyticsPanel() {
-  const { transactions } = useTransactionStore();
+export function ProductAnalyticsPanel({ branchId = "all" }: { branchId?: string }) {
+  const { transactions: allTransactions } = useTransactionStore();
   const { batches, saleAllocations } = useInventoryStore();
   const [period, setPeriod] = useState<Period>("30d");
+
+  // Branch filter
+  const transactions = useMemo(
+    () => branchId !== "all" ? allTransactions.filter((t) => t.pharmacyId === branchId) : allTransactions,
+    [allTransactions, branchId],
+  );
   const { tableRef, isExporting, handleExport } = useReportExport({ title: "Analytics Produk" });
 
   const cutoff = useMemo(() => {

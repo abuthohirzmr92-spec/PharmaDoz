@@ -24,7 +24,8 @@ const ACTION_LABELS: Record<string, string> = {
 const ACTIONS = ["", "sale.created", "purchase.created", "return.created", "opname.created", "wallet.transfer"];
 const SEVERITIES = ["", "info", "warning", "critical"];
 
-export function ActivityLogTable() {
+// TODO: branch isolation pending schema support — activity_logs has no pharmacy_id column
+export function ActivityLogTable({ branchId: _branchId = "all" }: { branchId?: string }) {
   const [logs, setLogs] = useState<ActivityLogEntry[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isExporting, setIsExporting] = useState(false);

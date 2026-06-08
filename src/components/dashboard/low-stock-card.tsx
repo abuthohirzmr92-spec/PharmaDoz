@@ -1,26 +1,43 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { AlertTriangle } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
+import { useTransactionStore } from "@/store/transaction-store";
 import { cn } from "@/lib/cn";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
 
-export function LowStockCard() {
+export function LowStockCard({ branchId }: { branchId?: string }) {
   const isLoading = useInventoryStore((s) => s.isLoading);
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
   const getLowStock = useInventoryStore((s) => s.getLowStockProducts);
+  const transactions = useTransactionStore((s) => s.transactions);
 
   useEffect(() => {
     if (batches.length === 0) load();
   }, [batches.length, load]);
 
+  // Approximate branch filter: only show products that appear in branch transactions
+  const branchProductIds = useMemo(() => {
+    if (!branchId) return null;
+    const ids = new Set<string>();
+    for (const txn of transactions) {
+      if (txn.pharmacyId === branchId) {
+        for (const item of txn.items) ids.add(item.productId);
+      }
+    }
+    return ids;
+  }, [transactions, branchId]);
+
   if (isLoading) {
     return <TableSkeleton rows={5} />;
   }
 
-  const products = getLowStock();
+  let products = getLowStock();
+  if (branchProductIds) {
+    products = products.filter((p) => branchProductIds.has(p.id));
+  }
 
   return (
     <div className="rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900">

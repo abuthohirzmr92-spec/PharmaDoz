@@ -17,7 +17,8 @@ const VIEWS: { key: ViewMode; label: string }[] = [
   { key: "h14", label: "H-14" },
 ];
 
-export function ExpiredReportTable() {
+// TODO: inventory branch isolation pending schema support — product_batches has no pharmacy_id column
+export function ExpiredReportTable({ branchId: _branchId = "all" }: { branchId?: string }) {
   const isLoading = useInventoryStore((s) => s.isLoading);
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);

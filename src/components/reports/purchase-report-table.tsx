@@ -24,7 +24,8 @@ const STATUS_FILTERS = [
   { label: "Belum", value: "unpaid" },
 ];
 
-export function PurchaseReportTable() {
+// TODO: branch isolation pending schema support — purchase_invoices has no pharmacy_id column
+export function PurchaseReportTable({ branchId: _branchId = "all" }: { branchId?: string }) {
   const isLoading = useInventoryStore((s) => s.isLoading);
   const load = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);

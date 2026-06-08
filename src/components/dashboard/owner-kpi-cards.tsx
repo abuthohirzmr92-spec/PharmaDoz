@@ -1,7 +1,6 @@
 "use client";
 
-import { useState } from "react";
-import { useOwnerMetrics, type MetricPeriod } from "@/hooks/use-owner-metrics";
+import { useOwnerMetrics, type MetricFilter } from "@/hooks/use-owner-metrics";
 import { cn } from "@/lib/cn";
 import { DollarSign, TrendingUp, ShoppingCart, Wallet, Banknote, Landmark, Package, AlertTriangle, Clock, Skull, Bell, ArrowDown, ArrowUp } from "lucide-react";
 
@@ -24,29 +23,16 @@ function KpiCard({ label, value, sub, icon: Icon, color }: {
   );
 }
 
-export function OwnerKpiCards() {
-  const [period, setPeriod] = useState<MetricPeriod>("today");
-  const m = useOwnerMetrics(period);
+interface Props {
+  filter: MetricFilter;
+  branchId?: string;
+}
 
-  const periods: { key: MetricPeriod; label: string }[] = [
-    { key: "today", label: "Hari Ini" }, { key: "week", label: "Minggu Ini" }, { key: "month", label: "Bulan Ini" },
-  ];
+export function OwnerKpiCards({ filter, branchId }: Props) {
+  const m = useOwnerMetrics(filter, branchId);
 
   return (
     <div className="space-y-4">
-      {/* Period toggle */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300">Ringkasan Bisnis</h2>
-        <div className="flex rounded-lg border border-neutral-200 bg-neutral-50 p-0.5 dark:border-neutral-700 dark:bg-neutral-900">
-          {periods.map((p) => (
-            <button key={p.key} onClick={() => setPeriod(p.key)}
-              className={cn("px-2.5 py-1 text-[11px] font-medium rounded-md", period === p.key ? "bg-white shadow-sm text-neutral-900 dark:bg-neutral-800 dark:text-neutral-50" : "text-neutral-500")}>
-              {p.label}
-            </button>
-          ))}
-        </div>
-      </div>
-
       {/* Financial KPIs */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <KpiCard label="Revenue" value={formatRupiah(m.revenue)} sub={`${m.transactionCount} transaksi`} icon={DollarSign} color="border-blue-200 dark:border-blue-800" />
