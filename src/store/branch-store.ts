@@ -45,6 +45,7 @@ interface BranchState {
 
   loadBranches: (tenantId: string) => Promise<void>;
   setActiveBranch: (branch: Branch) => void;
+  clearActiveBranch: () => void;
   restoreActiveBranch: () => void;
   clear: () => void;
 }
@@ -116,6 +117,17 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
       }
     }
     set({ activeBranch: branch, error: null });
+  },
+
+  clearActiveBranch: () => {
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // Silently ignore storage errors
+      }
+    }
+    set({ activeBranch: null });
   },
 
   restoreActiveBranch: () => {
