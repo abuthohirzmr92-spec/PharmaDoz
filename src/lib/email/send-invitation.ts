@@ -20,18 +20,24 @@ export async function sendInvitationEmail({
   roleLabel,
   branchName,
 }: SendInvitationParams): Promise<boolean> {
+  console.log("[email] 📧 sendInvitationEmail() CALLED", { to, token: token.slice(0, 8) + "...", tenantName, roleLabel, branchName });
+
   if (!RESEND_API_KEY) {
-    console.warn("[email] RESEND_API_KEY not set — skipping email send");
+    console.warn("[email] ❌ RESEND_API_KEY not set — skipping email send");
     return false;
   }
 
+  console.log("[email] ✅ RESEND_API_KEY found (length:", RESEND_API_KEY.length, ")");
+  console.log("[email] FROM:", RESEND_FROM);
   const resend = new Resend(RESEND_API_KEY);
   const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"}/invite/accept?token=${token}`;
+  console.log("[email] Invite URL:", inviteUrl);
 
   const branchInfo = branchName ? `Cabang: ${branchName}` : "Semua Cabang";
 
   try {
-    await resend.emails.send({
+    console.log("[email] 📤 Sending email to:", to);
+    const response = await resend.emails.send({
       from: RESEND_FROM,
       to,
       subject: `Undangan bergabung ke ${tenantName}`,
@@ -52,9 +58,11 @@ export async function sendInvitationEmail({
         </div>
       `,
     });
+    console.log("[email] ✅ Resend response:", JSON.stringify(response));
     return true;
-  } catch (err) {
-    console.error("[email] Failed to send invitation email:", err);
+  } catch (err: any) {
+    console.error("[email] ❌ Resend error:", err?.message ?? err);
+    console.error("[email] ❌ Full error:", JSON.stringify(err, null, 2));
     return false;
   }
 }

@@ -126,13 +126,15 @@ export async function inviteUser(input: {
   }
 
   // Fire email asynchronously — don't block the response
+  console.log("[invite] 📧 Triggering email send for:", input.email, "token:", inviteData.token?.slice(0, 8) + "...");
   sendInvitationEmail({
     to: input.email,
     token: inviteData.token,
     tenantName: input.tenantName ?? "Apotek",
     roleLabel: ROLE_LABELS[input.role] ?? input.role,
     branchName: input.branchName ?? null,
-  }).catch((err) => console.error("[invite] Email send failed:", err));
+  }).then(() => console.log("[invite] ✅ Email send completed"))
+    .catch((err) => console.error("[invite] ❌ Email send failed:", err));
 
   return { success: true, token: inviteData.token };
 }
@@ -476,13 +478,15 @@ export async function resendInvitation(
   }
 
   // Fire email asynchronously
+  console.log("[invite] 📧 Triggering RESEND email for:", existing.email, "token:", newInvite.token?.slice(0, 8) + "...");
   sendInvitationEmail({
     to: existing.email,
     token: newInvite.token,
     tenantName: tenantName ?? "Apotek",
     roleLabel: ROLE_LABELS[existing.role as TenantRole] ?? existing.role,
     branchName: branchName ?? null,
-  }).catch((err) => console.error("[invite] Resend email failed:", err));
+  }).then(() => console.log("[invite] ✅ Resend email completed"))
+    .catch((err) => console.error("[invite] ❌ Resend email failed:", err));
 
   return { success: true, token: newInvite.token };
 }

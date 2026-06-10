@@ -63,7 +63,7 @@ export class ProductRepository extends BaseRepository {
       .is("deleted_at", null);
 
     query = this.withTenantScope(query);
-    query = this.withBranchScope(query);
+    // Products are tenant-scoped (shared catalog) — no branch filter
 
     if (filters?.categoryId)
       query = query.eq("category_id", filters.categoryId);
@@ -133,7 +133,7 @@ export class ProductRepository extends BaseRepository {
       .eq("id", id);
 
     query = this.withTenantScope(query);
-    query = this.withBranchScope(query);
+    // Products are tenant-scoped (shared catalog) — no branch filter
 
     const { data, error } = await query.single();
 
@@ -200,7 +200,7 @@ export class ProductRepository extends BaseRepository {
       .eq("barcode", barcode);
 
     query = this.withTenantScope(query);
-    query = this.withBranchScope(query);
+    // Products are tenant-scoped (shared catalog) — no branch filter
 
     const { data, error } = await query.maybeSingle();
 
@@ -372,7 +372,7 @@ export class ProductRepository extends BaseRepository {
       .is("deleted_at", null);
 
     query = this.withTenantScope(query);
-    query = this.withBranchScope(query);
+    // Products are tenant-scoped (shared catalog) — no branch filter
 
     if (filters?.categoryId)
       query = query.eq("category_id", filters.categoryId);
