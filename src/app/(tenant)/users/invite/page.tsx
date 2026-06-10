@@ -15,6 +15,7 @@ export default function InviteUserPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tenantId = user?.tenantId;
+  const tenantName = user?.tenantName ?? "Apotek";
   const branches = useBranchStore((s) => s.branches);
   const loadBranches = useBranchStore((s) => s.loadBranches);
   const inviterRole = user?.role;
@@ -61,6 +62,8 @@ export default function InviteUserPage() {
       email: form.email,
       role: form.role as "admin" | "pharmacist" | "cashier" | "staff",
       branchId: form.branchId || undefined,
+      tenantName,
+      branchName: branches.find((b) => b.id === form.branchId)?.name ?? undefined,
     });
 
     if (res.success && res.token) {

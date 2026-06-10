@@ -3,6 +3,8 @@
 import { createServerSupabase } from "@/lib/supabase/server";
 import type { TenantRole } from "@/types";
 import { getPackageUserLimit } from "@/lib/quota-guard";
+import { sendInvitationEmail } from "@/lib/email/send-invitation";
+import { ROLE_LABELS } from "@/lib/auth/roles";
 
 async function checkUserQuota(
   db: any,
@@ -45,6 +47,8 @@ export async function inviteUser(input: {
   email: string;
   role: TenantRole;
   branchId?: string;
+  tenantName?: string;
+  branchName?: string;
 }): Promise<{ success: boolean; token?: string; error?: string }> {
   const supabase = await createServerSupabase();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -120,6 +124,15 @@ export async function inviteUser(input: {
   if (insertError) {
     return { success: false, error: insertError.message };
   }
+
+  // Fire email asynchronously — don't block the response
+  sendInvitationEmail({
+    to: input.email,
+    token: inviteData.token,
+    tenantName: input.tenantName ?? "Apotek",
+    roleLabel: ROLE_LABELS[input.role] ?? input.role,
+    branchName: input.branchName ?? null,
+  }).catch((err) => console.error("[invite] Email send failed:", err));
 
   return { success: true, token: inviteData.token };
 }
@@ -417,6 +430,8 @@ export async function listInvitations(
 export async function resendInvitation(
   invitationId: string,
   tenantId: string,
+  tenantName?: string,
+  branchName?: string,
 ): Promise<{ success: boolean; token?: string; error?: string }> {
   const supabase = await createServerSupabase();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -459,6 +474,15 @@ export async function resendInvitation(
   if (insertError) {
     return { success: false, error: insertError.message };
   }
+
+  // Fire email asynchronously
+  sendInvitationEmail({
+    to: existing.email,
+    token: newInvite.token,
+    tenantName: tenantName ?? "Apotek",
+    roleLabel: ROLE_LABELS[existing.role as TenantRole] ?? existing.role,
+    branchName: branchName ?? null,
+  }).catch((err) => console.error("[invite] Resend email failed:", err));
 
   return { success: true, token: newInvite.token };
 }
