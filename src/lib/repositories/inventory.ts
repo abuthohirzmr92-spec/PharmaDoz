@@ -250,6 +250,7 @@ export class InventoryRepository extends BaseRepository {
         note: data.note ?? null,
         user_id: data.userId ?? null,
         tenant_id: this.getTenantId(),
+        ...(this.branchId ? { pharmacy_id: this.branchId } : {}),
       })
       .select(
         `

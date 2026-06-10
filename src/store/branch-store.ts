@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { isDemoMode } from "@/config/env";
+import { useAuthStore } from "@/store/auth-store";
 import type { Branch } from "@/lib/branch/branch-types";
 import type { BranchRow } from "@/lib/supabase/database";
 
@@ -108,6 +109,16 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
   },
 
   setActiveBranch: (branch) => {
+    // Enforce assigned branch for restricted roles (non-owner, non-admin)
+    const user = useAuthStore.getState().user;
+    if (user) {
+      const isOwnerOrAdmin = user.role === "tenant_owner" || user.role === "admin";
+      if (!isOwnerOrAdmin && user.assignedBranchId && branch.id !== user.assignedBranchId) {
+        console.warn("[branch-store] Restricted role cannot switch branch. Assigned:", user.assignedBranchId);
+        return;
+      }
+    }
+
     // Persist to localStorage
     if (typeof window !== "undefined") {
       try {

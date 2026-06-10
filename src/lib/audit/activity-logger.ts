@@ -25,9 +25,13 @@ export async function logActivity(payload: LogPayload): Promise<void> {
     const user = useAuthStore.getState().user;
     if (!user) return;
 
+    const { useBranchStore } = await import("@/store/branch-store");
+    const activeBranch = useBranchStore.getState().activeBranch;
+
     await (supabase as any).from("activity_logs").insert({
       tenant_id: user.tenantId ?? null,
       actor_id: user.id,
+      pharmacy_id: activeBranch?.id ?? null,
       action: payload.action,
       resource_type: payload.resourceType,
       resource_id: payload.resourceId,

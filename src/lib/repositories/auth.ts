@@ -101,6 +101,7 @@ export class AuthRepository extends BaseRepository {
         isActive: p.is_active ?? true,
         tenantId: p.tenant_id ?? undefined,
         pharmacyId: p.tenant_id ?? undefined,
+        assignedBranchId: undefined,
         avatarUrl: p.avatar_url ?? null,
         phone: p.phone ?? null,
         lastLoginAt: p.last_login_at ?? null,
@@ -121,7 +122,7 @@ export class AuthRepository extends BaseRepository {
             .single(),
           this.client
             .from("tenant_users")
-            .select("role")
+            .select("role, assigned_branch_id")
             .eq("user_id", p.id)
             .eq("tenant_id", p.tenant_id)
             .eq("is_active", true)
@@ -140,6 +141,7 @@ export class AuthRepository extends BaseRepository {
 
         if (!roleError && roleData) {
           tenantRole = (roleData as any).role ?? null;
+          (p as any)._assignedBranchId = (roleData as any).assigned_branch_id ?? null;
         } else if (roleError) {
           /* Always log tenant_users lookup failures — they break role resolution.
            * PGRST116 = 0 rows — user has no active tenant_users row for this tenant. */
@@ -205,6 +207,7 @@ export class AuthRepository extends BaseRepository {
       isActive: p.is_active ?? true,
       tenantId: p.tenant_id ?? undefined,
       pharmacyId: p.tenant_id ?? undefined,
+      assignedBranchId: (p as any)._assignedBranchId ?? null,
       tenantName: (p as any)._tenantName ?? undefined,
       pharmacyName: (p as any)._tenantName ?? undefined,
       avatarUrl: p.avatar_url ?? null,
@@ -321,7 +324,7 @@ export class AuthRepository extends BaseRepository {
 
     const { data, error } = await this.client
       .from("tenant_users")
-      .select("role")
+      .select("role, assigned_branch_id")
       .eq("user_id", userId)
       .eq("tenant_id", tenantId)
       .eq("is_active", true)

@@ -14,6 +14,7 @@ import { buildInventoryProducts } from "@/lib/inventory-demo";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { Container } from "@/components/shared/container";
 import { BranchContextSelector } from "@/components/shared/branch-context-selector";
+import { useBranchStore } from "@/store/branch-store";
 import { InventoryDashboardCards } from "@/components/inventory/inventory-dashboard-cards";
 import { InventoryStockTable } from "@/components/inventory/inventory-stock-table";
 import { InventoryPurchasePanel } from "@/components/inventory/inventory-purchase-panel";
@@ -37,7 +38,14 @@ export function InventoryPageContent() {
   const setActiveTab = useInventoryStore((s) => s.setActiveTab);
   const searchQuery = useInventoryStore((s) => s.searchQuery);
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
+  const setInventoryBranchContext = useInventoryStore((s) => s.setBranchContext);
+  const activeBranch = useBranchStore((s) => s.activeBranch);
   const [branchId, setBranchId] = useState<string>("all");
+
+  // Sync branch-store.activeBranch → inventory-store.branchId
+  useEffect(() => {
+    setInventoryBranchContext(activeBranch?.id ?? null);
+  }, [activeBranch, setInventoryBranchContext]);
 
   useEffect(() => {
     if (checkDemoMode()) {

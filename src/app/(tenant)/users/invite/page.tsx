@@ -1,17 +1,23 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Loader2, Mail, Shield, Copy, CheckCircle2, Store } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
+import { useBranchStore } from "@/store/branch-store";
 import { inviteUser } from "@/lib/invitation/invite";
 import { TENANT_ROLES, ROLE_LABELS } from "@/lib/auth/roles";
 import { toast } from "sonner";
+
+const BRANCH_RESTRICTED_ROLES = new Set(["pharmacist", "cashier", "staff"]);
 
 export default function InviteUserPage() {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const tenantId = user?.tenantId;
+  const branches = useBranchStore((s) => s.branches);
+  const loadBranches = useBranchStore((s) => s.loadBranches);
+  const inviterRole = user?.role;
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -26,9 +32,25 @@ export default function InviteUserPage() {
   // Filter peran yang bisa di-invite (bukan tenant_owner atau system roles)
   const invitableRoles = TENANT_ROLES.filter((r) => r !== "tenant_owner");
 
+  // Load branches on mount
+  useEffect(() => {
+    if (tenantId) loadBranches(tenantId);
+  }, [tenantId, loadBranches]);
+
+  // Role-aware: is branch required for the selected role?
+  const isBranchRequired = BRANCH_RESTRICTED_ROLES.has(form.role);
+  // Owner/admin inviting someone — they can skip branch (lintas cabang)
+  const isInviterMultiBranch = inviterRole === "tenant_owner" || inviterRole === "admin";
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!tenantId) return;
+
+    // Frontend validation: branch required for restricted roles
+    if (isBranchRequired && !form.branchId) {
+      setError("Pilih cabang terlebih dahulu untuk peran ini.");
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -173,20 +195,30 @@ export default function InviteUserPage() {
 
           <div>
             <label className="mb-1 block text-xs font-medium text-neutral-600 dark:text-neutral-400">
-              Cabang (opsional)
+              Cabang{isBranchRequired ? " *" : " (opsional)"}
             </label>
             <div className="relative">
-              <Store className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400" />
-              <input
-                type="text"
+              <Store className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-neutral-400 z-10" />
+              <select
                 value={form.branchId}
                 onChange={(e) => setForm((p) => ({ ...p, branchId: e.target.value }))}
-                placeholder="ID cabang — kosongkan untuk akses semua"
-                className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50"
-              />
+                className="w-full appearance-none rounded-lg border border-neutral-200 bg-white py-2 pl-10 pr-3 text-sm dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50"
+                required={isBranchRequired}
+              >
+                <option value="">
+                  {isBranchRequired ? "-- Pilih Cabang --" : "Semua Cabang (opsional)"}
+                </option>
+                {branches.map((b) => (
+                  <option key={b.id} value={b.id}>
+                    {b.name}
+                  </option>
+                ))}
+              </select>
             </div>
             <p className="mt-1 text-[11px] text-neutral-400">
-              Untuk peran farmasis/kasir/staf, isi ID cabang untuk membatasi akses ke cabang tertentu.
+              {isBranchRequired
+                ? "Wajib memilih cabang untuk peran farmasis/kasir/staf."
+                : "Kosongkan untuk akses lintas cabang."}
             </p>
           </div>
 

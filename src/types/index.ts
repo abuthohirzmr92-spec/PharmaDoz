@@ -223,6 +223,8 @@ export interface UserProfile {
   // New fields (tenant-scoped)
   tenantId?: string;
   tenantName?: string;
+  // Branch assignment
+  assignedBranchId?: string | null;
   avatarUrl?: string | null;
   phone?: string | null;
   lastLoginAt?: string | null;

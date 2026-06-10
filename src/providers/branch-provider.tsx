@@ -72,12 +72,20 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
       // Only restore / auto-select if no active branch is already set
       if (!useBranchStore.getState().activeBranch) {
+        const isOwnerOrAdmin = user?.role === "tenant_owner" || user?.role === "admin";
+
+        // For restricted roles: force assigned branch (ignore localStorage)
+        if (!isOwnerOrAdmin && user?.assignedBranchId) {
+          const assigned = currentBranches.find((b) => b.id === user.assignedBranchId);
+          if (assigned) {
+            useBranchStore.getState().setActiveBranch(assigned);
+            return;
+          }
+        }
+
         if (currentBranches.length === 1) {
-          // Auto-select the only branch
-          // eslint-disable-next-line @typescript-eslint/no-non-null-assertion -- we know length === 1
           useBranchStore.getState().setActiveBranch(currentBranches[0]!);
         } else if (currentBranches.length > 1) {
-          // Try restoring from localStorage, falls back to first active
           useBranchStore.getState().restoreActiveBranch();
         }
       }

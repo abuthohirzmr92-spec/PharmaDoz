@@ -141,6 +141,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     inventoryRepo.setBranchContext(bid);
     productRepo.setBranchContext(bid);
     transactionRepo.setBranchContext(bid);
+    supplierRepo.setBranchContext(bid);
   },
 
   /* ---- UI ---- */
@@ -166,6 +167,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         inventoryRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
         transactionRepo.setBranchContext(branchId);
+        supplierRepo.setBranchContext(branchId);
       }
 
       try {
@@ -385,6 +387,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         inventoryRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
         transactionRepo.setBranchContext(branchId);
+        supplierRepo.setBranchContext(branchId);
       }
 
       try {
@@ -525,6 +528,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         inventoryRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
         transactionRepo.setBranchContext(branchId);
+        supplierRepo.setBranchContext(branchId);
       }
 
       try {
@@ -605,6 +609,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         inventoryRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
         transactionRepo.setBranchContext(branchId);
+        supplierRepo.setBranchContext(branchId);
       }
 
       const invoice = state.purchaseInvoices.find(inv => inv.id === invoiceId);
@@ -780,6 +785,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         inventoryRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
         transactionRepo.setBranchContext(branchId);
+        supplierRepo.setBranchContext(branchId);
       }
 
       try {
@@ -877,6 +883,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         inventoryRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
         transactionRepo.setBranchContext(branchId);
+        supplierRepo.setBranchContext(branchId);
       }
 
       try {

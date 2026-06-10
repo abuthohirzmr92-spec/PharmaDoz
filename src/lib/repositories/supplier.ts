@@ -137,6 +137,7 @@ export class SupplierRepository extends BaseRepository {
       .order("created_at", { ascending: false });
 
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     if (filters?.supplierId)
       query = query.eq("supplier_id", filters.supplierId);
@@ -198,6 +199,7 @@ export class SupplierRepository extends BaseRepository {
       .is("deleted_at", null)
       .eq("id", id);
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data: inv, error } = await query.single();
 
@@ -258,6 +260,7 @@ export class SupplierRepository extends BaseRepository {
       .select("total_amount, paid_amount, wallet_id, invoice_number")
       .eq("id", id);
     fetchQuery = this.withTenantScope(fetchQuery);
+    fetchQuery = this.withBranchScope(fetchQuery);
 
     const { data: current, error: fetchError } = await fetchQuery.single();
 
@@ -283,6 +286,7 @@ export class SupplierRepository extends BaseRepository {
       .eq("id", id)
       .select(`*, supplier:supplier_id(name)`);
     updateQuery = this.withTenantScope(updateQuery);
+    updateQuery = this.withBranchScope(updateQuery);
 
     const { data: updated, error } = await updateQuery.single();
 
@@ -360,6 +364,9 @@ export class SupplierRepository extends BaseRepository {
     }
     if (data.walletId) {
       invoiceInsert["wallet_id"] = data.walletId;
+    }
+    if (this.branchId) {
+      invoiceInsert["pharmacy_id"] = this.branchId;
     }
 
     const { data: inv, error: invError } = await this.client

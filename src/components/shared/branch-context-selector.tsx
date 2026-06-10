@@ -37,13 +37,14 @@ export function BranchContextSelector({ value, onChange, showAll = true, classNa
   const currentValue = value ?? (activeBranch?.id ?? "all");
 
   /* ---- Role-aware branch visibility ---- */
+  const isOwnerOrAdmin = user?.role === "tenant_owner" || user?.role === "admin";
+
   const visibleBranches = useMemo(() => {
-    const isOwnerOrAdmin = user?.role === "tenant_owner" || user?.role === "admin";
     if (isOwnerOrAdmin) return branches;
-    const userBranchId = (user as any)?.branchId ?? (user as any)?.pharmacyId;
+    const userBranchId = user?.assignedBranchId;
     if (userBranchId) return branches.filter((b) => b.id === userBranchId);
     return branches.filter((b) => b.isActive).slice(0, 1);
-  }, [branches, user]);
+  }, [branches, user, isOwnerOrAdmin]);
 
   const handleChange = useCallback(
     (newValue: string) => {
@@ -57,6 +58,17 @@ export function BranchContextSelector({ value, onChange, showAll = true, classNa
     },
     [branches, setActiveBranch, clearActiveBranch, onChange],
   );
+
+  // Restricted roles: show read-only branch badge (no selector)
+  if (!isOwnerOrAdmin) {
+    const branchName = visibleBranches[0]?.name ?? "Cabang";
+    return (
+      <div className={cn("flex items-center gap-2 rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 dark:border-neutral-700 dark:bg-neutral-900", className)}>
+        <Store className="h-3.5 w-3.5 text-brand-500 shrink-0" />
+        <span className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{branchName}</span>
+      </div>
+    );
+  }
 
   return (
     <div className={cn("relative", className)}>
