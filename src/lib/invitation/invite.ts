@@ -74,6 +74,12 @@ export async function inviteUser(input: {
     return { success: false, error: "Tidak dapat mengundang dengan peran Pemilik. Hanya ada satu pemilik per tenant." };
   }
 
+  // Branch assignment required for restricted roles
+  const BRANCH_REQUIRED_ROLES: TenantRole[] = ["pharmacist", "cashier", "staff"];
+  if (BRANCH_REQUIRED_ROLES.includes(input.role) && !input.branchId) {
+    return { success: false, error: "Cabang wajib dipilih untuk peran ini." };
+  }
+
   // Quota enforcement — check user limit against tenant package
   const quota = await checkUserQuota(db, input.tenantId);
   if (!quota.allowed) {
@@ -150,6 +156,12 @@ export async function acceptInvitation(input: {
     return { success: false, error: "Link undangan sudah kadaluarsa (7 hari). Minta pemilik untuk mengirim ulang." };
   }
 
+  // Re-validate: restricted roles must have assigned branch
+  const BRANCH_REQUIRED_ROLES: string[] = ["pharmacist", "cashier", "staff"];
+  if (BRANCH_REQUIRED_ROLES.includes(invite.role) && !invite.assigned_branch_id) {
+    return { success: false, error: "Undangan tidak valid: data cabang hilang. Minta pemilik untuk mengirim ulang." };
+  }
+
   // Quota enforcement — re-check before accepting (prevent race with concurrent invites)
   const acceptQuota = await checkUserQuota(db, invite.tenant_id);
   if (!acceptQuota.allowed) {
@@ -189,19 +201,41 @@ export async function acceptInvitation(input: {
     // Update display_name di metadata jika akun sudah ada
     await supabase.auth.updateUser({ data: { display_name: input.displayName } });
 
-    // Insert ke tenant_users
-    const { error: insertError } = await db
+    // Guard duplicate membership — existing user path
+    const { data: existingMember } = await db
       .from("tenant_users")
-      .insert({
-        tenant_id: invite.tenant_id,
-        user_id: existingUserId,
-        role: invite.role,
-        assigned_branch_id: invite.assigned_branch_id ?? null,
-        is_active: true,
-      });
+      .select("id, is_active")
+      .eq("tenant_id", invite.tenant_id)
+      .eq("user_id", existingUserId)
+      .maybeSingle();
 
-    if (insertError) {
-      return { success: false, error: insertError.message };
+    if (existingMember) {
+      if (existingMember.is_active) {
+        return { success: false, error: "Anda sudah menjadi anggota tenant ini." };
+      }
+      // Re-activate inactive membership
+      await db
+        .from("tenant_users")
+        .update({
+          is_active: true,
+          role: invite.role,
+          assigned_branch_id: invite.assigned_branch_id ?? null,
+        })
+        .eq("id", existingMember.id);
+    } else {
+      const { error: insertError } = await db
+        .from("tenant_users")
+        .insert({
+          tenant_id: invite.tenant_id,
+          user_id: existingUserId,
+          role: invite.role,
+          assigned_branch_id: invite.assigned_branch_id ?? null,
+          is_active: true,
+        });
+
+      if (insertError) {
+        return { success: false, error: insertError.message };
+      }
     }
 
     // Update profile.tenant_id so getUserBySupabaseUid can resolve the role
@@ -227,19 +261,41 @@ export async function acceptInvitation(input: {
   // Tunggu sebentar untuk trigger
   await new Promise((r) => setTimeout(r, 500));
 
-  // 4. Insert ke tenant_users
-  const { error: insertError } = await db
+  // 4. Guard duplicate membership — new user path
+  const { data: existingMemberNew } = await db
     .from("tenant_users")
-    .insert({
-      tenant_id: invite.tenant_id,
-      user_id: userId,
-      role: invite.role,
-      assigned_branch_id: invite.assigned_branch_id ?? null,
-      is_active: true,
-    });
+    .select("id, is_active")
+    .eq("tenant_id", invite.tenant_id)
+    .eq("user_id", userId)
+    .maybeSingle();
 
-  if (insertError) {
-    return { success: false, error: insertError.message };
+  if (existingMemberNew) {
+    if (existingMemberNew.is_active) {
+      return { success: false, error: "Anda sudah menjadi anggota tenant ini." };
+    }
+    // Re-activate inactive membership
+    await db
+      .from("tenant_users")
+      .update({
+        is_active: true,
+        role: invite.role,
+        assigned_branch_id: invite.assigned_branch_id ?? null,
+      })
+      .eq("id", existingMemberNew.id);
+  } else {
+    const { error: insertError } = await db
+      .from("tenant_users")
+      .insert({
+        tenant_id: invite.tenant_id,
+        user_id: userId,
+        role: invite.role,
+        assigned_branch_id: invite.assigned_branch_id ?? null,
+        is_active: true,
+      });
+
+    if (insertError) {
+      return { success: false, error: insertError.message };
+    }
   }
 
   // Update profile.tenant_id so getUserBySupabaseUid can resolve the role
