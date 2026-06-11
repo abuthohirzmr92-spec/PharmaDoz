@@ -22,6 +22,7 @@ import { OfflineIndicator } from "./offline-indicator";
 import { SyncStatus } from "./sync-status";
 import { RoleSwitcher } from "./role-switcher";
 import { SessionPanel } from "./session-panel";
+import { SidebarBranchSelector } from "@/components/layout/branch-selector";
 import { logSidebarRender, isDiagnosticsEnabled } from "@/lib/diagnostics";
 import type { SidebarMode } from "@/store/sidebar-store";
 
@@ -169,6 +170,9 @@ export function Sidebar() {
         <SyncStatus />
       </div>
 
+      {/* Active Branch Context — operational context, no "Semua Cabang" */}
+      {isExpanded && <SidebarBranchSelector />}
+
       {/* Session Panel */}
       <SessionPanel collapsed={!isExpanded} />
 
@@ -180,3 +184,4 @@ export function Sidebar() {
     </aside>
   );
 }
+

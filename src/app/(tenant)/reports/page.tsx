@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { Container } from "@/components/shared/container";
 import { ReportTabs } from "@/components/reports/report-tabs";
-import { BranchContextSelector } from "@/components/shared/branch-context-selector";
+import { useBranchStore } from "@/store/branch-store";
 import { SalesTable } from "@/components/reports/sales-table";
 import { InventoryReportTable } from "@/components/reports/inventory-report-table";
 import { ExpiredReportTable } from "@/components/reports/expired-report-table";
@@ -15,7 +15,8 @@ import type { ReportTab } from "@/types/report";
 
 export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>("sales");
-  const [branchId, setBranchId] = useState<string>("all");
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+  const branchId = activeBranch?.id ?? "all";
 
   return (
     <Container>
@@ -26,11 +27,6 @@ export default function ReportsPage() {
         <p className="mt-1 text-sm text-neutral-500">
           Penjualan, inventory, kadaluarsa, pembelian, dan laba/rugi operasional
         </p>
-      </div>
-
-      {/* Branch filter — shared across all report tabs */}
-      <div className="mb-4">
-        <BranchContextSelector value={branchId} onChange={setBranchId} />
       </div>
 
       {/* Tab bar */}

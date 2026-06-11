@@ -5,6 +5,7 @@ import type { Transaction } from "@/types/transaction";
 import { useAuthStore } from "@/store/auth-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
+import { useBranchStore } from "@/store/branch-store";
 import { transactionRepo } from "@/lib/repository-instances";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 import { localPersistence } from "@/lib/local-persistence";
@@ -213,7 +214,12 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
     // Build transaction
     const now = new Date().toISOString();
     const cashierName = auth.user?.displayName ?? "Kasir";
-    const pharmacyId = auth.user?.pharmacyId;
+    const activeBranch = useBranchStore.getState().activeBranch;
+    if (!activeBranch?.id) {
+      set({ isSubmitting: false, submitError: "Cabang aktif harus dipilih sebelum membuat transaksi." });
+      return { success: false, error: "Cabang aktif harus dipilih sebelum membuat transaksi." };
+    }
+    const pharmacyId = activeBranch.id;
     const cashierId = auth.user?.id;
 
     const transaction: Transaction = {

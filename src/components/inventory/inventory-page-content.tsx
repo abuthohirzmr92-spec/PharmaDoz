@@ -13,7 +13,6 @@ import { useInventoryStore, type InventoryTab } from "@/store/inventory-store";
 import { buildInventoryProducts } from "@/lib/inventory-demo";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { Container } from "@/components/shared/container";
-import { BranchContextSelector } from "@/components/shared/branch-context-selector";
 import { useBranchStore } from "@/store/branch-store";
 import { InventoryDashboardCards } from "@/components/inventory/inventory-dashboard-cards";
 import { InventoryStockTable } from "@/components/inventory/inventory-stock-table";
@@ -40,12 +39,14 @@ export function InventoryPageContent() {
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
   const setInventoryBranchContext = useInventoryStore((s) => s.setBranchContext);
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const [branchId, setBranchId] = useState<string>("all");
 
-  // Sync branch-store.activeBranch → inventory-store.branchId
+  // Sync branch-store.activeBranch → inventory-store.branchId + reload data
   useEffect(() => {
-    setInventoryBranchContext(activeBranch?.id ?? null);
-  }, [activeBranch, setInventoryBranchContext]);
+    const branchId = activeBranch?.id ?? null;
+    setInventoryBranchContext(branchId);
+    // Reload data when branch changes
+    if (checkDemoMode()) loadDemoData();
+  }, [activeBranch?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (checkDemoMode()) {
@@ -55,16 +56,13 @@ export function InventoryPageContent() {
 
   return (
     <Container>
-      <div className="mb-6 flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-            Inventory
-          </h1>
-          <p className="mt-1 text-sm text-neutral-500">
-            Kelola stok, batch FEFO, pembelian, mutasi, monitoring kadaluarsa, dan stock opname.
-          </p>
-        </div>
-        <BranchContextSelector value={branchId} onChange={setBranchId} />
+      <div className="mb-6">
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+          Inventory
+        </h1>
+        <p className="mt-1 text-sm text-neutral-500">
+          Kelola stok, batch FEFO, pembelian, mutasi, monitoring kadaluarsa, dan stock opname.
+        </p>
       </div>
 
       <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-800 dark:bg-neutral-900">

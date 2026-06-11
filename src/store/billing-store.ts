@@ -313,9 +313,9 @@ export const useBillingStore = create<BillingState>((set, get) => ({
         .eq("tenant_id", tenantId)
         .is("deleted_at", null);
 
-      // Fetch branch (pharmacy) count
+      // Fetch branch count from branches table
       const { count: branchCount, error: branchError } = await supabase!
-        .from("pharmacies")
+        .from("branches")
         .select("*", { count: "exact", head: true })
         .eq("tenant_id", tenantId)
         .is("deleted_at", null);

@@ -8,6 +8,7 @@ import { CardSkeleton } from "@/components/shared/card-skeleton";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { OnboardingBanner } from "@/components/shared/onboarding-banner";
 import { GlobalFilterBar } from "@/components/dashboard/global-filter-bar";
+import { BranchContextSelector } from "@/components/shared/branch-context-selector";
 import { BranchSummaryGrid } from "@/components/dashboard/branch-summary-grid";
 import { useBranchStore } from "@/store/branch-store";
 import { useTransactionStore } from "@/store/transaction-store";
@@ -243,9 +244,13 @@ export default function DashboardPage() {
     <Container>
       <OnboardingBanner />
 
-      {/* Global Filter Bar — shared between both levels */}
-      <div className="mb-6">
+      {/* Global Filter Bar + Dashboard Scope Selector */}
+      <div className="mb-6 space-y-3">
         <GlobalFilterBar filter={filter} onChange={setFilter} />
+        <BranchContextSelector
+          value={selectedBranchId ?? "all"}
+          onChange={(id) => setSelectedBranchId(id === "all" ? null : id)}
+        />
       </div>
 
       {/* LEVEL 2: Branch Detail Dashboard */}

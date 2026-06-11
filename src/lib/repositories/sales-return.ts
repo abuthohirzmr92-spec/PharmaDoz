@@ -146,6 +146,7 @@ export class SalesReturnRepository extends BaseRepository {
           qty_after: (alloc as any).batch_quantity + take,
           reference_number: refNum,
           note: `Retur penjualan ${refNum}`,
+          tenant_id: tenantId,
         });
 
         remaining -= take;
@@ -171,10 +172,12 @@ export class SalesReturnRepository extends BaseRepository {
           description: `Refund retur ${refNum}`,
         });
         // Mark as refunded
-        await this.client
+        let refundQuery = this.client
           .from("sales_returns")
           .update({ status: "refunded" })
           .eq("id", returnId);
+        refundQuery = this.withTenantScope(refundQuery);
+        await refundQuery;
       } catch (walletErr) {
         console.warn("[SalesReturnRepo] Refund wallet transaction failed:", walletErr);
       }
@@ -207,11 +210,14 @@ export class SalesReturnRepository extends BaseRepository {
   async getReturnsForTransaction(transactionId: string): Promise<SalesReturn[]> {
     if (!this.isConnected) return [];
 
-    const { data, error } = await this.client
+    let query = this.client
       .from("sales_returns")
       .select("*, items:sales_return_items(*), allocations:sales_return_allocations(*)")
       .eq("original_transaction_id", transactionId)
       .order("created_at", { ascending: false });
+    query = this.withTenantScope(query);
+
+    const { data, error } = await query;
 
     if (error) return this.handleError(error, "getReturnsForTransaction");
 
