@@ -102,6 +102,7 @@ export class ProductRepository extends BaseRepository {
             tenantId: this.pharmacyId ?? "",
             productId: b.product_id,
             productName: r.name,
+            pharmacyId: b.pharmacy_id ?? null,
             batchNumber: b.batch_number,
             expiredDate: b.expired_date,
             quantity: b.quantity,

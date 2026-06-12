@@ -8,6 +8,7 @@ export interface ProductBatch {
   tenantId: string;
   productId: string;
   productName: string;
+  pharmacyId?: string | null;
   batchNumber: string;
   expiredDate: string; // ISO 8601
   quantity: number;
