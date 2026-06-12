@@ -885,13 +885,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           supplierRepo.getSuppliers(),
         ]);
 
-        // Extract batches from InventoryProduct[] into ProductBatch[]
-        const allBatches: ProductBatch[] = [];
-        for (const p of products) {
-          for (const b of p.batches) {
-            allBatches.push({ ...b, productName: p.name });
-          }
-        }
+        // Fetch branch-scoped batches from inventoryRepo (withBranchScope)
+        const branchBatches = await inventoryRepo.getBatches();
 
         // Load purchase invoices, stock movements, and opnames from repos
         const [purchaseInvoices, stockMovements, stockOpnames, saleAllocations] = await Promise.all([
@@ -901,16 +896,16 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           inventoryRepo.getSaleAllocations(),
         ]);
 
-        console.log("[VERIFY] loadDemoData() DB LOAD COMPLETE — products:", products.length, "batches:", allBatches.length, "invoices:", purchaseInvoices.length);
+        console.log("[VERIFY] loadDemoData() DB LOAD COMPLETE — products:", products.length, "batches:", branchBatches.length, "invoices:", purchaseInvoices.length);
         console.log("[INVENTORY-STORE] branchId at load time:", get().branchId);
-        console.log("[INVENTORY-STORE] first 3 batches:", JSON.stringify(allBatches.slice(0, 3).map(b => ({
+        console.log("[INVENTORY-STORE] first 3 batches:", JSON.stringify(branchBatches.slice(0, 3).map(b => ({
           pharmacyId: (b as any).pharmacyId,
           productName: b.productName,
           quantity: b.quantity,
         }))));
 
         set({
-          batches: allBatches,
+          batches: branchBatches,
           suppliers,
           purchaseInvoices,
           stockMovements,
