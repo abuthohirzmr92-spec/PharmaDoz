@@ -45,19 +45,11 @@ export function InventoryPageContent() {
   useEffect(() => {
     const branchId = activeBranch?.id ?? null;
     setInventoryBranchContext(branchId);
-    // ── TEMP DEBUG ──
-    console.log("[INVENTORY] activeBranch changed:", branchId);
-    const storeState = useInventoryStore.getState();
-    console.log("[INVENTORY] store batches.length:", storeState.batches.length);
-    console.log("[INVENTORY] store dataSource:", storeState.dataSource);
-    console.log("[INVENTORY] first 5 batches:", JSON.stringify(storeState.batches.slice(0, 5).map(b => ({
-      pharmacyId: (b as any).pharmacyId,
-      productName: b.productName,
-      quantity: b.quantity,
-    }))));
-    // ── END DEBUG ──
-    // Reload data when branch changes
-    if (checkDemoMode()) loadDemoData();
+    // Reload data when branch changes (database mode)
+    if (!checkDemoMode() && branchId) {
+      useInventoryStore.setState({ batches: [], purchaseInvoices: [], stockMovements: [], stockOpnames: [], saleAllocations: [], dataSource: "loading" as const });
+    }
+    loadDemoData();
   }, [activeBranch?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
