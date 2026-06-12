@@ -109,6 +109,7 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
   },
 
   setActiveBranch: (branch) => {
+    console.log("[BRANCH-STORE] setActiveBranch CALLED", branch?.id, branch?.name);
     // Enforce assigned branch for restricted roles (non-owner, non-admin)
     const user = useAuthStore.getState().user;
     if (user) {

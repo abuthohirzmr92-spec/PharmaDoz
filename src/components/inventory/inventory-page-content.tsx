@@ -39,6 +39,7 @@ export function InventoryPageContent() {
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
   const setInventoryBranchContext = useInventoryStore((s) => s.setBranchContext);
   const activeBranch = useBranchStore((s) => s.activeBranch);
+  console.log("[INVENTORY RENDER] activeBranch:", activeBranch?.id, activeBranch?.name);
 
   // Sync branch-store.activeBranch → inventory-store.branchId + reload data
   useEffect(() => {
