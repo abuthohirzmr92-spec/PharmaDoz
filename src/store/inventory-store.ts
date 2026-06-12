@@ -902,6 +902,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         ]);
 
         console.log("[VERIFY] loadDemoData() DB LOAD COMPLETE — products:", products.length, "batches:", allBatches.length, "invoices:", purchaseInvoices.length);
+        console.log("[INVENTORY-STORE] branchId at load time:", get().branchId);
+        console.log("[INVENTORY-STORE] first 3 batches:", JSON.stringify(allBatches.slice(0, 3).map(b => ({
+          pharmacyId: (b as any).pharmacyId,
+          productName: b.productName,
+          quantity: b.quantity,
+        }))));
 
         set({
           batches: allBatches,
