@@ -14,7 +14,6 @@ export class InventoryRepository extends BaseRepository {
 
   async getBatches(): Promise<ProductBatch[]> {
     if (!this.isConnected) return [];
-
     let query = this.client
       .from("product_batches")
       .select(`*, product:product_id(name)`)

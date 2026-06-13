@@ -51,10 +51,8 @@ export function SidebarBranchSelector() {
         value={activeBranch?.id ?? "all"}
         onChange={(e) => {
           const id = e.target.value;
-          console.log("[BRANCH SELECTOR] onChange fired, new value:", id);
-          if (id === "all") { console.log("[BRANCH SELECTOR] clearing activeBranch"); clearActiveBranch(); return; }
+          if (id === "all") { clearActiveBranch(); return; }
           const branch = branches.find((b) => b.id === id);
-          console.log("[BRANCH SELECTOR] found branch:", branch?.name);
           if (branch) setActiveBranch(branch);
         }}
         className="w-full rounded-lg border border-neutral-200 bg-white px-2 py-1.5 text-xs text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"

@@ -143,7 +143,7 @@ export function InventoryPurchasePanel() {
   const handleSubmit = () => {
     const supplier = suppliers.find((s) => s.id === formSupplier);
     if (!supplier) { toast.error("Pilih supplier terlebih dahulu"); return; }
-    const validItems = formItems.filter((it) => it.productId && it.productName && it.batchNumber && it.quantity > 0);
+    const validItems = formItems.filter((it) => it.productId && it.productName && it.quantity > 0);
     if (validItems.length === 0) { toast.error("Isi minimal 1 item pembelian"); return; }
     for (const it of validItems) {
       if (!it.expiredDate) { toast.error("Isi tanggal kadaluarsa untuk semua item"); return; }
@@ -320,7 +320,7 @@ export function InventoryPurchasePanel() {
                         Produk
                       </th>
                       <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">
-                        Batch
+                        Batch (Opsional)
                       </th>
                       <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">
                         ED
@@ -374,7 +374,7 @@ export function InventoryPurchasePanel() {
                             onChange={(e) =>
                               handleItemChange(item.id, "batchNumber", e.target.value)
                             }
-                            placeholder="BN-..."
+                            placeholder="Kosongkan untuk auto-generate"
                             className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                           />
                         </td>

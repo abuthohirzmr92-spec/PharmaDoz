@@ -40,18 +40,6 @@ export function ProductsPageContent() {
         // totalStock = SUM(batch.quantity) — filtered by active branch.
         const inventoryProducts = await productRepo.getProducts();
 
-        // ── TEMPORARY RUNTIME DEBUG ──
-        console.log("ACTIVE_BRANCH", JSON.stringify(activeBranch));
-        console.log("PRODUCT_DEBUG", JSON.stringify(inventoryProducts.slice(0, 3).map((p) => ({
-          name: p.name,
-          totalStockOriginal: p.totalStock,
-          batchCount: p.batches.length,
-          batches: p.batches.map((b) => ({
-            pharmacyId: b.pharmacyId,
-            qty: b.quantity,
-          })),
-        }))));
-
         const mapped: ProductRow[] = inventoryProducts.map((p) => ({
           id: p.id,
           name: p.name,
@@ -69,12 +57,6 @@ export function ProductsPageContent() {
             : p.totalStock,
           isActive: p.isActive,
         }));
-
-        console.log("MAPPED_PRODUCTS", JSON.stringify(mapped.slice(0, 3).map((p) => ({
-          name: p.name,
-          totalStock: p.totalStock,
-        }))));
-        // ── END DEBUG ──
 
         setProducts(mapped);
       } else if (checkDemoMode()) {

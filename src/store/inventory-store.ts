@@ -169,6 +169,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       }
 
       try {
+        // Auto-generate batch number for items without one
+        // Format: AUTO-{invoiceNumber}-{NN} (e.g. AUTO-INV-P-20260613-001-01)
+        let autoSeq = 0;
+        const generateAutoBatch = () => {
+          autoSeq++;
+          return `AUTO-${invoice.invoiceNumber}-${String(autoSeq).padStart(2, "0")}`;
+        };
+        for (const item of invoice.items) {
+          if (!item.batchNumber?.trim()) {
+            item.batchNumber = generateAutoBatch();
+          }
+        }
+
         // 1. Create purchase invoice with items in the DB
         await supplierRepo.createPurchaseInvoice({
           invoiceNumber: invoice.invoiceNumber,
@@ -853,13 +866,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   loadDemoData: async () => {
     const state = get();
-    console.log("[VERIFY] loadDemoData() called. isLoading:", state.isLoading, "dataSource:", state.dataSource, "batches.length:", state.batches.length);
     // Prevent concurrent parallel loads from multiple components
-    if (state.isLoading) { console.log("[VERIFY] loadDemoData SKIP: isLoading"); return; }
+    if (state.isLoading) return;
     // Skip if already loaded from database
-    if (state.dataSource === "database" && state.batches.length > 0) { console.log("[VERIFY] loadDemoData SKIP: already loaded"); return; }
+    if (state.dataSource === "database" && state.batches.length > 0) return;
     // Skip if already loaded demo data
-    if (state.dataSource === "demo" && state.batches.length > 0) { console.log("[VERIFY] loadDemoData SKIP: demo already loaded"); return; }
+    if (state.dataSource === "demo" && state.batches.length > 0) return;
 
     // No tenant context — skip Supabase query (e.g. super admin with no tenant).
     // Without tenant_id the query is unfiltered and may hit RLS blocks.
@@ -895,14 +907,6 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           inventoryRepo.getStockOpnames(),
           inventoryRepo.getSaleAllocations(),
         ]);
-
-        console.log("[VERIFY] loadDemoData() DB LOAD COMPLETE — products:", products.length, "batches:", branchBatches.length, "invoices:", purchaseInvoices.length);
-        console.log("[INVENTORY-STORE] branchId at load time:", get().branchId);
-        console.log("[INVENTORY-STORE] first 3 batches:", JSON.stringify(branchBatches.slice(0, 3).map(b => ({
-          pharmacyId: (b as any).pharmacyId,
-          productName: b.productName,
-          quantity: b.quantity,
-        }))));
 
         set({
           batches: branchBatches,
