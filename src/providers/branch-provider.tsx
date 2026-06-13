@@ -57,6 +57,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
 
     const tenantId = user.tenantId ?? user.pharmacyId;
     if (!tenantId) return;
+    console.log("[BRANCH-PROVIDER] loading branches for tenant:", tenantId);
 
     // Non-null assertion is safe: we already returned on falsy above
     const resolvedTenantId: string = tenantId;
@@ -96,7 +97,7 @@ export function BranchProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, [isAuthenticated, user, loadBranches]);
+  }, [isAuthenticated, user?.tenantId, user?.pharmacyId, loadBranches]);
 
   return (
     <BranchCtx.Provider
