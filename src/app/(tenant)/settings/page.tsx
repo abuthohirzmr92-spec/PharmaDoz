@@ -79,6 +79,7 @@ export default function SettingsPage() {
 
   useEffect(() => {
     if (branding) {
+      console.log("RENDER_LOGO_URL", branding.logoUrl);
       setCompanyName(branding.companyName ?? "");
       setLogoUrl(branding.logoUrl ?? "");
       setAddress(branding.address ?? "");
@@ -196,10 +197,11 @@ export default function SettingsPage() {
               </div>
               <p className="mt-1 text-xs text-neutral-400">JPG, PNG, atau WebP — maksimal 150 KB.</p>
               {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
+              {/* DEBUG */ undefined}
               {logoUrl && (
                 <div className="mt-2 flex h-16 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-700 dark:bg-neutral-900">
                   <img src={logoUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain"
-                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                    onError={(e) => { console.error("LOGO_LOAD_ERROR", (e.target as HTMLImageElement).src); }} />
                 </div>
               )}
             </div>
