@@ -23,6 +23,7 @@ import { SyncStatus } from "./sync-status";
 import { RoleSwitcher } from "./role-switcher";
 import { SessionPanel } from "./session-panel";
 import { SidebarBranchSelector } from "@/components/layout/branch-selector";
+import { useTenantBranding } from "@/providers/tenant-brand-provider";
 import { logSidebarRender, isDiagnosticsEnabled } from "@/lib/diagnostics";
 import type { SidebarMode } from "@/store/sidebar-store";
 
@@ -76,6 +77,7 @@ function ModeSwitcher({ mode, collapsed }: { mode: SidebarMode; collapsed: boole
 export function Sidebar() {
   const { mode, slidingOpen } = useSidebarStore();
   const user = useAuthStore((s) => s.user);
+  const { branding } = useTenantBranding();
   const isExpanded = mode === "expanded" || (mode === "sliding" && slidingOpen);
   const isCollapsed = mode === "icon";
 
@@ -131,14 +133,23 @@ export function Sidebar() {
         widthClass,
       )}
     >
-      {/* Brand */}
+      {/* Brand — tenant logo + name, fallback "+ Apotek" */}
       <div className="flex h-14 items-center justify-between border-b border-neutral-200 px-4 dark:border-neutral-800">
         <Link
           href="/dashboard"
-          className="flex items-center gap-2 font-bold text-brand-600"
+          className="flex items-center gap-2 font-bold text-brand-600 min-w-0"
         >
-          <span className="text-xl">+</span>
-          {isExpanded && <span className="text-base">Apotek</span>}
+          {branding?.logoUrl ? (
+            <img src={branding.logoUrl} alt={branding.companyName ?? "Logo"}
+              className="h-10 w-10 rounded-lg object-contain shrink-0" />
+          ) : (
+            <span className="text-xl shrink-0">+</span>
+          )}
+          {isExpanded && (
+            <span className="text-base truncate">
+              {branding?.companyName ?? "Apotek"}
+            </span>
+          )}
         </Link>
         <OfflineIndicator />
       </div>

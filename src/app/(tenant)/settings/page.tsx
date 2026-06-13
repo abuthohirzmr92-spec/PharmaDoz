@@ -25,6 +25,57 @@ export default function SettingsPage() {
   const [receiptFooter, setReceiptFooter] = useState("");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
+  const MAX_SIZE = 150 * 1024; // 150 KB
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+
+    // Validate type
+    if (!ALLOWED_TYPES.includes(file.type)) {
+      setUploadError("Hanya menerima JPG, PNG, atau WebP.");
+      return;
+    }
+    // Validate size
+    if (file.size > MAX_SIZE) {
+      setUploadError("Ukuran file maksimal 150 KB.");
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const supabase = (await import("@/lib/supabase/client")).supabase;
+      if (!supabase) throw new Error("Storage tidak tersedia.");
+
+      const tenantId = user?.tenantId;
+      if (!tenantId) throw new Error("Tenant tidak ditemukan.");
+
+      const ext = file.name.split(".").pop() ?? "png";
+      const filePath = `${tenantId}/logo.${ext}`;
+
+      const { error: uploadErr } = await supabase.storage
+        .from("tenant-assets")
+        .upload(filePath, file, { upsert: true, contentType: file.type });
+
+      if (uploadErr) throw uploadErr;
+
+      const { data: urlData } = supabase.storage
+        .from("tenant-assets")
+        .getPublicUrl(filePath);
+
+      setLogoUrl(urlData.publicUrl);
+      toast.success("Logo berhasil diupload.");
+    } catch (err: any) {
+      setUploadError(err?.message ?? "Gagal mengupload logo.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   useEffect(() => {
     if (branding) {
@@ -129,16 +180,26 @@ export default function SettingsPage() {
                 className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50" />
             </div>
 
-            {/* Logo URL */}
+            {/* Logo Upload */}
             <div>
-              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">URL Logo</label>
-              <input type="url" value={logoUrl} onChange={(e) => setLogoUrl(e.target.value)}
-                placeholder="https://storage.example.com/logo.png"
-                className="mt-1 block w-full rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-mono focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50" />
-              <p className="mt-1 text-xs text-neutral-400">Masukkan URL gambar logo. Upload langsung akan tersedia di update berikutnya.</p>
+              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Upload Logo</label>
+              <div className="mt-1 flex items-center gap-3">
+                <label className="cursor-pointer rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800">
+                  {uploading ? "Mengupload..." : "Pilih File"}
+                  <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleLogoUpload} disabled={uploading}
+                    className="hidden" />
+                </label>
+                {logoUrl && (
+                  <button type="button" onClick={() => setLogoUrl("")}
+                    className="text-xs text-red-500 hover:text-red-700">Hapus</button>
+                )}
+              </div>
+              <p className="mt-1 text-xs text-neutral-400">JPG, PNG, atau WebP — maksimal 150 KB.</p>
+              {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
               {logoUrl && (
                 <div className="mt-2 flex h-16 items-center justify-center rounded-lg border border-neutral-200 bg-neutral-50 p-2 dark:border-neutral-700 dark:bg-neutral-900">
-                  <img src={logoUrl} alt="Preview" className="max-h-full max-w-full object-contain" onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
+                  <img src={logoUrl} alt="Logo Preview" className="max-h-full max-w-full object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }} />
                 </div>
               )}
             </div>
