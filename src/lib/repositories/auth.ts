@@ -319,6 +319,35 @@ export class AuthRepository extends BaseRepository {
     };
   }
 
+  /** Lookup tenant by slug — used for slug-based login routing */
+  async getTenantBySlug(slug: string): Promise<Tenant | null> {
+    if (!this.isConnected) return null;
+
+    const { data, error } = await this.client
+      .from("tenants")
+      .select("*")
+      .eq("slug", slug)
+      .is("deleted_at", null)
+      .single();
+
+    if (error) {
+      if (error.code === "PGRST116") return null;
+      return this.handleError(error, "getTenantBySlug");
+    }
+
+    const t = data as any;
+    return {
+      id: t.id,
+      name: t.name,
+      slug: t.slug ?? slug,
+      domain: t.domain ?? null,
+      settings: t.settings ?? {},
+      isActive: t.is_active,
+      createdAt: t.created_at ?? new Date().toISOString(),
+      updatedAt: t.updated_at ?? new Date().toISOString(),
+    };
+  }
+
   async getTenantRole(userId: string, tenantId: string): Promise<TenantRole | null> {
     if (!this.isConnected) return null;
 
