@@ -154,11 +154,21 @@ export class InventoryRepository extends BaseRepository {
 
   async deductBatchQuantity(id: string, amount: number): Promise<void> {
     if (!this.isConnected) return;
-    // Fetch current, validate, then update
+
+    // Atomic: fetch current quantity, compute new, UPDATE with WHERE guard
     const batch = await this.getBatchById(id);
     if (!batch) throw new Error(`Batch ${id} not found`);
     if (batch.quantity < amount) throw new Error(`Insufficient stock in batch ${id}`);
-    await this.updateBatchQuantity(id, batch.quantity - amount);
+
+    const newQuantity = batch.quantity - amount;
+    const { error } = await this.client
+      .from("product_batches")
+      .update({ quantity: newQuantity, updated_at: new Date().toISOString() })
+      .eq("id", id)
+      .gte("quantity", amount); // ← WHERE guard prevents oversell
+      // If another process already decremented below `amount`, 0 rows affected
+
+    if (error) return this.handleError(error, "deductBatchQuantity");
   }
 
   /* ------------------------------------------------------------------ */

@@ -274,7 +274,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
         }
       }
 
-      // Hook point: deduct inventory with REAL DB transaction + item IDs
+      // FEFO allocation + inventory deduction + sale_batch_allocations
       try {
         const realTxnId = dbTransaction?.id ?? transactionId;
         const realItems = (dbTransaction?.items ?? transaction.items).map((item) => ({
@@ -284,10 +284,12 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
           quantity: item.quantity,
         }));
         console.log("[TXN-TRACE] STEP 7: deductForSale called, realTxnId:", realTxnId, "items:", realItems.length);
-        await invStore.deductForSale?.(realItems, realTxnId);
+        await invStore.deductForSale(realItems, realTxnId);
         console.log("[TXN-TRACE] STEP 8: deductForSale completed");
       } catch (err) {
         console.error("[TXN-TRACE] STEP 8 FAILED:", err);
+        set({ isSubmitting: false, submitError: err instanceof Error ? err.message : "Gagal memproses inventori." });
+        return { success: false, error: "Gagal memproses inventori. Silakan coba lagi." };
       }
 
       // Add to transaction store

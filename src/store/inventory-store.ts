@@ -821,8 +821,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         // Record sale_batch_allocations for HPP tracking
         const { supabase } = await import("@/lib/supabase/client");
         if (supabase) {
-          const stateNow = get();
-          const tenantId = (stateNow as any).batches?.[0]?.tenantId ?? (this as any).getTenantId?.() ?? null;
+          const { useAuthStore } = await import("@/store/auth-store");
+          const tenantId = useAuthStore.getState().user?.tenantId ?? null;
           console.log("[FEFO-ALLOC] Recording allocations for txn:", transactionId, "items:", cartWithAllocations.length, "tenant:", tenantId);
           for (const { item, allocations } of cartWithAllocations) {
             for (const alloc of allocations) {
