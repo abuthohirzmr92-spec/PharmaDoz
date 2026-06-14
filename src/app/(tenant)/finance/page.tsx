@@ -9,6 +9,7 @@ import { CardSkeleton } from "@/components/shared/card-skeleton";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { useWalletStore } from "@/store/wallet-store";
 import { useAuthStore } from "@/store/auth-store";
+import { useBranchStore } from "@/store/branch-store";
 import { hasPermission } from "@/lib/auth/permissions";
 import { Plus, ArrowRightLeft } from "lucide-react";
 
@@ -59,6 +60,9 @@ const WalletBalanceCard = dynamic(
 
 export default function FinanceDashboardPage() {
   const { user } = useAuthStore();
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+  const branchId = activeBranch?.id ?? null;
+
   const {
     wallets,
     transactions,
@@ -71,10 +75,10 @@ export default function FinanceDashboardPage() {
   } = useWalletStore();
 
   useEffect(() => {
-    loadWallets();
-    loadTransactions(undefined, { limit: 10 });
+    loadWallets(branchId ?? undefined);
+    loadTransactions(undefined, { limit: 10, branchId: branchId ?? undefined });
     loadTransfers();
-  }, [loadWallets, loadTransactions, loadTransfers]);
+  }, [loadWallets, loadTransactions, loadTransfers, branchId]);
 
   const canManage = user ? hasPermission(user.role, "finance.wallet.manage") : false;
   const canTransfer = user ? hasPermission(user.role, "finance.wallet.transfer") : false;

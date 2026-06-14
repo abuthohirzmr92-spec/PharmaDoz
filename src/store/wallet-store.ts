@@ -28,7 +28,7 @@ interface WalletState {
   selectedWalletId: string | null;
 
   // Wallet CRUD
-  loadWallets(): Promise<void>;
+  loadWallets(branchId?: string): Promise<void>;
   loadWalletById(id: string): Promise<FinancialWallet | null>;
   createWallet(data: {
     name: string;
@@ -55,6 +55,7 @@ interface WalletState {
     dateTo?: string;
     page?: number;
     limit?: number;
+    branchId?: string;
   }): Promise<void>;
   recordTransaction(walletId: string, data: {
     type: "credit" | "debit";
@@ -297,7 +298,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
   // ====== WALLETS ======
 
-  loadWallets: async () => {
+  loadWallets: async (branchId) => {
     set({ isLoading: true, error: null });
 
     const isDemo = checkDemoMode() || !isSupabaseConnected();
@@ -325,7 +326,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         userId: user.id,
       });
 
-      const wallets = await walletRepo.getWallets();
+      const wallets = await walletRepo.getWallets({ branchId });
 
       // Load balances for each wallet
       const walletsWithBalance = await Promise.all(
@@ -519,6 +520,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         dateTo: filters?.dateTo,
         page: filters?.page ?? 1,
         limit: filters?.limit ?? 50,
+        branchId: filters?.branchId,
       });
 
       set({ transactions: result.data, isLoading: false });
