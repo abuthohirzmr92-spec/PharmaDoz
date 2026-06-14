@@ -230,9 +230,7 @@ export default function DashboardPage() {
     if (!isTxnsLoaded) loadTxns();
   }, [isTxnsLoaded, loadTxns]);
 
-  useEffect(() => {
-    if (branches.length === 0) loadBranches("demo");
-  }, [branches.length, loadBranches]);
+  // Branches are loaded by BranchProvider on auth — no lazy load needed
 
   /* ---- Resolve selected branch name ---- */
   const selectedBranch = useMemo(

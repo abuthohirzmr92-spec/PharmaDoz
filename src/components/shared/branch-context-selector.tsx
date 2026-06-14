@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useCallback } from "react";
+import { useMemo, useCallback } from "react";
 import { Store, ChevronDown } from "lucide-react";
 import { useBranchStore } from "@/store/branch-store";
 import { useAuthStore } from "@/store/auth-store";
@@ -26,12 +26,9 @@ export function BranchContextSelector({ value, onChange, showAll = true, classNa
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const setActiveBranch = useBranchStore((s) => s.setActiveBranch);
   const clearActiveBranch = useBranchStore((s) => s.clearActiveBranch);
-  const loadBranches = useBranchStore((s) => s.loadBranches);
   const user = useAuthStore((s) => s.user);
 
-  useEffect(() => {
-    if (branches.length === 0) loadBranches("demo");
-  }, [branches.length, loadBranches]);
+  // Branches are loaded by BranchProvider on auth — no lazy load needed
 
   // Derive current value: explicit prop > active branch > "all"
   const currentValue = value ?? (activeBranch?.id ?? "all");

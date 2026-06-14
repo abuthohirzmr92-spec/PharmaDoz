@@ -22,9 +22,7 @@ export function ReportBranchFilter({ selectedBranchId, onChange }: Props) {
   const loadBranches = useBranchStore((s) => s.loadBranches);
   const isLoading = useBranchStore((s) => s.isLoading);
 
-  useEffect(() => {
-    if (branches.length === 0) loadBranches("demo");
-  }, [branches.length, loadBranches]);
+  // Branches are loaded by BranchProvider on auth — no lazy load needed
 
   const options = useMemo(
     () => [{ id: "all", name: "Semua Cabang" }, ...branches.map((b) => ({ id: b.id, name: b.name }))],
