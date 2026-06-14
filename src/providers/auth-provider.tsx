@@ -194,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (cancelled) return;
 
         /* 2. Demo mode fallback */
-        if (isDemoMode()) {
+        if (process.env.NODE_ENV !== "production" && isDemoMode()) {
           devLog("hydrate: demo mode active");
           try {
             const stored = localStorage.getItem("apotek-auth");

@@ -39,6 +39,66 @@ export interface ProductCategory {
 }
 
 export class ProductRepository extends BaseRepository {
+  private async getScopedBatchesForProducts(productIds: string[]): Promise<Record<string, ProductBatch[]>> {
+    if (productIds.length === 0) return {};
+
+    let query = this.client
+      .from("product_batches")
+      .select("*")
+      .is("deleted_at", null)
+      .in("product_id", productIds);
+
+    query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
+
+    const { data, error } = await query;
+    if (error) return this.handleError(error, "getScopedBatchesForProducts");
+
+    const grouped: Record<string, ProductBatch[]> = {};
+    for (const batch of (data || []) as Record<string, unknown>[]) {
+      const productId = batch.product_id as string;
+      if (!grouped[productId]) grouped[productId] = [];
+      grouped[productId].push({
+        id: batch.id as string,
+        tenantId: (batch.tenant_id as string) ?? this.pharmacyId ?? "",
+        productId,
+        productName: "",
+        pharmacyId: (batch.pharmacy_id as string | null) ?? null,
+        batchNumber: batch.batch_number as string,
+        expiredDate: batch.expired_date as string,
+        quantity: (batch.quantity as number) ?? 0,
+        unitPrice: (batch.unit_price as number) ?? 0,
+        sellingPrice: (batch.selling_price as number) ?? 0,
+        createdAt: batch.created_at as string,
+      });
+    }
+
+    return grouped;
+  }
+
+  private mapInventoryProduct(row: Record<string, unknown>, batches: ProductBatch[]): InventoryProduct {
+    const r = row as any;
+    const namedBatches = batches.map((batch) => ({ ...batch, productName: r.name }));
+
+    return {
+      id: r.id,
+      tenantId: r.tenant_id ?? this.pharmacyId ?? "",
+      name: r.name,
+      category: r.category?.name ?? "",
+      categoryId: r.category_id,
+      description: r.description ?? null,
+      barcode: r.barcode ?? null,
+      unit: r.unit ?? "",
+      defaultPrice: r.default_price ?? 0,
+      defaultSellingPrice: r.default_selling_price ?? 0,
+      minStock: r.min_stock,
+      totalStock: namedBatches.reduce((sum, batch) => sum + (batch.quantity || 0), 0),
+      batches: namedBatches,
+      requiresPrescription: r.requires_prescription,
+      isActive: r.is_active,
+    } as InventoryProduct;
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Products (aggregated view)                                        */
   /* ------------------------------------------------------------------ */
@@ -56,8 +116,7 @@ export class ProductRepository extends BaseRepository {
       .select(
         `
         *,
-        category:category_id(name),
-        batches:product_batches(*)
+        category:category_id(name)
       `,
       )
       .is("deleted_at", null);
@@ -74,47 +133,10 @@ export class ProductRepository extends BaseRepository {
     const { data, error } = await query;
     if (error) return this.handleError(error, "getProducts");
 
-    return (data || []).map((row: Record<string, unknown>) => {
-      const r = row as any;
-      const batches: any[] = (r.batches || []).filter(
-        (b: any) => !b.deleted_at,
-      );
+    const rows = (data || []) as Record<string, unknown>[];
+    const batchesByProduct = await this.getScopedBatchesForProducts(rows.map((row) => row.id as string));
 
-      return {
-        id: r.id,
-        tenantId: this.pharmacyId ?? "",
-        name: r.name,
-        category: r.category?.name ?? "",
-        categoryId: r.category_id,
-        description: r.description ?? null,
-        barcode: r.barcode ?? null,
-        unit: r.unit ?? "",
-        defaultPrice: r.default_price ?? 0,
-        defaultSellingPrice: r.default_selling_price ?? 0,
-        minStock: r.min_stock,
-        totalStock: batches.reduce(
-          (sum: number, b: any) => sum + (b.quantity || 0),
-          0,
-        ),
-        batches: batches.map(
-          (b: any): ProductBatch => ({
-            id: b.id,
-            tenantId: this.pharmacyId ?? "",
-            productId: b.product_id,
-            productName: r.name,
-            pharmacyId: b.pharmacy_id ?? null,
-            batchNumber: b.batch_number,
-            expiredDate: b.expired_date,
-            quantity: b.quantity,
-            unitPrice: b.unit_price,
-            sellingPrice: b.selling_price,
-            createdAt: b.created_at,
-          }),
-        ),
-        requiresPrescription: r.requires_prescription,
-        isActive: r.is_active,
-      } as InventoryProduct;
-    });
+    return rows.map((row) => this.mapInventoryProduct(row, batchesByProduct[row.id as string] ?? []));
   }
 
   async getProductById(id: string): Promise<InventoryProduct | null> {
@@ -126,8 +148,7 @@ export class ProductRepository extends BaseRepository {
       .select(
         `
         *,
-        category:category_id(name),
-        batches:product_batches(*)
+        category:category_id(name)
       `,
       )
       .is("deleted_at", null)
@@ -143,41 +164,8 @@ export class ProductRepository extends BaseRepository {
       return this.handleError(error, "getProductById");
     }
 
-    const r = data as any;
-    const batches: any[] = (r.batches || []).filter(
-      (b: any) => !b.deleted_at,
-    );
-
-    return {
-      id: r.id,
-      name: r.name,
-      category: r.category?.name ?? "",
-      barcode: r.barcode ?? null,
-      unit: r.unit ?? "",
-      defaultPrice: r.default_price ?? 0,
-      defaultSellingPrice: r.default_selling_price ?? 0,
-      minStock: r.min_stock,
-      totalStock: batches.reduce(
-        (sum: number, b: any) => sum + (b.quantity || 0),
-        0,
-      ),
-      batches: batches.map(
-        (b: any): ProductBatch => ({
-          id: b.id,
-          tenantId: this.pharmacyId ?? "",
-          productId: b.product_id,
-          productName: r.name,
-          batchNumber: b.batch_number,
-          expiredDate: b.expired_date,
-          quantity: b.quantity,
-          unitPrice: b.unit_price,
-          sellingPrice: b.selling_price,
-          createdAt: b.created_at,
-        }),
-      ),
-      requiresPrescription: r.requires_prescription,
-      isActive: r.is_active,
-    } as InventoryProduct;
+    const batchesByProduct = await this.getScopedBatchesForProducts([data.id]);
+    return this.mapInventoryProduct(data as Record<string, unknown>, batchesByProduct[data.id] ?? []);
   }
 
   /* ------------------------------------------------------------------ */
@@ -193,8 +181,7 @@ export class ProductRepository extends BaseRepository {
       .select(
         `
         *,
-        category:category_id(name),
-        batches:product_batches(*)
+        category:category_id(name)
       `,
       )
       .is("deleted_at", null)
@@ -208,41 +195,8 @@ export class ProductRepository extends BaseRepository {
     if (error) return this.handleError(error, "searchByBarcode");
     if (!data) return null;
 
-    const r = data as any;
-    const batches: any[] = (r.batches || []).filter(
-      (b: any) => !b.deleted_at,
-    );
-
-    return {
-      id: r.id,
-      name: r.name,
-      category: r.category?.name ?? "",
-      barcode: r.barcode ?? null,
-      unit: r.unit ?? "",
-      defaultPrice: r.default_price ?? 0,
-      defaultSellingPrice: r.default_selling_price ?? 0,
-      minStock: r.min_stock,
-      totalStock: batches.reduce(
-        (sum: number, b: any) => sum + (b.quantity || 0),
-        0,
-      ),
-      batches: batches.map(
-        (b: any): ProductBatch => ({
-          id: b.id,
-          tenantId: this.pharmacyId ?? "",
-          productId: b.product_id,
-          productName: r.name,
-          batchNumber: b.batch_number,
-          expiredDate: b.expired_date,
-          quantity: b.quantity,
-          unitPrice: b.unit_price,
-          sellingPrice: b.selling_price,
-          createdAt: b.created_at,
-        }),
-      ),
-      requiresPrescription: r.requires_prescription,
-      isActive: r.is_active,
-    } as InventoryProduct;
+    const batchesByProduct = await this.getScopedBatchesForProducts([data.id]);
+    return this.mapInventoryProduct(data as Record<string, unknown>, batchesByProduct[data.id] ?? []);
   }
 
   /* ------------------------------------------------------------------ */

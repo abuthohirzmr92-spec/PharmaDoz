@@ -4,6 +4,10 @@ import { redirect } from "next/navigation";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { PlatformShell } from "./platform-shell";
 
+function hasValidSupabaseEnv(url: string | undefined, key: string | undefined): boolean {
+  return !!url && !!key && !url.includes("your-project");
+}
+
 export default async function PlatformLayout({
   children,
 }: {
@@ -12,19 +16,13 @@ export default async function PlatformLayout({
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Demo mode or missing env — allow through without auth check
-  if (
-    !supabaseUrl ||
-    !supabaseKey ||
-    supabaseUrl.includes("your-project") ||
-    process.env.NEXT_PUBLIC_DEMO_MODE === "true"
-  ) {
-    return <PlatformShell>{children}</PlatformShell>;
+  if (!hasValidSupabaseEnv(supabaseUrl, supabaseKey)) {
+    redirect("/login");
   }
 
   const cookieStore = await cookies();
 
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
     cookies: {
       getAll() {
         return cookieStore.getAll();
@@ -35,19 +33,19 @@ export default async function PlatformLayout({
     },
   });
 
-  const { data } = await supabase.auth.getSession();
+  const { data, error: sessionError } = await supabase.auth.getSession();
 
-  if (!data.session) {
+  if (sessionError || !data.session?.user?.id) {
     redirect("/login");
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("profiles")
     .select("system_role")
     .eq("id", data.session.user.id)
     .single();
 
-  if (!profile || !isPlatformUser(profile.system_role)) {
+  if (profileError || !profile || !isPlatformUser(profile.system_role)) {
     redirect("/dashboard");
   }
 

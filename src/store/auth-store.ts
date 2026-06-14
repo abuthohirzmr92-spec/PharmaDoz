@@ -257,7 +257,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   /* ---- Demo: loginAs ---- */
   loginAs: (role) => {
-    if (!isDemoMode()) {
+    if (process.env.NODE_ENV === "production" || !isDemoMode()) {
       set({ error: "Demo login hanya tersedia di development mode." });
       return;
     }
@@ -274,7 +274,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   /* ---- Demo: switchRole ---- */
   switchRole: (role) => {
-    if (!isDemoMode()) {
+    if (process.env.NODE_ENV === "production" || !isDemoMode()) {
       set({ error: "Demo role switch hanya tersedia di development mode." });
       return;
     }
@@ -936,7 +936,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 /*  Demo-only: localStorage hydration (does NOT run in production)      */
 /* ------------------------------------------------------------------ */
 
-if (typeof window !== "undefined" && isDemoMode()) {
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production" && isDemoMode()) {
   const stored = localStorage.getItem("apotek-auth");
   if (stored) {
     try {
@@ -960,7 +960,7 @@ if (typeof window !== "undefined" && isDemoMode()) {
 /*  Demo-only: localStorage persistence (does NOT run in production)    */
 /* ------------------------------------------------------------------ */
 
-if (typeof window !== "undefined" && isDemoMode()) {
+if (typeof window !== "undefined" && process.env.NODE_ENV !== "production" && isDemoMode()) {
   useAuthStore.subscribe((state) => {
     if (state.user && state.isAuthenticated) {
       localStorage.setItem(

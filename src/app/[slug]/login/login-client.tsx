@@ -47,7 +47,7 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
 
   const [showDemo, setShowDemo] = useState(false);
   const hasSupabase = isSupabaseConnected();
-  const isDemo = checkDemoMode();
+  const isDemo = process.env.NODE_ENV !== "production" && checkDemoMode();
 
   const handleDemoLogin = (role: AppRole) => {
     loginAs(role);

@@ -140,6 +140,7 @@ export class WalletRepository extends BaseRepository {
       .from("financial_wallets")
       .select("*")
       .is("deleted_at", null)
+      .eq("tenant_id", this.requireTenant())
       .eq("id", id)
       .single();
 
@@ -218,6 +219,7 @@ export class WalletRepository extends BaseRepository {
       .from("financial_wallets")
       .update(updateData)
       .eq("id", id)
+      .eq("tenant_id", this.requireTenant())
       .select()
       .single();
 
@@ -248,7 +250,8 @@ export class WalletRepository extends BaseRepository {
     const { error } = await this.client
       .from("financial_wallets")
       .update({ is_archived: true, deleted_at: new Date().toISOString() })
-      .eq("id", id);
+      .eq("id", id)
+      .eq("tenant_id", this.requireTenant());
 
     if (error) return this.handleError(error, "archiveWallet");
 
@@ -273,8 +276,9 @@ export class WalletRepository extends BaseRepository {
 
     const { data, error } = await this.client
       .from("wallet_transactions")
-      .select("type, amount")
-      .eq("wallet_id", walletId);
+      .select("type, amount, financial_wallets!inner(tenant_id)")
+      .eq("wallet_id", walletId)
+      .eq("financial_wallets.tenant_id", this.requireTenant());
 
     if (error) return this.handleError(error, "getWalletBalance");
 
@@ -570,6 +574,8 @@ export class WalletRepository extends BaseRepository {
           completed_at: new Date().toISOString(),
         })
         .eq("id", transfer.id)
+        .eq("from_wallet_id", fromId)
+        .eq("to_wallet_id", toId)
         .select()
         .single();
 
@@ -608,7 +614,9 @@ export class WalletRepository extends BaseRepository {
           status: "rejected",
           notes: `${transfer.notes ?? ""}\nGagal: ${errorMessage}`.trim(),
         })
-        .eq("id", transfer.id);
+        .eq("id", transfer.id)
+        .eq("from_wallet_id", fromId)
+        .eq("to_wallet_id", toId);
 
       // Audit
       await this.logAudit(fromId, "transfer.rejected", {
@@ -629,13 +637,14 @@ export class WalletRepository extends BaseRepository {
 
     let query = this.client
       .from("wallet_transfers")
-      .select("*, from_wallet:financial_wallets!wallet_transfers_from_wallet_id_fkey(tenant_id)")
+      .select("*, from_wallet:financial_wallets!wallet_transfers_from_wallet_id_fkey(tenant_id), to_wallet:financial_wallets!wallet_transfers_to_wallet_id_fkey(tenant_id)")
       .order("created_at", { ascending: false });
 
-    // Scope to tenant via from_wallet
+    // Scope to tenant via both wallet relationships.
     const tid = this.getTenantId();
     if (tid) {
       query = query.eq("from_wallet.tenant_id", tid);
+      query = query.eq("to_wallet.tenant_id", tid);
     }
 
     if (filters?.walletId) {
@@ -659,7 +668,7 @@ export class WalletRepository extends BaseRepository {
 
     // Strip nested objects
     const cleanRows = (data || []).map((row: Record<string, unknown>) => {
-      const { from_wallet, ...rest } = row;
+      const { from_wallet, to_wallet, ...rest } = row;
       return rest;
     });
 

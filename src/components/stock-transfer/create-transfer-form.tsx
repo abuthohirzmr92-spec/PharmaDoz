@@ -93,10 +93,14 @@ export function CreateTransferForm() {
       try {
         // Query batches directly for the selected product in the source branch
         if (isSupabaseConnected()) {
+          const tenantId = productRepo.getTenantId();
+          if (!tenantId) throw new Error("Tenant context required to load transfer batches");
+
           const { data, error } = await supabase!
             .from("product_batches")
             .select("*, product:product_id(name)")
             .is("deleted_at", null)
+            .eq("tenant_id", tenantId)
             .eq("product_id", selectedProductId)
             .eq("pharmacy_id", fromBranchId)
             .gt("quantity", 0);

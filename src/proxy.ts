@@ -42,23 +42,22 @@ function isSystemRole(role: string | null | undefined): boolean {
   return typeof role === "string" && SYSTEM_ROLES.has(role);
 }
 
+function hasValidSupabaseEnv(url: string | undefined, key: string | undefined): boolean {
+  return !!url && !!key && !url.includes("your-project");
+}
+
 export async function proxy(request: NextRequest) {
   const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const supabaseKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
-  // Demo mode or missing env: allow all traffic
-  if (
-    !supabaseUrl ||
-    !supabaseKey ||
-    supabaseUrl.includes("your-project") ||
-    process.env.NEXT_PUBLIC_DEMO_MODE === "true"
-  ) {
-    return NextResponse.next();
+  if (!hasValidSupabaseEnv(supabaseUrl, supabaseKey)) {
+    if (isPublicPath(request.nextUrl.pathname)) return NextResponse.next();
+    return NextResponse.redirect(new URL("/login", request.url));
   }
 
   let response = NextResponse.next({ request: { headers: request.headers } });
 
-  const supabase = createServerClient(supabaseUrl, supabaseKey, {
+  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
     cookies: {
       getAll() {
         return request.cookies.getAll();

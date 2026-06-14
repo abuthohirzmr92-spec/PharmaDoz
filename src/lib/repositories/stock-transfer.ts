@@ -2,6 +2,13 @@ import { BaseRepository, mapRow } from "./base";
 import type { StockTransfer, TransferStatus, CreateTransferInput, TransferFilters } from "@/types/stock-transfer";
 
 export class StockTransferRepository extends BaseRepository {
+  private withTransferBranchScope(query: any): any {
+    if (!this.branchId) return query;
+    return query.or(
+      `from_pharmacy_id.eq.${this.branchId},to_pharmacy_id.eq.${this.branchId}`,
+    );
+  }
+
   /* ------------------------------------------------------------------ */
   /*  List Transfers                                                     */
   /* ------------------------------------------------------------------ */
@@ -67,6 +74,7 @@ export class StockTransferRepository extends BaseRepository {
       .eq("id", id);
 
     query = this.withTenantScope(query);
+    query = this.withTransferBranchScope(query);
 
     const { data, error } = await query.single();
 
@@ -139,6 +147,7 @@ export class StockTransferRepository extends BaseRepository {
       );
 
     query = this.withTenantScope(query);
+    query = this.withTransferBranchScope(query);
 
     const { data: row, error } = await query.single();
 
@@ -178,6 +187,7 @@ export class StockTransferRepository extends BaseRepository {
       );
 
     query = this.withTenantScope(query);
+    query = this.withTransferBranchScope(query);
 
     const { data: row, error } = await query.single();
 
@@ -214,6 +224,7 @@ export class StockTransferRepository extends BaseRepository {
       );
 
     query = this.withTenantScope(query);
+    query = this.withTransferBranchScope(query);
 
     const { data: row, error } = await query.single();
 
@@ -249,6 +260,8 @@ export class StockTransferRepository extends BaseRepository {
       .select("*")
       .is("deleted_at", null)
       .eq("id", transfer.batchId)
+      .eq("tenant_id", this.requireTenant())
+      .eq("pharmacy_id", transfer.fromPharmacyId)
       .single();
 
     if (srcErr) return this.handleError(srcErr, "receiveTransfer - source batch");
@@ -268,7 +281,9 @@ export class StockTransferRepository extends BaseRepository {
     const { error: deductErr } = await this.client
       .from("product_batches")
       .update({ quantity: newSourceQty, updated_at: now })
-      .eq("id", transfer.batchId);
+      .eq("id", transfer.batchId)
+      .eq("tenant_id", this.requireTenant())
+      .eq("pharmacy_id", transfer.fromPharmacyId);
 
     if (deductErr) return this.handleError(deductErr, "receiveTransfer - deduct");
 
@@ -282,6 +297,7 @@ export class StockTransferRepository extends BaseRepository {
       .from("product_batches")
       .select("*")
       .is("deleted_at", null)
+      .eq("tenant_id", this.requireTenant())
       .eq("batch_number", batchNumber)
       .eq("pharmacy_id", transfer.toPharmacyId)
       .maybeSingle();
@@ -294,7 +310,9 @@ export class StockTransferRepository extends BaseRepository {
       const { error: updateDestErr } = await this.client
         .from("product_batches")
         .update({ quantity: destQty + transfer.quantity, updated_at: now })
-        .eq("id", (existingDest as any).id);
+        .eq("id", (existingDest as any).id)
+        .eq("tenant_id", this.requireTenant())
+        .eq("pharmacy_id", transfer.toPharmacyId);
 
       if (updateDestErr) return this.handleError(updateDestErr, "receiveTransfer - update dest");
     } else {

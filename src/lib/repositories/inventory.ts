@@ -83,6 +83,7 @@ export class InventoryRepository extends BaseRepository {
       .is("deleted_at", null)
       .eq("id", id);
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data, error } = await query.single();
 
@@ -139,6 +140,7 @@ export class InventoryRepository extends BaseRepository {
       .eq("id", id)
       .select(`*, product:product_id(name)`);
     query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
 
     const { data: row, error } = await query.single();
 
@@ -345,9 +347,12 @@ export class InventoryRepository extends BaseRepository {
 
     let query = this.client
       .from("sale_batch_allocations")
-      .select("transaction_id, transaction_item_id, batch_id, quantity, cost_price, batch:batch_id(batch_number, expired_date)");
+      .select("transaction_id, transaction_item_id, batch_id, quantity, cost_price, batch:product_batches!inner(batch_number, expired_date, tenant_id, pharmacy_id)");
 
     query = this.withTenantScope(query);
+    const tenantId = this.getTenantId();
+    if (tenantId) query = query.eq("batch.tenant_id", tenantId);
+    if (this.branchId) query = query.eq("batch.pharmacy_id", this.branchId);
     if (dateFrom) query = query.gte("created_at", dateFrom);
 
     const { data, error } = await query;
