@@ -375,6 +375,12 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   createWallet: async (data) => {
     set({ isLoading: true, error: null });
 
+    // Auto-set branchId from active branch if not explicitly provided
+    if (!data.branchId) {
+      const { useBranchStore } = await import("@/store/branch-store");
+      data.branchId = useBranchStore.getState().activeBranch?.id ?? null;
+    }
+
     const isDemo = checkDemoMode() || !isSupabaseConnected();
 
     if (isDemo) {
