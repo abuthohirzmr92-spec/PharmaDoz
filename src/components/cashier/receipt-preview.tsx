@@ -167,8 +167,8 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
         createPortal(
           <div
             id="receipt-print-root"
+            className="hidden print:block"
             style={{
-              display: "none",
               width: "58mm",
               margin: "0 auto",
               padding: "2mm",
