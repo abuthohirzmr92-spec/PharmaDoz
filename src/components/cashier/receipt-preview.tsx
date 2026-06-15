@@ -1,5 +1,6 @@
 "use client";
 
+import { useMemo } from "react";
 import { createPortal } from "react-dom";
 import { Printer, X } from "lucide-react";
 import { useCashierStore } from "@/store/cashier-store";
@@ -7,6 +8,8 @@ import { useAuthStore } from "@/store/auth-store";
 import { useBranchStore } from "@/store/branch-store";
 import { useTenantBranding } from "@/providers/tenant-brand-provider";
 import { useWalletStore } from "@/store/wallet-store";
+import { BluetoothPrintButton } from "@/components/cashier/bluetooth-print-button";
+import { ReceiptBuilder } from "@/lib/escpos/encoder";
 
 export interface ReceiptPreviewProps {
   open: boolean;
@@ -78,6 +81,37 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
 
   const handlePrint = () => window.print();
   const handleNew = () => { resetCashier(); onClose(); };
+
+  // Build ESC/POS data for Bluetooth printing
+  const escposData = useMemo(() => {
+    try {
+      const builder = new ReceiptBuilder();
+      builder.setStore(pharmacyName, address, phone);
+      builder.setInvoice(invoiceNumber ?? "—", `${dateStr} ${timeStr}`, user?.displayName);
+      for (const item of cart) {
+        builder.addItem(
+          item.productName.slice(0, 20),
+          item.quantity,
+          item.unitPrice,
+          item.quantity * item.unitPrice,
+        );
+      }
+      builder.setTotal(cartTotal);
+      builder.setPayment(
+        payments.map((p) => getPaymentMethodLabel(p.method)).join(", "),
+      );
+      if (receiptFooter) builder.setFooter(receiptFooter);
+      return builder.build();
+    } catch {
+      return null;
+    }
+  }, [pharmacyName, address, phone, invoiceNumber, dateStr, timeStr, user?.displayName, cart, cartTotal, payments, receiptFooter]);
+
+  const handleBluetoothPrinted = () => {
+    // Reset cashier after Bluetooth print
+    resetCashier();
+    onClose();
+  };
 
   // ---- Receipt content (reused for both screen + print) ----
   const receiptBody = (
@@ -232,6 +266,10 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
               className="flex items-center gap-1 rounded border border-neutral-300 px-2 py-1.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-50">
               <Printer className="h-3 w-3" />Cetak
             </button>
+            <BluetoothPrintButton
+              printData={escposData}
+              onPrinted={handleBluetoothPrinted}
+            />
             <button onClick={handleNew}
               className="flex-1 rounded bg-brand-600 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-brand-700">
               Transaksi Baru
