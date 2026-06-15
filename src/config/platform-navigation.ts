@@ -5,7 +5,7 @@ import {
   Activity,
   Brain,
   Package,
-  Palette,
+  Settings,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Permission } from "@/types";
@@ -51,6 +51,12 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
         icon: Package,
         permission: "platform.quotas.manage",
       },
+      {
+        href: "/platform/settings",
+        label: "Pengaturan Platform",
+        icon: Settings,
+        permission: "platform.view",
+      },
     ],
   },
   {
@@ -72,12 +78,6 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
         href: "/platform/maintenance",
         label: "Maintenance",
         icon: Activity,
-        permission: "platform.view",
-      },
-      {
-        href: "/platform/branding",
-        label: "Branding Aplikasi",
-        icon: Palette,
         permission: "platform.view",
       },
     ],

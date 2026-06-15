@@ -141,7 +141,7 @@ export default function PlatformBrandingPage() {
     <Container>
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-          Branding Aplikasi
+          Pengaturan Platform
         </h1>
         <p className="mt-1 text-sm text-neutral-500">
           Atur nama, logo, dan tampilan aplikasi Medisync di seluruh platform.
