@@ -7,7 +7,8 @@ export async function GET(request: Request) {
   const code = searchParams.get("code");
   const accessToken = searchParams.get("access_token");
   const refreshToken = searchParams.get("refresh_token");
-  const next = searchParams.get("next") ?? "/dashboard";
+  const type = searchParams.get("type"); // "recovery", "invite", "signup", etc.
+  let next = searchParams.get("next") ?? "/dashboard";
 
   if (!code && !accessToken) {
     return NextResponse.redirect(`${origin}/login`);
@@ -46,6 +47,11 @@ export async function GET(request: Request) {
 
   if (error) {
     return NextResponse.redirect(`${origin}/login?error=auth`);
+  }
+
+  // Recovery flow (forgot password / reset password) — redirect to set-password
+  if (type === "recovery") {
+    next = "/auth/set-password";
   }
 
   const response = NextResponse.redirect(`${origin}${next}`);
