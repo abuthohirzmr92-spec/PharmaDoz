@@ -113,6 +113,19 @@ export class SuperAdminRepository extends BaseRepository {
     return true;
   }
 
+  async deleteTenant(tenantId: string): Promise<boolean> {
+    if (!this.isConnected) return false;
+
+    const { error } = await this.client
+      .from("tenants")
+      .update({ deleted_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+      .eq("id", tenantId)
+      .is("deleted_at", null);
+
+    if (error) return this.handleError(error, "deleteTenant");
+    return true;
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Platform stats (aggregate across all tenants)                       */
   /* ------------------------------------------------------------------ */

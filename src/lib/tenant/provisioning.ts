@@ -174,13 +174,13 @@ export async function provisionTenant(
   try {
     const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
     await authClient().auth.resetPasswordForEmail(validation.ownerEmail, {
-      redirectTo: `${appUrl}/login`,
+      redirectTo: `${appUrl}/auth/set-password`,
     });
   } catch {
     emailWarning = {
       type: "email_delivery_failed",
       message:
-        "Email setup password gagal dikirim. Pemilik dapat menggunakan 'Lupa Password' di halaman login.",
+        "Email aktivasi gagal dikirim. Pemilik dapat menggunakan 'Lupa Password' di halaman login untuk mengatur password.",
       recoverable: true,
     };
   }
