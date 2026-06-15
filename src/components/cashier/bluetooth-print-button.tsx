@@ -35,11 +35,18 @@ export function BluetoothPrintButton({ printData, onPrinted, disabled }: Props) 
 
       if (result.success) {
         toast.success("Struk berhasil dicetak via Bluetooth.");
-        // Disconnect after printing
         await bluetoothPrinter.disconnect();
         onPrinted?.();
       } else {
-        toast.error(result.error || "Gagal mencetak.");
+        // Classic Bluetooth SPP printer detected — show fallback guidance
+        if (result.isClassicBluetooth) {
+          toast.error(result.error, {
+            duration: 6000,
+            description: "Gunakan tombol [Cetak] untuk mencetak via dialog sistem.",
+          });
+        } else {
+          toast.error(result.error || "Gagal mencetak.");
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Gagal mencetak via Bluetooth";
