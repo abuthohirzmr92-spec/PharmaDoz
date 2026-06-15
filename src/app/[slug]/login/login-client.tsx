@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Pill,
@@ -25,6 +25,8 @@ import { isDemoMode as checkDemoMode } from "@/config/env";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
 import type { AppRole } from "@/types";
+import { PwaInstallButton } from "@/components/auth/pwa-install-button";
+import { usePlatformBrandingStore } from "@/store/platform-branding-store";
 
 const LOGIN_DEADLINE_MS = 30_000;
 
@@ -38,6 +40,11 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
   const router = useRouter();
   const loginAs = useAuthStore((s) => s.loginAs);
   const loginWithEmail = useAuthStore((s) => s.loginWithEmail);
+  const platformBranding = usePlatformBrandingStore();
+
+  useEffect(() => {
+    platformBranding.loadSettings();
+  }, []);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -199,6 +206,9 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
           </form>
         )}
 
+        {/* PWA Install */}
+        <PwaInstallButton />
+
         {/* Demo section */}
         {isDemo && (
           <div className="mt-4">
@@ -245,7 +255,7 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
         )}
 
         <p className="mt-6 text-center text-[10px] text-neutral-400">
-          {branding.companyName} — Aplikasi Manajemen Apotek
+          {branding.companyName} — {platformBranding.getAppName()}
         </p>
       </div>
     </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   Pill,
@@ -25,6 +25,8 @@ import { isDemoMode as checkDemoMode } from "@/config/env";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { ROLE_LABELS, SYSTEM_ROLES, TENANT_ROLES } from "@/lib/auth/roles";
 import type { AppRole } from "@/types";
+import { PwaInstallButton } from "@/components/auth/pwa-install-button";
+import { usePlatformBrandingStore } from "@/store/platform-branding-store";
 
 const LOGIN_DEADLINE_MS = 30_000;
 
@@ -32,6 +34,7 @@ export default function LoginPage() {
   const router = useRouter();
   const loginAs = useAuthStore((s) => s.loginAs);
   const loginWithEmail = useAuthStore((s) => s.loginWithEmail);
+  const branding = usePlatformBrandingStore();
 
   /* ---- email/password form ---- */
   const [email, setEmail] = useState("");
@@ -45,6 +48,10 @@ export default function LoginPage() {
 
   const hasSupabase = isSupabaseConnected();
   const isDemo = process.env.NODE_ENV !== "production" && checkDemoMode();
+
+  useEffect(() => {
+    branding.loadSettings();
+  }, []);
 
   const handleDemoLogin = (role: AppRole) => {
     loginAs(role);
@@ -123,16 +130,27 @@ export default function LoginPage() {
       <div className="w-full max-w-lg">
         {/* Branding */}
         <div className="mb-6 flex flex-col items-center gap-3">
-          <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
-            <Pill className="h-7 w-7" />
-          </div>
+          {branding.getLogoUrl() ? (
+            <img
+              src={branding.getLogoUrl()!}
+              alt={branding.getAppName()}
+              className="h-14 w-14 rounded-2xl object-contain shadow-lg"
+              onError={(e) => {
+                (e.target as HTMLImageElement).style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
+              <Pill className="h-7 w-7" />
+            </div>
+          )}
           <div className="text-center">
             <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-              Apotek Manage
+              {branding.getAppName()}
             </h1>
             <p className="text-sm text-neutral-500">
               {hasSupabase
-                ? "Masuk dengan akun Anda"
+                ? branding.getTagline()
                 : isDemo
                   ? "Demo Mode — Pilih role untuk masuk"
                   : "Layanan sedang tidak tersedia"}
@@ -274,6 +292,9 @@ export default function LoginPage() {
             )}
           </form>
         )}
+
+        {/* PWA Install */}
+        <PwaInstallButton />
 
         {/* Demo Mode Section — only visible when NEXT_PUBLIC_DEMO_MODE=true */}
         {isDemo && (
