@@ -545,16 +545,20 @@ export class WalletRepository extends BaseRepository {
       fee: options?.fee ?? 0,
     });
 
+    let debitRecorded = false;
+    const debitAmount = amount + (options?.fee ?? 0);
+
     try {
       // 2. Debit from_wallet
       await this.recordTransaction(fromId, {
         type: "debit",
-        amount: amount + (options?.fee ?? 0),
+        amount: debitAmount,
         sourceType: "transfer_out",
         sourceId: transfer.id,
         description: `Transfer ke ${toWallet.name}${options?.fee ? ` (biaya: Rp ${options.fee.toLocaleString("id-ID")})` : ""}`,
         transactionDate: new Date().toISOString(),
       });
+      debitRecorded = true;
 
       // 3. Credit to_wallet (amount only, fee is not credited)
       await this.recordTransaction(toId, {
@@ -605,14 +609,50 @@ export class WalletRepository extends BaseRepository {
 
       return completed;
     } catch (err) {
-      // If debit/credit fails, mark transfer as rejected
       const errorMessage = err instanceof Error ? err.message : "Unknown error";
 
+      // Compensation: if debit was already recorded, reverse it
+      if (debitRecorded) {
+        try {
+          await this.recordTransaction(fromId, {
+            type: "credit",
+            amount: debitAmount,
+            sourceType: "adjustment",
+            sourceId: transfer.id,
+            description: `Pembatalan transfer gagal ke ${toWallet.name}: ${errorMessage}`,
+            transactionDate: new Date().toISOString(),
+          });
+          await this.logAudit(fromId, "transfer.reversed", {
+            transfer_id: transfer.id,
+            to_wallet_id: toId,
+            amount: debitAmount,
+            reason: errorMessage,
+          });
+        } catch (reversalErr) {
+          console.error(
+            "[WalletRepository] CRITICAL: Failed to reverse debit after transfer failure.",
+            "Transfer ID:", transfer.id,
+            "Debit amount:", debitAmount,
+            "From wallet:", fromId,
+            "Error:", reversalErr instanceof Error ? reversalErr.message : reversalErr,
+          );
+          await this.logAudit(fromId, "transfer.reversal_failed", {
+            transfer_id: transfer.id,
+            to_wallet_id: toId,
+            amount: debitAmount,
+            reason: errorMessage,
+            reversal_error: reversalErr instanceof Error ? reversalErr.message : String(reversalErr),
+          });
+        }
+      }
+
+      // Mark transfer as rejected
       await this.client
         .from("wallet_transfers")
         .update({
           status: "rejected",
-          notes: `${transfer.notes ?? ""}\nGagal: ${errorMessage}`.trim(),
+          notes: `${transfer.notes ?? ""}\nGagal: ${errorMessage}${debitRecorded ? " (debit telah dibatalkan)" : ""}`.trim(),
+          completed_at: new Date().toISOString(),
         })
         .eq("id", transfer.id)
         .eq("from_wallet_id", fromId)
@@ -622,6 +662,7 @@ export class WalletRepository extends BaseRepository {
       await this.logAudit(fromId, "transfer.rejected", {
         transfer_id: transfer.id,
         error: errorMessage,
+        debit_reversed: debitRecorded,
       });
 
       throw err;
