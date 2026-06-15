@@ -46,6 +46,9 @@ function createSupabaseClient() {
       lock: noOpLock,
       detectSessionInUrl: false,
     },
+    realtime: {
+      enabled: false,
+    },
   } as any);
 }
 
