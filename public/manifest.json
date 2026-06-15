@@ -1,6 +1,6 @@
 {
-  "name": "Apotek Manage",
-  "short_name": "Apotek",
+  "name": "Medisync",
+  "short_name": "Medisync",
   "description": "Modern Pharmacy Management System",
   "start_url": "/dashboard",
   "display": "standalone",

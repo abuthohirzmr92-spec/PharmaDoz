@@ -10,7 +10,7 @@ import { isDemoMode as checkDemoMode } from "@/config/env";
 /* ------------------------------------------------------------------ */
 
 const DEFAULTS = {
-  appName: "Apotek Manage",
+  appName: "Medisync",
   tagline: "Modern Pharmacy Management System",
 } as const;
 
