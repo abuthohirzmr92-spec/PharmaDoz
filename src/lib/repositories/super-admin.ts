@@ -126,6 +126,23 @@ export class SuperAdminRepository extends BaseRepository {
     return true;
   }
 
+  async hardDeleteTenant(tenantId: string): Promise<{
+    success: boolean;
+    tenantName?: string;
+    branchCount?: number;
+    userCount?: number;
+    error?: string;
+  }> {
+    if (!this.isConnected) return { success: false, error: "Not connected" };
+
+    const { data, error } = await (this.client.rpc as any)("hard_delete_tenant", {
+      p_tenant_id: tenantId,
+    });
+
+    if (error) return { success: false, error: error.message };
+    return data as any;
+  }
+
   /* ------------------------------------------------------------------ */
   /*  Platform stats (aggregate across all tenants)                       */
   /* ------------------------------------------------------------------ */

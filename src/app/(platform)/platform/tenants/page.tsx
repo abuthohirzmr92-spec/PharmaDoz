@@ -199,6 +199,7 @@ export default function PlatformTenantsPage() {
     suspendTenant: suspend,
     activateTenant: activate,
     deleteTenant: deleteTnt,
+    hardDeleteTenant: hardDeleteTnt,
   } = useSuperAdminStore();
 
   const [searchQuery, setSearchQuery] = useState("");
@@ -264,16 +265,17 @@ export default function PlatformTenantsPage() {
   const handleDelete = useCallback(async () => {
     if (!deleteTarget) return;
     setActioningId(deleteTarget.id);
-    const ok = await deleteTnt(deleteTarget.id);
-    if (ok) {
-      toast.success(`Tenant "${deleteTarget.name}" berhasil dihapus.`);
+    const result = await hardDeleteTnt(deleteTarget.id);
+    if (result.success) {
+      toast.success(`"${result.tenantName}" dihapus permanen. ${result.branchCount} cabang, ${result.userCount} user.`);
       setDeleteTarget(null);
       setDeleteConfirm("");
+      loadTenants();
     } else {
-      toast.error("Gagal menghapus tenant.");
+      toast.error(result.error || "Gagal menghapus tenant.");
     }
     setActioningId(null);
-  }, [deleteTarget, deleteTnt]);
+  }, [deleteTarget, hardDeleteTnt, loadTenants]);
 
   /* ---- Maintenance gate ---- */
   if (maintenanceConfig.mode === "full") {
@@ -619,10 +621,19 @@ export default function PlatformTenantsPage() {
 
             <div className="space-y-3">
               <div className="rounded-lg border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-800 dark:bg-red-950/30 dark:text-red-300">
-                <p className="font-medium">Tindakan ini tidak dapat dibatalkan.</p>
+                <p className="font-medium">⚠️ Penghapusan Permanen</p>
                 <p className="mt-1 text-xs text-red-600 dark:text-red-400">
-                  Tenant <strong>{deleteTarget.name}</strong> akan dihapus secara permanen beserta seluruh data terkait.
-                  Pastikan tidak ada transaksi aktif sebelum melanjutkan.
+                  Tenant <strong>{deleteTarget.name}</strong> dan seluruh data terkait akan dihapus secara permanen.
+                </p>
+                <ul className="mt-2 text-xs text-red-600 dark:text-red-400 list-disc list-inside space-y-0.5">
+                  <li>Seluruh cabang dan stok per cabang</li>
+                  <li>Seluruh produk, batch, dan inventaris</li>
+                  <li>Seluruh transaksi penjualan dan pembelian</li>
+                  <li>Seluruh wallet, transaksi keuangan, dan modal</li>
+                  <li>Seluruh pengguna tenant (auth accounts)</li>
+                </ul>
+                <p className="mt-2 text-xs font-medium text-red-700 dark:text-red-300">
+                  Tindakan ini <strong>TIDAK DAPAT DIBATALKAN</strong>.
                 </p>
               </div>
 

@@ -22,6 +22,7 @@ interface SuperAdminState {
   suspendTenant(tenantId: string): Promise<boolean>;
   activateTenant(tenantId: string): Promise<boolean>;
   deleteTenant(tenantId: string): Promise<boolean>;
+  hardDeleteTenant(tenantId: string): Promise<{ success: boolean; tenantName?: string; branchCount?: number; userCount?: number; error?: string }>;
 
   // Subscription lifecycle
   changeSubscription(tenantId: string, newPackageId: string): Promise<boolean>;
@@ -144,6 +145,16 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
     } catch {
       return false;
     }
+  },
+
+  hardDeleteTenant: async (tenantId) => {
+    const result = await superAdminRepo.hardDeleteTenant(tenantId);
+    if (result.success) {
+      set((s) => ({
+        tenants: s.tenants.filter((t) => t.pharmacyId !== tenantId),
+      }));
+    }
+    return result;
   },
 
   // Subscription lifecycle
