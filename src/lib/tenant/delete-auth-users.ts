@@ -7,10 +7,12 @@ import { createClient } from "@supabase/supabase-js";
  * Uses service_role key — only callable from server actions.
  * This frees the email addresses for re-registration.
  *
- * IMPORTANT:
- * - profiles cascade-delete when auth.users is deleted (FK ON DELETE CASCADE)
- * - Call this BEFORE hard_delete_tenant RPC
- * - Global product catalog (global_products) is NEVER touched
+ * User IDs are sourced from:
+ *   - tenant_users.user_id (all tenant members)
+ *   - users.supabase_uid / users.id (fallback, migration 001 schema)
+ *
+ * Call this BEFORE hard_delete_tenant RPC.
+ * Global product catalog (global_products) is NEVER touched.
  */
 export async function deleteTenantAuthUsers(
   tenantId: string,
@@ -31,7 +33,7 @@ export async function deleteTenantAuthUsers(
   });
 
   // ------------------------------
-  // 1. Get all user IDs for this tenant
+  // 1. Get all user IDs for this tenant via tenant_users
   // ------------------------------
   const { data: memberships, error: memberError } = await adminClient
     .from("tenant_users")
@@ -42,22 +44,30 @@ export async function deleteTenantAuthUsers(
     return { success: false, deleted: 0, error: `Gagal memuat user tenant: ${memberError.message}` };
   }
 
-  // Also find profiles linked to this tenant (owner might not have tenant_users row)
-  const { data: profiles, error: profileError } = await adminClient
-    .from("profiles")
-    .select("id")
-    .eq("tenant_id", tenantId);
+  // Also try users table (migration 001) if it exists (pre-profiles production)
+  let extraUserIds: string[] = [];
+  try {
+    const { data: users } = await adminClient
+      .from("users")
+      .select("supabase_uid, id")
+      .eq("tenant_id", tenantId);
 
-  if (profileError) {
-    return { success: false, deleted: 0, error: `Gagal memuat profiles: ${profileError.message}` };
+    if (users) {
+      for (const u of users as any[]) {
+        const uid = u.supabase_uid || u.id;
+        if (uid) extraUserIds.push(uid);
+      }
+    }
+  } catch {
+    // users table might not have tenant_id column — ignore
   }
 
   const userIds = new Set<string>();
   for (const m of memberships || []) {
     if (m.user_id) userIds.add(m.user_id);
   }
-  for (const p of profiles || []) {
-    if (p.id) userIds.add(p.id);
+  for (const uid of extraUserIds) {
+    userIds.add(uid);
   }
 
   if (userIds.size === 0) {
