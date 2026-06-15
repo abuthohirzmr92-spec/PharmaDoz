@@ -26,8 +26,6 @@ function getPaymentMethodLabel(method: string): string {
   return m[method] ?? method;
 }
 
-function pad(n: number): string { return String(n).padStart(2, "0"); }
-
 export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewProps) {
   const { cart, payments, resetCashier, isSubmitting } = useCashierStore();
   const user = useAuthStore((s) => s.user);
@@ -43,44 +41,25 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
     return w?.name ?? null;
   };
 
-  // Loading state
-  if (isSubmitting) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-        <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-lg">
-          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
-          <p className="text-sm text-neutral-600">Menyimpan transaksi...</p>
-        </div>
-      </div>
-    );
-  }
+  // ---- ALL data computations MUST be before any early return (Rules of Hooks) ----
 
-  if (!open) return null;
-
-  // ---- Data (from tenant branding, with fallbacks) ----
   const pharmacyName = branding?.companyName ?? user?.pharmacyName ?? user?.tenantName ?? "Apotek";
   const branch = activeBranch ?? branches[0];
   const address = branding?.address ?? branch?.address ?? "";
   const phone = branding?.phone ?? user?.phone ?? branch?.phone ?? "";
-
-  // Logo — from tenant branding (tenants.settings.logo_url)
   const logoUrl: string | null = branding?.logoUrl ?? null;
-
-  // Footer — from tenant branding, with fallback
   const receiptFooter =
     branding?.receiptFooter ??
     "Barang yang sudah dibeli tidak dapat ditukar atau dikembalikan";
 
-  // ---- Calculations (FIXED) ----
   const cartTotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
   const paymentTotal = payments.reduce((s, p) => s + p.amount, 0);
   const change = paymentTotal - cartTotal;
-  const now = new Date();
-  const dateStr = `${pad(now.getDate())}/${pad(now.getMonth() + 1)}/${now.getFullYear()}`;
-  const timeStr = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
 
-  const handlePrint = () => window.print();
-  const handleNew = () => { resetCashier(); onClose(); };
+  const now = new Date();
+  const pad2 = (n: number) => String(n).padStart(2, "0");
+  const dateStr = `${pad2(now.getDate())}/${pad2(now.getMonth() + 1)}/${now.getFullYear()}`;
+  const timeStr = `${pad2(now.getHours())}:${pad2(now.getMinutes())}`;
 
   // Build ESC/POS data for Bluetooth printing
   const escposData = useMemo(() => {
@@ -107,11 +86,25 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
     }
   }, [pharmacyName, address, phone, invoiceNumber, dateStr, timeStr, user?.displayName, cart, cartTotal, payments, receiptFooter]);
 
-  const handleBluetoothPrinted = () => {
-    // Reset cashier after Bluetooth print
-    resetCashier();
-    onClose();
-  };
+  const handlePrint = () => window.print();
+  const handleNew = () => { resetCashier(); onClose(); };
+  const handleBluetoothPrinted = () => { resetCashier(); onClose(); };
+
+  // ═══════════ RENDER — early returns AFTER all hooks ═══════════
+
+  // Loading state
+  if (isSubmitting) {
+    return (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+        <div className="w-full max-w-sm rounded-xl border border-neutral-200 bg-white p-8 text-center shadow-lg">
+          <div className="mx-auto mb-4 h-8 w-8 animate-spin rounded-full border-2 border-brand-600 border-t-transparent" />
+          <p className="text-sm text-neutral-600">Menyimpan transaksi...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (!open) return null;
 
   // ---- Receipt content (reused for both screen + print) ----
   const receiptBody = (
@@ -132,61 +125,62 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
       <div style={{ fontSize: 9 }}>
         <div>No : {invoiceNumber ?? "—"}</div>
         <div>Tgl: {dateStr} {timeStr}</div>
-        {branch && <div>Cab : {branch.name}</div>}
-        <div>Kasir: {user?.displayName ?? "—"}</div>
+        {user?.displayName && <div>Kasir: {user.displayName}</div>}
+        <div style={{ borderBottom: "1px dashed #000", margin: "2px 0" }} />
       </div>
-      <div style={{ borderBottom: "1px dashed #000", margin: "2px 0" }} />
 
       {/* ITEMS */}
-      {cart.map((item) => {
-        const lt = item.quantity * item.unitPrice;
-        return (
-          <div key={item.productId} style={{ display: "flex", justifyContent: "space-between", fontSize: 9 }}>
-            <span style={{ flex: "0 0 55%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-              {item.productName}
-            </span>
-            <span style={{ flex: "0 0 10%", textAlign: "center" }}>{item.quantity}</span>
-            <span style={{ flex: "0 0 35%", textAlign: "right" }}>{Math.round(lt).toLocaleString("id-ID")}</span>
-          </div>
-        );
-      })}
-
-      <div style={{ borderBottom: "1px solid #000", margin: "2px 0" }} />
-
-      {/* SUMMARY — Subtotal, each payment, change */}
       <div style={{ fontSize: 9 }}>
-        <div style={{ display: "flex", justifyContent: "space-between" }}>
-          <span>Subtotal</span><span>{Math.round(cartTotal).toLocaleString("id-ID")}</span>
+        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", borderBottom: "1px solid #000", paddingBottom: 1, marginBottom: 2 }}>
+          <span style={{ width: "50%" }}>Item</span>
+          <span style={{ width: "12%", textAlign: "center" }}>Qty</span>
+          <span style={{ width: "18%", textAlign: "right" }}>Harga</span>
+          <span style={{ width: "20%", textAlign: "right" }}>Subtotal</span>
         </div>
-        {payments.map((p, i) => {
-          const walletName = p.method === "transfer" ? getWalletName(p.walletId) : null;
-          return (
-            <div key={i}>
-              <div style={{ display: "flex", justifyContent: "space-between" }}>
-                <span>{getPaymentMethodLabel(p.method)}</span><span>{Math.round(p.amount).toLocaleString("id-ID")}</span>
-              </div>
-              {walletName && (
-                <div style={{ fontSize: 7, textAlign: "right" }}>ke {walletName}</div>
-              )}
-            </div>
-          );
-        })}
+        {cart.map((item, idx) => (
+          <div key={idx} style={{ display: "flex", justifyContent: "space-between", marginBottom: 1 }}>
+            <span style={{ width: "50%", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item.productName}</span>
+            <span style={{ width: "12%", textAlign: "center" }}>{item.quantity}</span>
+            <span style={{ width: "18%", textAlign: "right" }}>{Math.round(item.unitPrice).toLocaleString("id-ID")}</span>
+            <span style={{ width: "20%", textAlign: "right" }}>{(item.quantity * item.unitPrice).toLocaleString("id-ID")}</span>
+          </div>
+        ))}
+        <div style={{ borderBottom: "1px dashed #000", margin: "2px 0" }} />
+      </div>
+
+      {/* TOTAL */}
+      <div style={{ fontSize: 9, marginTop: 2 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: 11 }}>
+          <span>TOTAL</span>
+          <span>{Math.round(cartTotal).toLocaleString("id-ID")}</span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", color: "#555", marginTop: 2 }}>
+          <span>Dibayar</span>
+          <span>{Math.round(paymentTotal).toLocaleString("id-ID")}</span>
+        </div>
         {change > 0 && (
-          <div style={{ display: "flex", justifyContent: "space-between" }}>
-            <span>Kembalian</span><span>{Math.round(change).toLocaleString("id-ID")}</span>
+          <div style={{ display: "flex", justifyContent: "space-between", color: "#555" }}>
+            <span>Kembali</span>
+            <span>{Math.round(change).toLocaleString("id-ID")}</span>
           </div>
         )}
       </div>
 
-      {/* TOTAL = cartTotal (the actual transaction value, NOT paymentTotal) */}
-      <div style={{
-        display: "flex", justifyContent: "space-between", fontWeight: "bold", fontSize: 11,
-        borderTop: "1px dashed #000", borderBottom: "1px dashed #000", padding: "1px 0", margin: "2px 0"
-      }}>
-        <span>TOTAL</span><span>{Math.round(cartTotal).toLocaleString("id-ID")}</span>
+      {/* PAYMENT METHOD */}
+      <div style={{ fontSize: 9, marginTop: 4, paddingTop: 2, borderTop: "1px dashed #000" }}>
+        {payments.map((p, idx) => {
+          const method = getPaymentMethodLabel(p.method);
+          const walletName = getWalletName((p as any).walletId);
+          return (
+            <div key={idx}>
+              {method}{walletName ? ` (${walletName})` : ""}
+              {p.ref ? ` - ${p.ref}` : ""}: {Math.round(p.amount).toLocaleString("id-ID")}
+            </div>
+          );
+        })}
       </div>
 
-      {/* FOOTER — dynamic from tenant settings */}
+      {/* FOOTER */}
       <div style={{ textAlign: "center", marginTop: 4, fontSize: 9 }}>
         <div>--- Terima Kasih ---</div>
         <div>{receiptFooter}</div>
@@ -205,9 +199,7 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
             style={{
               width: "58mm",
               margin: "0 auto",
-              padding: "2mm",
-              background: "white",
-              color: "black",
+              padding: 0,
             }}
           >
             {receiptBody}
@@ -221,36 +213,47 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
           {/* Close button */}
           <div className="flex justify-end px-2 pt-2">
             <button onClick={onClose} className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100">
-              <X className="h-4 w-4" />
+              <X className="h-3.5 w-3.5" />
             </button>
           </div>
 
-          {/* Receipt content in mini scale */}
+          {/* Receipt content */}
           <div className="px-3 pb-3 text-[9px] font-mono text-neutral-800 leading-tight">
             <div className="text-center mb-2">
               <div className="text-[11px] font-bold">{pharmacyName}</div>
               {address && <div className="text-[8px] text-neutral-500">{address}</div>}
             </div>
-            <div className="text-center text-[8px] text-neutral-500 mb-1">
-              {invoiceNumber} &middot; {dateStr} {timeStr}
+
+            <div className="flex justify-between text-[8px] text-neutral-500 mb-1">
+              <span>{invoiceNumber ?? "—"}</span>
+              <span>{dateStr} {timeStr}</span>
             </div>
-            {cart.map((item) => (
-              <div key={item.productId} className="flex justify-between">
-                <span className="truncate max-w-[60%]">{item.productName}</span>
-                <span>x{item.quantity}</span>
-                <span className="tabular-nums">{Math.round(item.quantity * item.unitPrice).toLocaleString("id-ID")}</span>
-              </div>
-            ))}
-            <div className="border-t border-dashed border-neutral-300 my-1" />
-            {payments.map((p, i) => (
-              <div key={i} className="flex justify-between text-[8px] text-neutral-500">
-                <span>{getPaymentMethodLabel(p.method)}</span>
-                <span className="tabular-nums">{Math.round(p.amount).toLocaleString("id-ID")}</span>
-              </div>
-            ))}
-            {change > 0 && (
-              <div className="flex justify-between text-[8px] text-neutral-500">
-                <span>Kembalian</span><span className="tabular-nums">{Math.round(change).toLocaleString("id-ID")}</span>
+
+            <div className="border-t border-neutral-300 pt-1 mt-0.5">
+              {cart.map((item, idx) => (
+                <div key={idx} className="flex justify-between text-[9px] py-0.5">
+                  <span className="truncate max-w-[100px]">{item.productName}</span>
+                  <span className="tabular-nums">
+                    {item.quantity} × {Math.round(item.unitPrice).toLocaleString("id-ID")}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {payments.length > 0 && (
+              <div className="border-t border-neutral-200 pt-0.5 mt-0.5">
+                {payments.map((p, idx) => {
+                  const method = getPaymentMethodLabel(p.method);
+                  const walletName = getWalletName((p as any).walletId);
+                  return (
+                    <div key={idx} className="flex justify-between text-[8px] text-neutral-500">
+                      <span>
+                        {method}{walletName ? ` (${walletName})` : ""}
+                      </span>
+                      <span className="tabular-nums">{Math.round(p.amount).toLocaleString("id-ID")}</span>
+                    </div>
+                  );
+                })}
               </div>
             )}
             <div className="flex justify-between font-bold border-t border-neutral-300 pt-0.5 mt-0.5 text-[10px]">
