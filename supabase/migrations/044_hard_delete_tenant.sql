@@ -70,9 +70,9 @@ BEGIN
   -- Tenant users
   DELETE FROM tenant_users WHERE tenant_id = p_tenant_id;
 
-  -- Profiles — unlink from tenant (don't delete the auth user yet)
-  UPDATE profiles SET tenant_id = NULL, updated_at = NOW()
-  WHERE tenant_id = p_tenant_id;
+  -- Profiles — auth users deleted via server action (deleteTenantAuthUsers)
+  -- before this RPC runs. Profiles cascade-delete with auth.users FK.
+  -- No need to unlink here.
 
   -- Tenant quotas
   DELETE FROM tenant_quotas WHERE tenant_id = p_tenant_id;

@@ -267,7 +267,11 @@ export default function PlatformTenantsPage() {
     setActioningId(deleteTarget.id);
     const result = await hardDeleteTnt(deleteTarget.id);
     if (result.success) {
-      toast.success(`"${result.tenantName}" dihapus permanen. ${result.branchCount} cabang, ${result.userCount} user.`);
+      toast.success(
+        `"${result.tenantName}" dihapus permanen. ` +
+        `${result.branchCount} cabang, ${result.userCount} user tenant, ` +
+        `${result.deletedAuthUsers ?? result.userCount} auth account dihapus.`
+      );
       setDeleteTarget(null);
       setDeleteConfirm("");
       loadTenants();

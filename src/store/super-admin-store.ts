@@ -22,7 +22,7 @@ interface SuperAdminState {
   suspendTenant(tenantId: string): Promise<boolean>;
   activateTenant(tenantId: string): Promise<boolean>;
   deleteTenant(tenantId: string): Promise<boolean>;
-  hardDeleteTenant(tenantId: string): Promise<{ success: boolean; tenantName?: string; branchCount?: number; userCount?: number; error?: string }>;
+  hardDeleteTenant(tenantId: string): Promise<{ success: boolean; tenantName?: string; branchCount?: number; userCount?: number; deletedAuthUsers?: number; error?: string }>;
 
   // Subscription lifecycle
   changeSubscription(tenantId: string, newPackageId: string): Promise<boolean>;
@@ -148,13 +148,24 @@ export const useSuperAdminStore = create<SuperAdminState>((set, get) => ({
   },
 
   hardDeleteTenant: async (tenantId) => {
+    // Step 1: Delete auth users (frees emails for re-registration)
+    const { deleteTenantAuthUsers } = await import("@/lib/tenant/delete-auth-users");
+    const authResult = await deleteTenantAuthUsers(tenantId);
+    if (!authResult.success) {
+      return { success: false, error: authResult.error };
+    }
+
+    // Step 2: Hard delete all tenant data via RPC
     const result = await superAdminRepo.hardDeleteTenant(tenantId);
     if (result.success) {
       set((s) => ({
         tenants: s.tenants.filter((t) => t.pharmacyId !== tenantId),
       }));
     }
-    return result;
+    return {
+      ...result,
+      deletedAuthUsers: authResult.deleted,
+    };
   },
 
   // Subscription lifecycle
