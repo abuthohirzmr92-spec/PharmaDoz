@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -14,17 +14,9 @@ function formatRupiah(n: number): string {
 
 export function NetProfitCards() {
   const { transactions } = useTransactionStore();
-  const { transactions: walletTxns, loadTransactions: loadWalletTxns } = useWalletStore();
+  const walletTxns = useWalletStore((s) => s.transactions);
   const allocations = useInventoryStore((s) => s.saleAllocations);
   const isDemo = useInventoryStore((s) => s.isDemoMode);
-  const loadInv = useInventoryStore((s) => s.loadDemoData);
-  const [isLoaded, setIsLoaded] = useState(false);
-
-  useEffect(() => {
-    loadWalletTxns(undefined, { limit: 500 });
-    if (allocations.length === 0) loadInv();
-    setIsLoaded(true);
-  }, []);
 
   // Build allocation map from store data
   const allocationMap = useMemo(() => {
@@ -75,8 +67,6 @@ export function NetProfitCards() {
   }, [transactions, walletTxns, allocationMap]);
 
   const hasAllocations = allocations.length > 0;
-
-  if (!isLoaded) return null;
 
   return (
     <div className="space-y-4">

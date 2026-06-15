@@ -740,8 +740,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
 
-    return transactions
-      .filter((t) => t.type === "credit" && new Date(t.transactionDate) >= cutoff)
+    // DEBUG: trace sourceType values at runtime
+    const credits = transactions.filter((t) =>
+      t.type === "credit" && new Date(t.transactionDate) >= cutoff
+    );
+    const transferCredits = credits.filter((t) =>
+      t.sourceType === "transfer_in" || t.sourceType === "transfer_out"
+    );
+    if (transferCredits.length > 0) {
+      console.log("[getInflowSummary] EXCLUDING transfer credits:", transferCredits.map((t) => ({
+        id: t.id, sourceType: t.sourceType, amount: t.amount, desc: t.description,
+      })));
+    }
+    return credits
+      .filter((t) => t.sourceType !== "transfer_in" && t.sourceType !== "transfer_out")
       .reduce((sum, t) => sum + t.amount, 0);
   },
 
@@ -750,8 +762,20 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - days);
 
-    return transactions
-      .filter((t) => t.type === "debit" && new Date(t.transactionDate) >= cutoff)
+    // DEBUG: trace sourceType values at runtime
+    const debits = transactions.filter((t) =>
+      t.type === "debit" && new Date(t.transactionDate) >= cutoff
+    );
+    const transferDebits = debits.filter((t) =>
+      t.sourceType === "transfer_in" || t.sourceType === "transfer_out"
+    );
+    if (transferDebits.length > 0) {
+      console.log("[getOutflowSummary] EXCLUDING transfer debits:", transferDebits.map((t) => ({
+        id: t.id, sourceType: t.sourceType, amount: t.amount, desc: t.description,
+      })));
+    }
+    return debits
+      .filter((t) => t.sourceType !== "transfer_in" && t.sourceType !== "transfer_out")
       .reduce((sum, t) => sum + t.amount, 0);
   },
 

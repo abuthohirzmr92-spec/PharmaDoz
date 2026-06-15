@@ -29,6 +29,8 @@ export const FEATURE_FLAGS = {
   PRIORITY_SUPPORT: "priority_support",
   /** Financial insight dashboard — capital, profit, ROI */
   FINANCIAL_INSIGHT: "financial_insight",
+  /** Profit allocation — tutup buku, cadangan, pemilik, operasional */
+  PROFIT_ALLOCATION: "profit_allocation",
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
@@ -46,6 +48,7 @@ export const FEATURE_LABELS: Record<FeatureFlagKey, string> = {
   api_access: "Akses API",
   priority_support: "Support Prioritas",
   financial_insight: "Insight Bisnis",
+  profit_allocation: "Alokasi Profit",
 };
 
 /** Feature descriptions for tooltips */
@@ -61,6 +64,7 @@ export const FEATURE_DESCRIPTIONS: Record<FeatureFlagKey, string> = {
   api_access: "Akses API eksternal untuk integrasi dengan sistem lain (ERP, akuntansi, dll).",
   priority_support: "Saluran support prioritas dengan waktu respon lebih cepat.",
   financial_insight: "Dashboard modal usaha, profit kotor, ROI, dan performa cabang — tanpa akuntansi penuh.",
+  profit_allocation: "Alokasi profit bersih ke cadangan, pemilik, dan operasional dengan tutup buku bulanan.",
 };
 
 /** All feature keys as an array for iteration */

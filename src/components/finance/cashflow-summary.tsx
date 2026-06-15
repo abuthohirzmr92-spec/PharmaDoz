@@ -30,9 +30,13 @@ export function CashflowSummary() {
     };
     const cutoff = cutoffs[period];
 
+    const INTERNAL_TRANSFER_TYPES = ["transfer_in", "transfer_out"];
+
     let inflow = 0, outflow = 0;
     for (const tx of transactions) {
       if (new Date(tx.transactionDate) < cutoff) continue;
+      // Exclude internal transfers — they don't represent operational cashflow
+      if (INTERNAL_TRANSFER_TYPES.includes(tx.sourceType)) continue;
       if (tx.type === "credit") inflow += tx.amount;
       else outflow += tx.amount;
     }

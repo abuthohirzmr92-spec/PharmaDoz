@@ -120,11 +120,13 @@ export const useCapitalStore = create<CapitalState>((set, get) => ({
   },
 
   deposit: async (data) => {
+    console.log("[CAPITAL_STORE_START]", { amount: data.amount, walletId: data.walletId, branchId: data.branchId });
     set({ isLoading: true, error: null });
 
     const isDemo = checkDemoMode() || !isSupabaseConnected();
 
     if (isDemo) {
+      console.log("[CAPITAL_STORE_DEMO] Demo mode active, skipping DB");
       const newTx: CapitalTransaction = {
         id: `capital-demo-${Date.now()}`,
         tenantId: "pharm-001",
@@ -147,14 +149,22 @@ export const useCapitalStore = create<CapitalState>((set, get) => ({
 
     try {
       const user = useAuthStore.getState().user;
+      console.log("[CAPITAL_STORE_USER]", { exists: !!user, tenantId: user?.tenantId, role: user?.role });
       if (!user) throw new Error("Tidak terautentikasi");
 
       capitalRepo.setTenantContext({ tenantId: user.tenantId ?? "", role: user.role, userId: user.id });
+      console.log("[CAPITAL_STORE_CALLING_REPO]");
       const tx = await capitalRepo.depositCapital(data);
+      console.log("[CAPITAL_STORE_REPO_SUCCESS]", { txId: tx?.id });
       await get().loadTransactions();
+      console.log("[CAPITAL_LOAD_TX_SUCCESS]");
       set({ isLoading: false });
       return tx;
     } catch (err) {
+      console.log("[CAPITAL_STORE_CATCH]", {
+        message: err instanceof Error ? err.message : String(err),
+        stack: err instanceof Error ? err.stack?.split("\n").slice(0, 3).join(" | ") : undefined,
+      });
       set({ error: err instanceof Error ? err.message : "Gagal setor modal", isLoading: false });
       return null;
     }

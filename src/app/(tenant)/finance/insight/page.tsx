@@ -10,11 +10,13 @@ import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { useCapitalStore } from "@/store/capital-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { useInventoryStore } from "@/store/inventory-store";
+import { useTransactionStore } from "@/store/transaction-store";
 import { useAuthStore } from "@/store/auth-store";
 import { hasPermission } from "@/lib/auth/permissions";
 import { CapitalModal } from "@/components/finance/capital-modal";
 import { formatRupiah } from "@/lib/finance/profit-engine";
 import { Wallet, TrendingUp, Plus, Minus } from "lucide-react";
+import { ProfitAllocationCard } from "@/components/finance/profit-allocation-card";
 
 // Lazy-loaded components
 const ProfitSummaryCards = dynamic(
@@ -40,19 +42,36 @@ const NetProfitCards = dynamic(
 export default function InsightPage() {
   const { user } = useAuthStore();
   const { balance: capitalBalance, transactions: capitalTxns, loadTransactions: loadCapital, deposit, withdraw, isLoading } = useCapitalStore();
-  const { wallets, loadWallets } = useWalletStore();
-  const loadInventory = useInventoryStore((s) => (s as any).loadBatches);
+  const { wallets, loadWallets, loadTransactions: loadWalletTxns } = useWalletStore();
+  const loadInventory = useInventoryStore((s) => s.loadDemoData);
+  const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
+  const setTxnsBranch = useTransactionStore((s) => s.setBranchContext);
+  const setInvBranch = useInventoryStore((s) => s.setBranchContext);
 
   const activeBranch = useBranchStore((s) => s.activeBranch);
-  const branchId = activeBranch?.id ?? "all";
+  const branchId = activeBranch?.id ?? null;
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState<"deposit" | "withdrawal">("deposit");
 
+  // Load all data when page mounts or branch changes
   useEffect(() => {
+    const bid = branchId ?? undefined;
+
+    // Set branch context on repos before querying
+    setTxnsBranch(bid ?? null);
+    setInvBranch(bid ?? null);
+
+    // Reset load guards so data reloads for the new branch
+    useTransactionStore.setState({ isLoaded: false });
+    useInventoryStore.setState({ batches: [], dataSource: "loading" as const });
+
+    // Load all data in parallel
     loadCapital();
-    loadWallets();
-    loadInventory?.();
-  }, []);
+    loadWallets(bid);
+    loadWalletTxns(undefined, { limit: 500, branchId: bid });
+    loadInventory();
+    loadTxns();
+  }, [branchId]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const canManage = user ? hasPermission(user.role, "finance.wallet.manage") : false;
 
@@ -122,6 +141,14 @@ export default function InsightPage() {
       <WidgetErrorBoundary title="Net Profit">
         <div className="mb-6">
           <NetProfitCards />
+        </div>
+      </WidgetErrorBoundary>
+
+      {/* Profit Allocation — Coming Soon */}
+      <WidgetErrorBoundary title="Profit Allocation">
+        <div className="mb-6">
+          <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-300">Alokasi Profit</h2>
+          <ProfitAllocationCard />
         </div>
       </WidgetErrorBoundary>
 

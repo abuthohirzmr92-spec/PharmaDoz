@@ -48,6 +48,9 @@ export function CashflowChart() {
       const key = txDate.toISOString().slice(0, 10);
       if (!dailyMap[key]) continue;
 
+      // Exclude internal transfers from cashflow chart
+      if (tx.sourceType === "transfer_in" || tx.sourceType === "transfer_out") continue;
+
       if (tx.type === "credit") {
         dailyMap[key].masuk += tx.amount;
       } else {

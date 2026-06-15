@@ -79,11 +79,13 @@ export class CapitalRepository extends BaseRepository {
     branchId?: string | null;
     description?: string | null;
   }): Promise<CapitalTransaction> {
+    console.log("[CAPITAL_REPO_START]", { amount: data.amount, walletId: data.walletId, branchId: data.branchId });
     if (!this.isConnected) throw new Error("Not connected");
     this.requireTenantUser();
 
     const tenantId = this.requireTenant();
     const actorId = this.getTenantUserId();
+    console.log("[CAPITAL_REPO_TENANT]", { tenantId, actorId });
 
     // 1. Create capital_transaction
     const insert: Record<string, unknown> = {
@@ -95,6 +97,7 @@ export class CapitalRepository extends BaseRepository {
       description: data.description ?? null,
       actor_id: actorId ?? null,
     };
+    console.log("[CAPITAL_REPO_INSERT]", insert);
 
     const { data: row, error } = await this.client
       .from("capital_transactions")
@@ -102,7 +105,16 @@ export class CapitalRepository extends BaseRepository {
       .select()
       .single();
 
-    if (error) return this.handleError(error, "depositCapital");
+    if (error) {
+      console.log("[CAPITAL_INSERT_ERROR]", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
+      return this.handleError(error, "depositCapital");
+    }
+    console.log("[CAPITAL_INSERT_SUCCESS]", { id: row?.id });
 
     // 2. Record wallet transaction (credit the wallet)
     if (data.walletId) {
