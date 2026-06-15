@@ -10,7 +10,8 @@ import { isSystemRole } from "@/lib/auth/permissions";
 import { ALL_FEATURE_KEYS, FEATURE_LABELS } from "@/lib/features/registry";
 import type { TenantDetail, TenantSummary } from "@/types";
 import type { PackageRow } from "@/lib/repositories/package";
-import { Shield, ChevronLeft, Building2, Users, Store, Package, ArrowUpCircle, ArrowDownCircle, Ban, RotateCw, XCircle, Clock } from "lucide-react";
+import { Shield, ChevronLeft, Building2, Users, Store, Package, ArrowUpCircle, ArrowDownCircle, Ban, RotateCw, XCircle, Clock, Send } from "lucide-react";
+import { toast } from "sonner";
 
 function formatDate(iso?: string): string {
   if (!iso) return "—";
@@ -35,6 +36,50 @@ export default function TenantDetailPage() {
   const [showChangeModal, setShowChangeModal] = useState(false);
   const [actioning, setActioning] = useState("");
   const [error, setError] = useState("");
+  const [resending, setResending] = useState(false);
+
+  const handleResendInvitation = async () => {
+    if (!tenant) return;
+    const email = window.prompt("Masukkan email pemilik tenant untuk dikirim ulang undangan:");
+    if (!email?.trim()) return;
+
+    setResending(true);
+    try {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+      const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+
+      if (!supabaseUrl || !anonKey) {
+        toast.error("Konfigurasi Supabase tidak ditemukan.");
+        return;
+      }
+
+      const res = await fetch(`${supabaseUrl}/auth/v1/recover`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          apikey: anonKey,
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          gotrue_meta_security: {
+            redirect_to: `${appUrl}/auth/set-password`,
+          },
+        }),
+      });
+
+      if (res.ok) {
+        toast.success(`Email aktivasi dikirim ke ${email.trim()}.`);
+      } else {
+        const body = await res.json().catch(() => ({}));
+        toast.error((body as any).msg || "Gagal mengirim ulang email.");
+      }
+    } catch {
+      toast.error("Gagal mengirim ulang undangan.");
+    } finally {
+      setResending(false);
+    }
+  };
 
   useEffect(() => {
     if (tenants.length === 0) loadTenants();
@@ -202,6 +247,10 @@ export default function TenantDetailPage() {
 
           {/* Actions */}
           <div className="rounded-xl border border-neutral-200 bg-white p-6 dark:border-neutral-800 dark:bg-neutral-950 space-y-3">
+            <button onClick={handleResendInvitation} disabled={resending}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-brand-200 bg-brand-50 px-4 py-2 text-sm font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50 dark:border-brand-900 dark:bg-brand-950 dark:text-brand-400 transition-colors">
+              <Send className="h-4 w-4" />{resending ? "Mengirim..." : "Kirim Ulang Undangan"}
+            </button>
             <button onClick={() => setShowChangeModal(true)} disabled={actioning === "change"}
               className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2 text-sm font-medium text-white hover:bg-brand-700 disabled:opacity-50 transition-colors">
               <ArrowUpCircle className="h-4 w-4" />Ubah Paket

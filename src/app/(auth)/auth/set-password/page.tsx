@@ -6,6 +6,15 @@ import { Lock, Loader2, CheckCircle2, Shield, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { usePlatformBrandingStore } from "@/store/platform-branding-store";
 
+/**
+ * Set Password Page
+ *
+ * Handles two entry points:
+ *   1. Via auth callback → user arrives with cookies (getSession)
+ *   2. Via direct hash fragment #access_token=... (Supabase implicit flow)
+ *
+ * Flow: check hash → set session → show form → updateUser(password) → /login
+ */
 export default function SetPasswordPage() {
   const router = useRouter();
   const branding = usePlatformBrandingStore();
@@ -19,36 +28,60 @@ export default function SetPasswordPage() {
 
   useEffect(() => {
     branding.loadSettings();
-
-    const checkSession = async () => {
-      try {
-        const { createBrowserClient } = await import("@supabase/ssr");
-        const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-        const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
-        if (!url || !key) {
-          setError("Konfigurasi aplikasi tidak lengkap.");
-          setIsLoading(false);
-          return;
-        }
-
-        const supabase = createBrowserClient(url, key);
-        const { data, error: sessionErr } = await supabase.auth.getSession();
-
-        if (sessionErr || !data.session) {
-          setError("Session tidak ditemukan. Silakan buka link aktivasi dari email Anda.");
-          setIsLoading(false);
-          return;
-        }
-
-        setIsAuthenticated(true);
-      } catch {
-        setError("Gagal memeriksa session. Silakan coba lagi.");
-      }
-      setIsLoading(false);
-    };
-
-    checkSession();
+    initSession();
   }, []);
+
+  async function initSession() {
+    try {
+      const { createBrowserClient } = await import("@supabase/ssr");
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+      if (!url || !key) {
+        setError("Konfigurasi aplikasi tidak lengkap.");
+        setIsLoading(false);
+        return;
+      }
+
+      const supabase = createBrowserClient(url, key);
+
+      // 1. Check hash fragment — Supabase implicit flow (#access_token=...)
+      if (typeof window !== "undefined" && window.location.hash) {
+        const hash = window.location.hash.substring(1);
+        const params = new URLSearchParams(hash);
+        const accessToken = params.get("access_token");
+        const refreshToken = params.get("refresh_token");
+
+        if (accessToken && refreshToken) {
+          const { error: sessionErr } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken,
+          });
+
+          if (!sessionErr) {
+            // Clean URL — remove hash
+            window.history.replaceState(null, "", window.location.pathname);
+            setIsAuthenticated(true);
+            setIsLoading(false);
+            return;
+          }
+        }
+      }
+
+      // 2. Check cookie-based session (from auth callback)
+      const { data, error: sessionErr } = await supabase.auth.getSession();
+
+      if (sessionErr || !data.session) {
+        setError("Session tidak ditemukan. Silakan buka link aktivasi atau reset password dari email Anda.");
+        setIsLoading(false);
+        return;
+      }
+
+      setIsAuthenticated(true);
+    } catch {
+      setError("Gagal memeriksa session. Silakan coba lagi.");
+    }
+    setIsLoading(false);
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -92,13 +125,13 @@ export default function SetPasswordPage() {
       <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="h-8 w-8 animate-spin text-brand-600" />
-          <p className="text-sm text-neutral-500">Memeriksa aktivasi...</p>
+          <p className="text-sm text-neutral-500">Memeriksa sesi...</p>
         </div>
       </div>
     );
   }
 
-  // --- Not authenticated or error ---
+  // --- Not authenticated — show guidance ---
   if (!isAuthenticated) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-neutral-50 px-4 dark:bg-neutral-950">
@@ -106,19 +139,28 @@ export default function SetPasswordPage() {
           <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-center dark:border-amber-800 dark:bg-amber-950/30">
             <Shield className="mx-auto h-8 w-8 text-amber-500" />
             <p className="mt-2 text-sm font-medium text-amber-700 dark:text-amber-300">
-              Aktivasi Diperlukan
+              Diperlukan Verifikasi
             </p>
             <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-              {error || "Silakan buka link aktivasi dari email yang dikirim ke Anda."}
+              {error || "Silakan buka link aktivasi atau reset password dari email yang dikirim ke Anda."}
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => router.push("/login")}
-            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-200 px-4 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-900"
-          >
-            Kembali ke Login
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={() => router.push("/login")}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition"
+            >
+              Kembali ke Login
+            </button>
+            <button
+              type="button"
+              onClick={() => router.push("/forgot-password")}
+              className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-neutral-200 px-4 py-2.5 text-sm font-medium text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-900"
+            >
+              Kirim Ulang Reset Password
+            </button>
+          </div>
         </div>
       </div>
     );
@@ -132,18 +174,18 @@ export default function SetPasswordPage() {
           <div className="rounded-xl border border-green-200 bg-green-50 p-6 text-center dark:border-green-800 dark:bg-green-950/30">
             <CheckCircle2 className="mx-auto h-12 w-12 text-green-500" />
             <p className="mt-3 text-lg font-semibold text-green-700 dark:text-green-300">
-              Akun Berhasil Diaktifkan!
+              Password Berhasil Disimpan!
             </p>
             <p className="mt-1 text-sm text-green-600 dark:text-green-400">
-              Password Anda telah disimpan. Selamat bergabung di {branding.getAppName()}.
+              Silakan login dengan password baru Anda.
             </p>
           </div>
           <button
             type="button"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => router.push("/login")}
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg bg-brand-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-brand-700 transition"
           >
-            Lanjut ke Dashboard
+            Lanjut ke Login
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -160,7 +202,7 @@ export default function SetPasswordPage() {
             <Lock className="h-6 w-6" />
           </div>
           <h1 className="text-lg font-semibold text-neutral-900 dark:text-neutral-50">
-            Atur Password
+            Atur Password Baru
           </h1>
           <p className="mt-1 text-xs text-neutral-500">
             Buat password untuk akun Anda di {branding.getAppName()}

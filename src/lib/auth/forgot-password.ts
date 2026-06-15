@@ -4,9 +4,10 @@ export async function sendPasswordResetEmail(email: string): Promise<{
   success: boolean;
   error?: string;
 }> {
-  // Direct REST API call — bypasses PKCE setup entirely.
-  // Without code_challenge, Supabase uses implicit flow and the recovery
-  // link redirects back with access_token in the hash fragment.
+  const appUrl = process.env.VERCEL_URL
+    ? `https://${process.env.VERCEL_URL}`
+    : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover`,
     {
@@ -18,9 +19,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{
       body: JSON.stringify({
         email,
         gotrue_meta_security: {
-          redirect_to: process.env.VERCEL_URL
-            ? `https://${process.env.VERCEL_URL}`
-            : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000",
+          redirect_to: `${appUrl}/auth/set-password`,
         },
       }),
     },
