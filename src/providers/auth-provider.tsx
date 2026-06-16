@@ -38,7 +38,8 @@ function devLog(...args: unknown[]) {
 /*  Constants                                                           */
 /* ------------------------------------------------------------------ */
 
-const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/unauthorized", "/offline"];
+const PUBLIC_PATHS = ["/login", "/register", "/forgot-password", "/unauthorized", "/offline",
+  "/auth/callback", "/auth/set-password", "/invite/accept"];
 
 function isPublicPath(pathname: string): boolean {
   return PUBLIC_PATHS.some(
@@ -304,6 +305,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
           }
           devLog("onAuthStateChange: TOKEN_REFRESHED — refreshing profile only");
           await refreshUserProfile();
+        } else if (event === "PASSWORD_RECOVERY") {
+          devLog("onAuthStateChange: PASSWORD_RECOVERY — redirecting to /auth/set-password");
+          if (pathname !== "/auth/set-password") {
+            router.push("/auth/set-password");
+          }
         }
         /* INITIAL_SESSION and USER_UPDATED are handled by the hydrate effect */
       } catch (err) {
