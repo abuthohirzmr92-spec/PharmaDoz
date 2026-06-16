@@ -8,16 +8,41 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+function detectPlatform(): "ios" | "android" | "desktop" {
+  if (typeof navigator === "undefined") return "desktop";
+  const ua = navigator.userAgent || "";
+  if (/iPhone|iPad|iPod/.test(ua)) return "ios";
+  if (/Android/.test(ua)) return "android";
+  return "desktop";
+}
+
+const PLATFORM_INSTRUCTIONS = {
+  ios: {
+    title: "iPhone / iPad (Safari)",
+    steps: 'Klik <strong>Bagikan</strong> <code class="rounded bg-neutral-200 px-1 dark:bg-neutral-700">↗</code> lalu pilih <strong>Add to Home Screen</strong>',
+  },
+  android: {
+    title: "Android (Chrome / Edge)",
+    steps: 'Klik menu <code class="rounded bg-neutral-200 px-1 dark:bg-neutral-700">⋮</code> lalu pilih <strong>Install App</strong> atau <strong>Add to Home Screen</strong>',
+  },
+  desktop: {
+    title: "Desktop (Chrome / Edge)",
+    steps: 'Klik ikon <strong>Install</strong> <code class="rounded bg-neutral-200 px-1 dark:bg-neutral-700">⊕</code> di address bar',
+  },
+};
+
 /**
  * PWA Install Button — Login Page
  *
- * Shows "Install Aplikasi" when the browser supports PWA installation.
- * Falls back to instructions modal if beforeinstallprompt is unavailable.
+ * Android/Desktop (Chrome/Edge): captures beforeinstallprompt → native dialog
+ * iOS (Safari): shows platform-specific "Add to Home Screen" guidance
+ * Other browsers: shows platform-specific fallback instructions
  */
 export function PwaInstallButton() {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showFallback, setShowFallback] = useState(false);
   const [installed, setInstalled] = useState(false);
+  const platform = detectPlatform();
 
   useEffect(() => {
     // Check if already installed
@@ -26,7 +51,10 @@ export function PwaInstallButton() {
       return;
     }
 
-    // Capture beforeinstallprompt
+    // iOS never fires beforeinstallprompt — we'll handle in button click
+    if (platform === "ios") return;
+
+    // Capture beforeinstallprompt (Chrome/Edge on Android and Desktop)
     const handler = (e: Event) => {
       e.preventDefault();
       setInstallPrompt(e as BeforeInstallPromptEvent);
@@ -45,25 +73,32 @@ export function PwaInstallButton() {
       window.removeEventListener("beforeinstallprompt", handler);
       window.removeEventListener("appinstalled", installedHandler);
     };
-  }, []);
+  }, [platform]);
 
   const handleInstall = async () => {
-    if (!installPrompt) {
+    // iOS: always show guidance (no beforeinstallprompt support)
+    if (platform === "ios") {
       setShowFallback(true);
       return;
     }
 
-    installPrompt.prompt();
-    const { outcome } = await installPrompt.userChoice;
-
-    if (outcome === "accepted") {
-      setInstalled(true);
+    // Android/Desktop: use native prompt if available
+    if (installPrompt) {
+      installPrompt.prompt();
+      const { outcome } = await installPrompt.userChoice;
+      if (outcome === "accepted") setInstalled(true);
+      setInstallPrompt(null);
+      return;
     }
-    setInstallPrompt(null);
+
+    // No native prompt available — show fallback
+    setShowFallback(true);
   };
 
   // Already installed — nothing to show
   if (installed) return null;
+
+  const instr = PLATFORM_INSTRUCTIONS[platform] ?? PLATFORM_INSTRUCTIONS.desktop!;
 
   return (
     <>
@@ -76,7 +111,7 @@ export function PwaInstallButton() {
         Install Aplikasi
       </button>
 
-      {/* Fallback modal — browser doesn't support PWA install prompt */}
+      {/* Fallback modal — platform-specific instructions */}
       {showFallback && (
         <div className="fixed inset-0 z-50 flex items-center justify-center">
           <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={() => setShowFallback(false)} />
@@ -97,18 +132,8 @@ export function PwaInstallButton() {
               <p>Aplikasi dapat diinstal melalui menu browser Anda:</p>
 
               <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                <p className="font-medium text-neutral-900 dark:text-neutral-50">Android (Chrome / Edge)</p>
-                <p className="mt-1 text-xs">Klik menu <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-700">⋮</code> lalu pilih <strong>Install App</strong> atau <strong>Add to Home Screen</strong></p>
-              </div>
-
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                <p className="font-medium text-neutral-900 dark:text-neutral-50">iPhone / iPad (Safari)</p>
-                <p className="mt-1 text-xs">Klik <strong>Bagikan</strong> <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-700">↗</code> lalu pilih <strong>Add to Home Screen</strong></p>
-              </div>
-
-              <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-900">
-                <p className="font-medium text-neutral-900 dark:text-neutral-50">Desktop (Chrome / Edge)</p>
-                <p className="mt-1 text-xs">Klik ikon <strong>Install</strong> <code className="rounded bg-neutral-200 px-1 dark:bg-neutral-700">⊕</code> di address bar</p>
+                <p className="font-medium text-neutral-900 dark:text-neutral-50">{instr.title}</p>
+                <p className="mt-1 text-xs" dangerouslySetInnerHTML={{ __html: instr.steps }} />
               </div>
             </div>
           </div>
