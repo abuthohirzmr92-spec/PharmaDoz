@@ -273,6 +273,13 @@ export async function provisionTenant(
   // ------------------------------------------------------------------
   // 4. Call SECURITY DEFINER provision_tenant() — atomic DB writes
   // ------------------------------------------------------------------
+  console.log("[PROVISION] Calling provision_tenant RPC:", {
+    slug: validation.slug,
+    tenantName: validation.tenantName,
+    packageId: validation.packageId,
+    ownerUserId,
+  });
+
   let rpcError: string | null = null;
   let tenantId: string | null = null;
 
@@ -291,8 +298,15 @@ export async function provisionTenant(
 
     if (error) {
       rpcError = error.message;
+      console.error("[PROVISION] RPC error:", {
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint,
+      });
     } else if (rpcResult) {
       tenantId = (rpcResult as any).tenant_id ?? null;
+      console.log("[PROVISION] RPC success:", { tenantId });
     }
   } catch (err) {
     rpcError = err instanceof Error ? err.message : String(err);
