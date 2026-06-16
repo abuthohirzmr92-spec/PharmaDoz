@@ -62,8 +62,8 @@ export default function TenantDetailPage() {
         },
         body: JSON.stringify({
           email: email.trim(),
-          gotrue_meta_security: {
-            redirect_to: `${appUrl}/auth/set-password`,
+          options: {
+            redirectTo: `${appUrl}/auth/set-password`,
           },
         }),
       });
