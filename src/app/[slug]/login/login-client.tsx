@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Pill,
   Shield,
@@ -38,6 +38,7 @@ interface Props {
 
 export function SluggifiedLoginPage({ tenantName, branding }: Props) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const loginAs = useAuthStore((s) => s.loginAs);
   const loginWithEmail = useAuthStore((s) => s.loginWithEmail);
   const platformBranding = usePlatformBrandingStore();
@@ -45,6 +46,24 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
   useEffect(() => {
     platformBranding.loadSettings();
   }, []);
+
+  // Safety net: redirect recovery links to /auth/set-password
+  useEffect(() => {
+    const type = searchParams.get("type");
+    const code = searchParams.get("code");
+    if (type === "recovery" || (code && searchParams.get("error_description")?.includes("recovery"))) {
+      const params = new URLSearchParams(searchParams.toString());
+      router.replace(`/auth/set-password?${params.toString()}`);
+      return;
+    }
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      if (hashParams.get("type") === "recovery") {
+        window.location.replace("/auth/set-password" + window.location.hash);
+      }
+    }
+  }, [searchParams, router]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

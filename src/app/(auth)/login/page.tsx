@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import {
   Pill,
   Shield,
@@ -32,9 +32,33 @@ const LOGIN_DEADLINE_MS = 30_000;
 
 export default function LoginPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const loginAs = useAuthStore((s) => s.loginAs);
   const loginWithEmail = useAuthStore((s) => s.loginWithEmail);
   const branding = usePlatformBrandingStore();
+
+  // Safety net: redirect recovery/reset-password links to /auth/set-password
+  useEffect(() => {
+    // 1. Check URL search params
+    const type = searchParams.get("type");
+    const code = searchParams.get("code");
+    if (type === "recovery" || (code && searchParams.get("error_description")?.includes("recovery"))) {
+      const params = new URLSearchParams(searchParams.toString());
+      router.replace(`/auth/set-password?${params.toString()}`);
+      return;
+    }
+
+    // 2. Check hash fragment (access_token=...&type=recovery)
+    if (typeof window !== "undefined" && window.location.hash) {
+      const hash = window.location.hash.substring(1);
+      const hashParams = new URLSearchParams(hash);
+      const hashType = hashParams.get("type");
+      if (hashType === "recovery") {
+        window.location.replace("/auth/set-password" + window.location.hash);
+        return;
+      }
+    }
+  }, [searchParams, router]);
 
   /* ---- email/password form ---- */
   const [email, setEmail] = useState("");
