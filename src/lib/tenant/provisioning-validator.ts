@@ -2,14 +2,6 @@ import { createServerSupabase } from "@/lib/supabase/server";
 import { generateSlug } from "./onboarding";
 import type { ProvisioningInput, ProvisioningError } from "@/types";
 
-const PACKAGE_UUIDS = {
-  basic: "00000000-0000-0000-0000-000000000101",
-  professional: "00000000-0000-0000-0000-000000000102",
-  enterprise: "00000000-0000-0000-0000-000000000103",
-} as const;
-
-type PackageSlug = keyof typeof PACKAGE_UUIDS;
-const VALID_PACKAGES: string[] = Object.keys(PACKAGE_UUIDS);
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export interface ValidationContext {
@@ -63,16 +55,6 @@ function validateFields(input: ProvisioningInput): ProvisioningError[] {
     });
   }
 
-  const pkg = input.packageSlug ?? "basic";
-  if (!VALID_PACKAGES.includes(pkg)) {
-    errors.push({
-      code: "VALIDATION_ERROR",
-      message: `Paket tidak valid: ${pkg}. Pilih: ${VALID_PACKAGES.join(", ")}.`,
-      field: "packageSlug",
-      retryable: false,
-    });
-  }
-
   if (input.domain && !/^[a-z0-9][a-z0-9.-]+\.[a-z]{2,}$/i.test(input.domain)) {
     errors.push({
       code: "VALIDATION_ERROR",
@@ -86,7 +68,7 @@ function validateFields(input: ProvisioningInput): ProvisioningError[] {
 }
 
 /**
- * Full validation incl. slug availability check against Supabase.
+ * Full validation incl. slug availability and package resolution against DB.
  * Called from the server action before auth user creation.
  */
 export async function validateProvisioning(
@@ -108,13 +90,48 @@ export async function validateProvisioning(
     };
   }
 
-  const pkg = (input.packageSlug ?? "basic") as PackageSlug;
-  const packageId = PACKAGE_UUIDS[pkg] ?? PACKAGE_UUIDS.basic;
+  const packageSlug = input.packageSlug ?? "basic";
+
+  // Resolve package from database
+  const supabase = await createServerSupabase();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const db: any = supabase;
+
+  const { data: pkgRow, error: pkgError } = await db
+    .from("tenant_packages")
+    .select("id, name, is_active")
+    .eq("name", packageSlug)
+    .single();
+
+  if (pkgError || !pkgRow) {
+    return {
+      valid: false,
+      errors: [{
+        code: "VALIDATION_ERROR",
+        message: `Paket "${packageSlug}" tidak ditemukan di database. Pastikan paket sudah dikonfigurasi di Package Management.`,
+        field: "packageSlug",
+        retryable: false,
+      }],
+    };
+  }
+
+  if (!pkgRow.is_active) {
+    return {
+      valid: false,
+      errors: [{
+        code: "VALIDATION_ERROR",
+        message: `Paket "${packageSlug}" saat ini tidak aktif. Aktifkan di Package Management.`,
+        field: "packageSlug",
+        retryable: false,
+      }],
+    };
+  }
+
+  const packageId = pkgRow.id as string;
 
   // Slug availability check (best-effort — final validation is in the DB function)
   try {
-    const supabase = await createServerSupabase();
-    const { count, error } = await supabase
+    const { count, error } = await db
       .from("tenants")
       .select("id", { count: "exact", head: true })
       .eq("slug", slug)
@@ -127,25 +144,25 @@ export async function validateProvisioning(
         valid: false,
         errors: [{
           code: "RACE_CONSTRAINT",
-          message: `Slug "${slug}" sudah digunakan. Coba nama apotek lain.`,
+          message: `Slug "${slug}" sudah digunakan. Coba gunakan nama apotek yang berbeda.`,
           field: "slug",
           retryable: true,
-          suggestion: `${slug}-${Date.now().toString(36)}`,
+          suggestion: "Gunakan nama apotek yang berbeda untuk menghasilkan slug unik.",
         }],
       };
     }
   } catch {
-    // Network error — let the DB function catch any issues
+    // Non-fatal — DB function has final say
   }
 
   return {
     valid: true,
-    ownerEmail: input.ownerEmail.trim().toLowerCase(),
-    ownerDisplayName: input.ownerDisplayName.trim(),
-    tenantName: input.tenantName.trim(),
+    ownerEmail: input.ownerEmail,
+    ownerDisplayName: input.ownerDisplayName,
+    tenantName: input.tenantName,
     slug,
     packageId,
-    domain: input.domain?.trim() || null,
-    settings: input.settings ?? {},
+    domain: input.domain ?? null,
+    settings: {},
   };
 }

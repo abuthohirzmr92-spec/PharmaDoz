@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect, useRef } from "react";
+import { useState, useCallback, useEffect, useRef, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import {
   Building2,
@@ -19,18 +19,39 @@ import { provisionTenant } from "@/lib/tenant/provisioning";
 import { generateSlug } from "@/lib/tenant/onboarding";
 import type { ProvisioningInput, ProvisioningError, ProvisioningWarning } from "@/types";
 import { cn } from "@/lib/cn";
+import { usePackageStore } from "@/store/package-store";
 
 type FormState = "idle" | "submitting" | "success" | "success_with_warning" | "failure";
 
-const PACKAGES = [
-  { value: "basic", label: "Basic", desc: "3 user, 1 cabang, 200 produk", price: "Gratis" },
-  { value: "professional", label: "Professional", desc: "10 user, 3 cabang, 1.000 produk", price: "Rp 299.000/bln" },
-  { value: "enterprise", label: "Enterprise", desc: "50 user, 10 cabang, 10.000 produk", price: "Rp 999.000/bln" },
-];
+function formatPrice(price: number): string {
+  if (price === 0) return "Gratis";
+  return `Rp ${price.toLocaleString("id-ID")}/bln`;
+}
+
+function buildPackageLabel(pkg: { name: string; label: string; maxUsers: number; maxBranches: number; maxProducts: number; monthlyPrice: number }): string {
+  return `${pkg.label} — ${pkg.maxUsers} user, ${pkg.maxBranches} cabang, ${pkg.maxProducts.toLocaleString("id-ID")} produk (${formatPrice(pkg.monthlyPrice)})`;
+}
 
 export default function CreateTenantPage() {
   const router = useRouter();
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const { packages: dbPackages, loadPackages } = usePackageStore();
+
+  useEffect(() => {
+    loadPackages();
+  }, [loadPackages]);
+
+  // Build dropdown options from database packages
+  const packageOptions = useMemo(() => {
+    if (dbPackages.length === 0) return [];
+    return dbPackages
+      .filter((p) => p.isActive)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((p) => ({
+        value: p.name,
+        label: buildPackageLabel(p),
+      }));
+  }, [dbPackages]);
 
   const [form, setForm] = useState({
     ownerEmail: "",
@@ -359,11 +380,15 @@ export default function CreateTenantPage() {
                 onChange={(e) => updateField("packageSlug", e.target.value)}
                 className="w-full rounded-lg border bg-background py-2 pl-10 pr-3 text-sm"
               >
-                {PACKAGES.map((pkg) => (
-                  <option key={pkg.value} value={pkg.value}>
-                    {pkg.label} — {pkg.desc} ({pkg.price})
-                  </option>
-                ))}
+                {packageOptions.length === 0 ? (
+                  <option value="">Memuat paket...</option>
+                ) : (
+                  packageOptions.map((pkg) => (
+                    <option key={pkg.value} value={pkg.value}>
+                      {pkg.label}
+                    </option>
+                  ))
+                )}
               </select>
             </div>
           </div>
