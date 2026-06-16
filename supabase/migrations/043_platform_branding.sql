@@ -73,22 +73,31 @@ CREATE POLICY "platform_assets_public_read" ON storage.objects
     FOR SELECT
     USING (bucket_id = 'platform-assets');
 
--- Storage RLS: Allow authenticated upload to platform-assets
-DROP POLICY IF EXISTS "platform_assets_authenticated_insert" ON storage.objects;
-CREATE POLICY "platform_assets_authenticated_insert" ON storage.objects
+-- Storage RLS: Only super_admin can upload to platform-assets
+DROP POLICY IF EXISTS "platform_assets_super_admin_insert" ON storage.objects;
+CREATE POLICY "platform_assets_super_admin_insert" ON storage.objects
     FOR INSERT TO authenticated
-    WITH CHECK (bucket_id = 'platform-assets');
+    WITH CHECK (
+        bucket_id = 'platform-assets'
+        AND public.is_super_admin()
+    );
 
--- Storage RLS: Allow authenticated update on platform-assets
-DROP POLICY IF EXISTS "platform_assets_authenticated_update" ON storage.objects;
-CREATE POLICY "platform_assets_authenticated_update" ON storage.objects
+-- Storage RLS: Only super_admin can update platform-assets
+DROP POLICY IF EXISTS "platform_assets_super_admin_update" ON storage.objects;
+CREATE POLICY "platform_assets_super_admin_update" ON storage.objects
     FOR UPDATE TO authenticated
-    USING (bucket_id = 'platform-assets');
+    USING (
+        bucket_id = 'platform-assets'
+        AND public.is_super_admin()
+    );
 
--- Storage RLS: Allow authenticated delete on platform-assets
-DROP POLICY IF EXISTS "platform_assets_authenticated_delete" ON storage.objects;
-CREATE POLICY "platform_assets_authenticated_delete" ON storage.objects
+-- Storage RLS: Only super_admin can delete from platform-assets
+DROP POLICY IF EXISTS "platform_assets_super_admin_delete" ON storage.objects;
+CREATE POLICY "platform_assets_super_admin_delete" ON storage.objects
     FOR DELETE TO authenticated
-    USING (bucket_id = 'platform-assets');
+    USING (
+        bucket_id = 'platform-assets'
+        AND public.is_super_admin()
+    );
 
 COMMIT;
