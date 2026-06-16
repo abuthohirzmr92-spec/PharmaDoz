@@ -52,13 +52,7 @@ CREATE POLICY ps_update ON platform_settings
 -- Create bucket via Supabase Dashboard or SQL:
 -- INSERT INTO storage.buckets (id, name, public) VALUES ('platform-assets', 'platform-assets', true);
 
--- Storage RLS policies (applied via Supabase Dashboard or SQL):
--- Allow public read on platform-assets
--- Allow super_admin to upload/delete
-
--- Note: Storage bucket creation and policies are typically done via Supabase Dashboard.
--- The SQL below provides the equivalent RLS policies if the bucket already exists.
-
+-- Storage RLS policies for platform-assets bucket
 DO $$
 BEGIN
     -- Create bucket if it doesn't exist
@@ -72,5 +66,29 @@ BEGIN
     )
     ON CONFLICT (id) DO NOTHING;
 END $$;
+
+-- Storage RLS: Allow public read on platform-assets
+DROP POLICY IF EXISTS "platform_assets_public_read" ON storage.objects;
+CREATE POLICY "platform_assets_public_read" ON storage.objects
+    FOR SELECT
+    USING (bucket_id = 'platform-assets');
+
+-- Storage RLS: Allow authenticated upload to platform-assets
+DROP POLICY IF EXISTS "platform_assets_authenticated_insert" ON storage.objects;
+CREATE POLICY "platform_assets_authenticated_insert" ON storage.objects
+    FOR INSERT TO authenticated
+    WITH CHECK (bucket_id = 'platform-assets');
+
+-- Storage RLS: Allow authenticated update on platform-assets
+DROP POLICY IF EXISTS "platform_assets_authenticated_update" ON storage.objects;
+CREATE POLICY "platform_assets_authenticated_update" ON storage.objects
+    FOR UPDATE TO authenticated
+    USING (bucket_id = 'platform-assets');
+
+-- Storage RLS: Allow authenticated delete on platform-assets
+DROP POLICY IF EXISTS "platform_assets_authenticated_delete" ON storage.objects;
+CREATE POLICY "platform_assets_authenticated_delete" ON storage.objects
+    FOR DELETE TO authenticated
+    USING (bucket_id = 'platform-assets');
 
 COMMIT;

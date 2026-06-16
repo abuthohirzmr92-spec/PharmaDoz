@@ -67,7 +67,9 @@ export default function PlatformBrandingPage() {
       else if (field === "sidebar_logo") setSidebarLogoUrl(url);
       else if (field === "favicon") setFaviconUrl(url);
 
-      toast.success("File berhasil diupload.");
+      toast.success("File berhasil diupload. Menyimpan...");
+      // Auto-save after upload
+      setTimeout(() => handleSave(), 100);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal upload file.");
     } finally {
