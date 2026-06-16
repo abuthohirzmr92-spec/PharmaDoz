@@ -2,13 +2,12 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Lock, Monitor, ArrowLeft } from "lucide-react";
+import { Building2, UserCircle, ArrowLeft } from "lucide-react";
 import { cn } from "@/lib/cn";
 
-const TABS = [
-  { label: "Profil", href: "/settings/profile", icon: User },
-  { label: "Keamanan", href: "/settings/security", icon: Lock },
-  { label: "Session", href: "/settings/session", icon: Monitor },
+const PRIMARY_TABS = [
+  { label: "Konfigurasi Apotek", href: "/settings/config", icon: Building2 },
+  { label: "Akun Saya", href: "/settings/account", icon: UserCircle },
 ];
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
@@ -26,17 +25,17 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
         </Link>
         <div>
           <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
-            Pengaturan Akun
+            Pengaturan
           </h1>
-          <p className="text-sm text-neutral-500">Kelola profil, keamanan, dan session Anda</p>
+          <p className="text-sm text-neutral-500">Konfigurasi apotek dan akun Anda</p>
         </div>
       </div>
 
-      {/* Tabs */}
+      {/* Primary Tabs */}
       <div className="flex gap-1 rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-700 dark:bg-neutral-900">
-        {TABS.map((tab) => {
+        {PRIMARY_TABS.map((tab) => {
           const Icon = tab.icon;
-          const isActive = pathname === tab.href;
+          const isActive = pathname.startsWith(tab.href);
           return (
             <Link
               key={tab.href}
