@@ -18,6 +18,11 @@ export default function SettingsPage() {
   const canEditSettings = usePermission("settings.edit");
   const { branding } = useTenantBranding();
 
+  // Redirect to account settings profile by default
+  useEffect(() => {
+    router.replace("/settings/profile");
+  }, [router]);
+
   const [companyName, setCompanyName] = useState("");
   const [logoUrl, setLogoUrl] = useState("");
   const [address, setAddress] = useState("");
