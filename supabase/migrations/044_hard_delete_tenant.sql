@@ -160,6 +160,9 @@ BEGIN
   -- Branches
   DELETE FROM branches WHERE tenant_id = p_tenant_id;
 
+  -- Legacy pharmacy (id = tenant_id from old migration)
+  DELETE FROM pharmacies WHERE id = p_tenant_id;
+
   -- Tenant itself
   DELETE FROM tenants WHERE id = p_tenant_id;
 
