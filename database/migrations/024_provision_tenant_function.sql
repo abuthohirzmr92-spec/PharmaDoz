@@ -91,13 +91,24 @@ BEGIN
 
     -- ----------------------------------------------------------------------
     -- 4. Legacy pharmacy sync (same UUID = same logical entity)
+    --    Generate unique pharmacy code with collision handling
     -- ----------------------------------------------------------------------
-    INSERT INTO public.pharmacies (id, name, code, is_active, created_at, updated_at)
-    VALUES (
-        v_tenant_id, p_name,
-        upper(substr(regexp_replace(p_slug, '[^a-z0-9]', '', 'g'), 1, 6)),
-        true, NOW(), NOW()
-    );
+    DECLARE
+        v_base_code TEXT := upper(substr(regexp_replace(p_slug, '[^a-z0-9]', '', 'g'), 1, 6));
+        v_pharmacy_code TEXT := v_base_code;
+        v_suffix INTEGER := 1;
+    BEGIN
+        WHILE EXISTS (SELECT 1 FROM public.pharmacies WHERE code = v_pharmacy_code AND deleted_at IS NULL) LOOP
+            v_suffix := v_suffix + 1;
+            v_pharmacy_code := v_base_code || '-' || v_suffix::TEXT;
+        END LOOP;
+
+        INSERT INTO public.pharmacies (id, name, code, is_active, created_at, updated_at)
+        VALUES (
+            v_tenant_id, p_name, v_pharmacy_code,
+            true, NOW(), NOW()
+        );
+    END;
 
     -- ----------------------------------------------------------------------
     -- 5. Default branch (main location)
