@@ -121,9 +121,12 @@ export async function provisionTenant(
   }
 
   // ------------------------------------------------------------------
-  // 3. Create auth user for the owner (stateless client — avoids
-  //    replacing the admin's session cookies with the new user's)
+  // 3. Create or reuse auth user for the owner (stateless client —
+  //    avoids replacing the admin's session cookies)
   // ------------------------------------------------------------------
+  let ownerUserId: string;
+  let userReused = false;
+
   const tempPassword = generateSecurePassword();
 
   const { data: authData, error: authError } = await authClient().auth.signUp({
@@ -137,34 +140,116 @@ export async function provisionTenant(
   });
 
   if (authError) {
-    const retryable =
-      authError.message?.includes("rate") ||
-      authError.message?.includes("timeout") ||
-      authError.message?.includes("network");
+    // User already registered — reuse existing auth account
+    if (
+      authError.message?.includes("already registered") ||
+      authError.message?.includes("already been registered") ||
+      authError.message?.includes("already exists") ||
+      authError.message?.includes("unique") ||
+      authError.status === 422
+    ) {
+      userReused = true;
 
-    return {
-      status: "failure",
-      errors: [{
-        code: retryable ? "NETWORK_ERROR" : "AUTH_ERROR",
-        message: authError.message,
-        field: "ownerEmail",
-        retryable,
-      }],
-    };
+      // Look up existing user via admin API (service_role)
+      try {
+        const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+        if (serviceKey) {
+          const adminClient = createClient(
+            process.env.NEXT_PUBLIC_SUPABASE_URL!,
+            serviceKey,
+            { auth: { autoRefreshToken: false, persistSession: false } },
+          );
+
+          // Get user by email
+          const {
+            data: { users },
+            error: listError,
+          } = await adminClient.auth.admin.listUsers();
+
+          if (listError) throw listError;
+
+          const existingUser = users?.find(
+            (u) => u.email?.toLowerCase() === validation.ownerEmail.toLowerCase(),
+          );
+
+          if (existingUser) {
+            ownerUserId = existingUser.id;
+
+            // Update display name if changed (best-effort)
+            adminClient.auth.admin.updateUserById(existingUser.id, {
+              user_metadata: {
+                display_name: validation.ownerDisplayName,
+              },
+            }).catch(() => { /* best-effort */ });
+          } else {
+            return {
+              status: "failure",
+              errors: [{
+                code: "AUTH_ERROR",
+                message:
+                  "Email sudah terdaftar tetapi tidak dapat ditemukan. Hubungi support.",
+                field: "ownerEmail",
+                retryable: false,
+              }],
+            };
+          }
+        } else {
+          // No service_role key — can't reuse
+          return {
+            status: "failure",
+            errors: [{
+              code: "AUTH_ERROR",
+              message:
+                "Email sudah terdaftar tetapi SUPABASE_SERVICE_ROLE_KEY tidak dikonfigurasi. Hubungi admin platform.",
+              field: "ownerEmail",
+              retryable: false,
+            }],
+          };
+        }
+      } catch (lookupErr) {
+        return {
+          status: "failure",
+          errors: [{
+            code: "AUTH_ERROR",
+            message:
+              lookupErr instanceof Error
+                ? `Gagal mencari pengguna: ${lookupErr.message}`
+                : "Gagal mencari pengguna yang sudah terdaftar.",
+            field: "ownerEmail",
+            retryable: true,
+          }],
+        };
+      }
+    } else {
+      // Other auth errors — not related to user reuse
+      const retryable =
+        authError.message?.includes("rate") ||
+        authError.message?.includes("timeout") ||
+        authError.message?.includes("network");
+
+      return {
+        status: "failure",
+        errors: [{
+          code: retryable ? "NETWORK_ERROR" : "AUTH_ERROR",
+          message: authError.message,
+          field: "ownerEmail",
+          retryable,
+        }],
+      };
+    }
+  } else {
+    if (!authData.user) {
+      return {
+        status: "failure",
+        errors: [{
+          code: "AUTH_ERROR",
+          message: "Gagal membuat akun pengguna.",
+          retryable: true,
+        }],
+      };
+    }
+    ownerUserId = authData.user.id;
   }
-
-  if (!authData.user) {
-    return {
-      status: "failure",
-      errors: [{
-        code: "AUTH_ERROR",
-        message: "Gagal membuat akun pengguna.",
-        retryable: true,
-      }],
-    };
-  }
-
-  const ownerUserId = authData.user.id;
 
   // ------------------------------------------------------------------
   // 3b. Send password setup email (magic-link equivalent)
