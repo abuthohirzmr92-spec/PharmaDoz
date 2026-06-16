@@ -455,6 +455,7 @@ export interface PaginatedResponse<T> {
 // Tenant packages & quotas (SaaS foundation)
 // ---------------------------------------------------------------------------
 export type TenantPackage = "basic" | "professional" | "enterprise";
+export type TenantOnboardingStatus = "pending" | "active" | "inactive";
 
 export interface TenantQuotaInfo {
   packageName: TenantPackage;
@@ -620,6 +621,7 @@ export interface TenantSummary {
   userCount: number;
   branchCount: number;
   isActive: boolean;
+  onboardingStatus?: TenantOnboardingStatus;
   lastActiveAt: string | null;
   lastSyncAt: string | null;
   transactionVolume: number;

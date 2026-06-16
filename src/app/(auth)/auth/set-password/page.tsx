@@ -111,6 +111,29 @@ export default function SetPasswordPage() {
 
       if (updateErr) throw updateErr;
 
+      // Activate tenant onboarding — owner has completed password setup
+      try {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await (supabase as any)
+            .from("profiles")
+            .select("tenant_id")
+            .eq("id", user.id)
+            .maybeSingle();
+
+          if (profile?.tenant_id) {
+            // Update tenant to 'active' — idempotent
+            await (supabase as any)
+              .from("tenants")
+              .update({ onboarding_status: "active", updated_at: new Date().toISOString() })
+              .eq("id", profile.tenant_id)
+              .eq("onboarding_status", "pending"); // Only activate if still pending
+          }
+        }
+      } catch {
+        // Best-effort — don't block password setup
+      }
+
       setIsDone(true);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Gagal menyimpan password.");

@@ -30,7 +30,14 @@ import { TenantDetailPanel } from "@/components/admin/tenant-detail-panel";
 /*  Types                                                               */
 /* ------------------------------------------------------------------ */
 
-type StatusFilter = "all" | "active" | "inactive";
+type StatusFilter = "all" | "active" | "pending" | "inactive";
+type OnboardingStatus = "pending" | "active" | "inactive";
+
+const ONBOARDING_BADGE: Record<OnboardingStatus, { bg: string; text: string; darkBg: string; darkText: string; label: string }> = {
+  pending:   { bg: "bg-yellow-50",  text: "text-yellow-700",  darkBg: "dark:bg-yellow-950/30", darkText: "dark:text-yellow-300",  label: "Pending" },
+  active:    { bg: "bg-green-50",   text: "text-green-700",   darkBg: "dark:bg-green-950/30",  darkText: "dark:text-green-300",   label: "Aktif" },
+  inactive:  { bg: "bg-red-50",     text: "text-red-700",     darkBg: "dark:bg-red-950/30",    darkText: "dark:text-red-300",     label: "Nonaktif" },
+};
 
 /* ------------------------------------------------------------------ */
 /*  Demo placeholder data                                              */
@@ -154,6 +161,7 @@ const PACKAGE_LABELS: Record<TenantPackage, string> = {
 const STATUS_TABS: { key: StatusFilter; label: string }[] = [
   { key: "all", label: "Semua" },
   { key: "active", label: "Aktif" },
+  { key: "pending", label: "Pending" },
   { key: "inactive", label: "Nonaktif" },
 ];
 
@@ -235,13 +243,25 @@ export default function PlatformTenantsPage() {
       const matchesSearch = t.pharmacyName
         .toLowerCase()
         .includes(searchQuery.toLowerCase());
+      const status = (t as any).onboardingStatus ?? (t.isActive ? "active" : "inactive");
       const matchesStatus =
         statusFilter === "all" ||
-        (statusFilter === "active" && t.isActive) ||
-        (statusFilter === "inactive" && !t.isActive);
+        (statusFilter === "active" && status === "active") ||
+        (statusFilter === "pending" && status === "pending") ||
+        (statusFilter === "inactive" && status === "inactive");
       return matchesSearch && matchesStatus;
     });
   }, [sourceTenants, searchQuery, statusFilter]);
+
+  // Status counts
+  const statusCounts = useMemo(() => {
+    const counts = { active: 0, pending: 0, inactive: 0 };
+    for (const t of sourceTenants) {
+      const s = (t as any).onboardingStatus ?? (t.isActive ? "active" : "inactive") as OnboardingStatus;
+      if (s in counts) counts[s as keyof typeof counts]++;
+    }
+    return counts;
+  }, [sourceTenants]);
 
   const hasData = filteredTenants.length > 0;
 
@@ -370,6 +390,19 @@ export default function PlatformTenantsPage() {
         </div>
       </div>
 
+      {/* Status Count Summary */}
+      <div className="flex gap-3 text-xs">
+        <span className="inline-flex items-center gap-1 rounded-full bg-green-50 px-2.5 py-1 font-medium text-green-700 dark:bg-green-950/30 dark:text-green-300">
+          Aktif: {statusCounts.active}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-50 px-2.5 py-1 font-medium text-yellow-700 dark:bg-yellow-950/30 dark:text-yellow-300">
+          Pending: {statusCounts.pending}
+        </span>
+        <span className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2.5 py-1 font-medium text-red-700 dark:bg-red-950/30 dark:text-red-300">
+          Nonaktif: {statusCounts.inactive}
+        </span>
+      </div>
+
       {/* Loading */}
       {isLoading && !isDemo ? (
         <div className="flex items-center justify-center rounded-xl border border-neutral-200 bg-white py-16 dark:border-neutral-700 dark:bg-neutral-900">
@@ -488,26 +521,15 @@ export default function PlatformTenantsPage() {
 
                         {/* Status */}
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1.5">
-                            <Circle
-                              className={cn(
-                                "h-2 w-2 fill-current",
-                                tenant.isActive
-                                  ? "text-green-500"
-                                  : "text-neutral-300 dark:text-neutral-600",
-                              )}
-                            />
-                            <span
-                              className={cn(
-                                "text-[11px] font-medium",
-                                tenant.isActive
-                                  ? "text-green-600 dark:text-green-400"
-                                  : "text-neutral-400",
-                              )}
-                            >
-                              {tenant.isActive ? "Aktif" : "Nonaktif"}
-                            </span>
-                          </div>
+                          {(() => {
+                            const status: OnboardingStatus = (tenant as any).onboardingStatus ?? (tenant.isActive ? "active" : "inactive");
+                            const badge = ONBOARDING_BADGE[status] ?? ONBOARDING_BADGE.active;
+                            return (
+                              <span className={cn("inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium", badge.bg, badge.text, badge.darkBg, badge.darkText)}>
+                                {badge.label}
+                              </span>
+                            );
+                          })()}
                         </td>
 
                         {/* Last active */}

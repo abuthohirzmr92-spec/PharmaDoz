@@ -266,10 +266,10 @@ BEGIN
     v_tenant_id := gen_random_uuid();
 
     INSERT INTO public.tenants (
-        id, name, slug, domain, settings, package_id, is_active, created_at, updated_at
+        id, name, slug, domain, settings, package_id, is_active, onboarding_status, created_at, updated_at
     ) VALUES (
         v_tenant_id, p_name, p_slug, p_domain, p_settings, p_package_id,
-        true, NOW(), NOW()
+        true, 'pending', NOW(), NOW()
     );
 
     ----------------------------------------------------------------------
