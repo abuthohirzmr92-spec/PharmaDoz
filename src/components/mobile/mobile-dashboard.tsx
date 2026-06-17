@@ -1,8 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { TrendingUp, ShoppingCart, Package, Truck, ClipboardList, Users, FileText } from "lucide-react";
-import { cn } from "@/lib/cn";
+import { TrendingUp, Package, Truck, ClipboardList, Users, FileText } from "lucide-react";
 import { MobileHeader } from "./mobile-header";
 import { useTransactionStore } from "@/store/transaction-store";
 
@@ -17,7 +16,7 @@ export function MobileDashboard() {
   const todayTxns = useTransactionStore((s) => s.getTodayTransactionCount());
 
   return (
-    <div className="min-h-screen bg-[#F7F9FC] dark:bg-[#0F172A]">
+    <div className="flex-1 bg-[#F7F9FC] dark:bg-[#0F172A] pb-6">
       <MobileHeader />
 
       {/* ─── HERO CARD ─── */}
@@ -48,7 +47,6 @@ export function MobileDashboard() {
       <div className="mt-6 px-4">
         <div className="grid grid-cols-3 gap-3">
           {([
-            { href: "/cashier", label: "Kasir", icon: ShoppingCart },
             { href: "/products", label: "Produk", icon: Package },
             { href: "/inventory", label: "Pembelian", icon: Truck },
             { href: "/inventory?tab=opname", label: "Stok Opname", icon: ClipboardList },

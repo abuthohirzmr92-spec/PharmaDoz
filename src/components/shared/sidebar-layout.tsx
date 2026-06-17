@@ -7,7 +7,6 @@ import { useAuthStore } from "@/store/auth-store";
 import { MOBILE_BOTTOM_NAV_HEIGHT } from "@/config/constants";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { Sidebar } from "./sidebar";
-import { MobileBottomNav } from "./mobile-bottom-nav";
 import { Menu, X } from "lucide-react";
 
 export function SidebarLayout({ children }: { children: ReactNode }) {
@@ -100,8 +99,6 @@ export function SidebarLayout({ children }: { children: ReactNode }) {
         <div className="flex flex-1 flex-col p-2 sm:p-3 lg:p-4">{children}</div>
       </main>
 
-      {/* Mobile bottom nav */}
-      <MobileBottomNav />
     </div>
   );
 }
