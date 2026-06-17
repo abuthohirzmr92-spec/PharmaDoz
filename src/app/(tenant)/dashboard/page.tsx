@@ -244,37 +244,8 @@ export default function DashboardPage() {
       {/* ─── MOBILE DASHBOARD ─── */}
       <MobileDashboard />
 
-      {/* ─── DESKTOP DASHBOARD ─── */}
-      <Container className="hidden md:block">
-        <OnboardingBanner />
-
-      {/* Global Filter Bar + Dashboard Scope Selector */}
-      <div className="mb-6 space-y-3">
-        <GlobalFilterBar filter={filter} onChange={setFilter} />
-        <BranchContextSelector
-          value={selectedBranchId ?? "all"}
-          onChange={(id) => setSelectedBranchId(id === "all" ? null : id)}
-        />
-      </div>
-
-      {/* LEVEL 2: Branch Detail Dashboard */}
-      {selectedBranchId && selectedBranch && (
-        <BranchDashboard
-          branchId={selectedBranchId}
-          branchName={selectedBranch.name}
-          filter={filter}
-          onBack={() => setSelectedBranchId(null)}
-        />
-      )}
-
-      {/* LEVEL 1: Global Dashboard */}
-      {selectedBranchId === null && (
-        <GlobalDashboard
-          filter={filter}
-          onSelectBranch={setSelectedBranchId}
-        />
-      )}
-    </Container>
+      {/* ─── DESKTOP DASHBOARD — TEMPORARILY DISABLED FOR DEBUG ─── */}
+      {/* <Container className="hidden md:block"> ... all widgets disabled ... </Container> */}
     </>
   );
 }

@@ -63,6 +63,7 @@ const StatCardComponent = memo(function StatCardComponent({
 /* ------------------------------------------------------------------ */
 
 export function DashboardStatsGrid() {
+  if (typeof window !== "undefined") console.log("[MOUNT-CHECK] DashboardStatsGrid mounted on", window.innerWidth < 768 ? "MOBILE" : "DESKTOP");
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isTxnsLoaded = useTransactionStore((s) => s.isLoaded);
   const todaySales = useTransactionStore((s) => s.getTodaySalesTotal());
