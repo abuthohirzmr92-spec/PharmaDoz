@@ -87,19 +87,38 @@ export function PwaInstallButton() {
       return;
     }
 
-    // Native prompt available — use it
+    // Native prompt available — use it immediately
     if (installPrompt) {
       installPrompt.prompt();
       const { outcome } = await installPrompt.userChoice;
-      if (outcome === "accepted") {
-        setInstalled(true);
-      }
+      if (outcome === "accepted") setInstalled(true);
       setInstallPrompt(null);
       setPromptAvailable(false);
       return;
     }
 
-    // Fallback: platform-specific guide
+    // beforeinstallprompt may not have fired yet — wait briefly for it
+    // Chrome sometimes fires the event with a delay on first visit
+    const waited = await new Promise<BeforeInstallPromptEvent | null>((resolve) => {
+      let resolved = false;
+      const timeout = setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, 2000);
+
+      const captureOnce = (e: Event) => {
+        e.preventDefault();
+        window.removeEventListener("beforeinstallprompt", captureOnce);
+        if (!resolved) { resolved = true; clearTimeout(timeout); resolve(e as BeforeInstallPromptEvent); }
+      };
+      window.addEventListener("beforeinstallprompt", captureOnce);
+    });
+
+    if (waited) {
+      waited.prompt();
+      const { outcome } = await waited.userChoice;
+      if (outcome === "accepted") setInstalled(true);
+      return;
+    }
+
+    // Still no native prompt — fallback to platform-specific guide
     setShowGuide(true);
   }, [platform, installPrompt]);
 
