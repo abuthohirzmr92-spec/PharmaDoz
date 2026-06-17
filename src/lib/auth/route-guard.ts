@@ -11,6 +11,9 @@ const PUBLIC_PATHS = new Set([
   "/forgot-password",
   "/unauthorized",
   "/offline",
+  "/auth/set-password",
+  "/auth/callback",
+  "/invite/accept",
 ]);
 
 export function getRequiredPermission(path: string): Permission | null {

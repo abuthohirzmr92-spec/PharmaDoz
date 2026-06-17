@@ -8,6 +8,8 @@ const PUBLIC_PATHS = new Set([
   "/forgot-password",
   "/unauthorized",
   "/offline",
+  "/auth/set-password",
+  "/auth/callback",
 ]);
 
 const PUBLIC_PATH_PREFIXES = [
