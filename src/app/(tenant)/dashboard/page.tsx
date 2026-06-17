@@ -241,8 +241,8 @@ export default function DashboardPage() {
 
   return (
     <>
-      {/* ─── MOBILE DASHBOARD — DEBUG: replaced with plain HTML ─── */}
-      <div style={{padding:20}}>HELLO MOBILE</div>
+      {/* ─── MOBILE DASHBOARD ─── */}
+      <MobileDashboard />
 
       {/* ─── DESKTOP DASHBOARD — TEMPORARILY DISABLED FOR DEBUG ─── */}
       {/* <Container className="hidden md:block"> ... all widgets disabled ... </Container> */}
