@@ -138,11 +138,15 @@ export default function PlatformBrandingPage() {
     try {
       const { supabase } = await import("@/lib/supabase/client");
       if (!supabase) throw new Error("Not connected");
+      const timestamp = Date.now();
       const ext = file.name.split(".").pop() || "png";
-      const { error } = await supabase.storage.from("platform-assets").upload(`${field}-${Date.now()}.${ext}`, file, { upsert: true });
+      const fileName = `${field}-${timestamp}.${ext}`;
+      console.log("[UPLOAD]", { field, fileName });
+      const { error } = await supabase.storage.from("platform-assets").upload(fileName, file, { upsert: true });
       if (error) throw error;
-      const { data: { publicUrl } } = supabase.storage.from("platform-assets").getPublicUrl(`${field}-${Date.now()}.${ext}`);
-      const url = `${publicUrl}?t=${Date.now()}`;
+      const { data: { publicUrl } } = supabase.storage.from("platform-assets").getPublicUrl(fileName);
+      console.log("[UPLOAD] publicUrl:", publicUrl);
+      const url = `${publicUrl}?t=${timestamp}`;
       if (field === "logo") setLogoUrl(url);
       else if (field === "sidebar_logo") setSidebarLogoUrl(url);
       else if (field === "favicon") setFaviconUrl(url);
