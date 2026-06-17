@@ -1,6 +1,8 @@
 "use client";
 
-import { TrendingUp } from "lucide-react";
+import Link from "next/link";
+import { TrendingUp, ShoppingCart, Package, Truck, ClipboardList, Users, FileText } from "lucide-react";
+import { cn } from "@/lib/cn";
 import { MobileHeader } from "./mobile-header";
 import { useTransactionStore } from "@/store/transaction-store";
 
@@ -39,16 +41,38 @@ export function MobileDashboard() {
               <p className="text-[10px] text-white/70">Transaksi</p>
             </div>
           </div>
-          <div className="mt-3 flex items-center gap-2 text-xs text-white/60">
-            <TrendingUp className="h-3 w-3 text-[#10B981]" />
-            <span className="text-[#10B981] font-medium">+12%</span>
-            <span>dari kemarin</span>
-          </div>
         </div>
       </div>
 
-      <div style={{ padding: 20 }}>
-        <p style={{ fontWeight: "bold" }}>HERO CARD ONLY</p>
+      {/* ─── QUICK MENU ─── */}
+      <div className="mt-6 px-4">
+        <div className="grid grid-cols-3 gap-3">
+          {([
+            { href: "/cashier", label: "Kasir", icon: ShoppingCart },
+            { href: "/products", label: "Produk", icon: Package },
+            { href: "/inventory", label: "Pembelian", icon: Truck },
+            { href: "/inventory?tab=opname", label: "Stok Opname", icon: ClipboardList },
+            { href: "/inventory?tab=purchase", label: "Supplier", icon: Users },
+            { href: "/reports", label: "Laporan", icon: FileText },
+          ]).map((item) => {
+            const Icon = item.icon;
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                className="flex flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-sm transition active:scale-95 dark:bg-[#1E293B]"
+                style={{ minHeight: "88px" }}
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#12D6B5] to-[#1E88E5]">
+                  <Icon className="h-5 w-5 text-white" />
+                </div>
+                <span className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200 text-center leading-tight">
+                  {item.label}
+                </span>
+              </Link>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
