@@ -19,6 +19,7 @@ export interface PackageRow {
   isActive: boolean;
   isCustom: boolean;
   featureFlags: Record<string, boolean>;
+  mobileAppEnabled: boolean;
   sortOrder: number;
 }
 
@@ -31,6 +32,7 @@ export interface CreatePackageInput {
   monthlyPrice?: number;
   isActive?: boolean;
   featureFlags?: Record<string, boolean>;
+  mobileAppEnabled?: boolean;
   sortOrder?: number;
 }
 
@@ -43,6 +45,7 @@ export interface UpdatePackageInput {
   monthlyPrice?: number;
   isActive?: boolean;
   featureFlags?: Record<string, boolean>;
+  mobileAppEnabled?: boolean;
   sortOrder?: number;
 }
 
@@ -112,6 +115,7 @@ export class PackageRepository extends BaseRepository {
       is_active: data.isActive ?? true,
       is_custom: true,
       feature_flags: data.featureFlags ?? {},
+      mobile_app_enabled: data.mobileAppEnabled ?? false,
       sort_order: data.sortOrder ?? 99,
     };
 
@@ -152,6 +156,7 @@ export class PackageRepository extends BaseRepository {
     if (data.monthlyPrice !== undefined) update["monthly_price"] = data.monthlyPrice;
     if (data.isActive !== undefined) update["is_active"] = data.isActive;
     if (data.featureFlags !== undefined) update["feature_flags"] = data.featureFlags;
+    if (data.mobileAppEnabled !== undefined) update["mobile_app_enabled"] = data.mobileAppEnabled;
     if (data.sortOrder !== undefined) update["sort_order"] = data.sortOrder;
 
     const { data: row, error } = await this.client
@@ -395,5 +400,6 @@ function normalizePackage(pkg: PackageRow): PackageRow {
   return {
     ...pkg,
     featureFlags: pkg.featureFlags ?? {},
+    mobileAppEnabled: pkg.mobileAppEnabled ?? false,
   };
 }

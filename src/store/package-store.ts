@@ -37,6 +37,7 @@ const DEMO_PACKAGES: PackageRow[] = [
     monthlyPrice: 0,
     isActive: true,
     isCustom: false,
+    mobileAppEnabled: false,
     featureFlags: {
       financial_wallet: false,
       cashflow_dashboard: false,
@@ -57,6 +58,7 @@ const DEMO_PACKAGES: PackageRow[] = [
     monthlyPrice: 299000,
     isActive: true,
     isCustom: false,
+    mobileAppEnabled: false,
     featureFlags: {
       financial_wallet: true,
       cashflow_dashboard: false,
@@ -77,6 +79,7 @@ const DEMO_PACKAGES: PackageRow[] = [
     monthlyPrice: 999000,
     isActive: true,
     isCustom: false,
+    mobileAppEnabled: false,
     featureFlags: {
       financial_wallet: true,
       cashflow_dashboard: true,
@@ -139,6 +142,7 @@ export const usePackageStore = create<PackageState>((set, get) => ({
         monthlyPrice: data.monthlyPrice ?? 0,
         isActive: data.isActive ?? true,
         isCustom: true,
+        mobileAppEnabled: data.mobileAppEnabled ?? false,
         featureFlags: data.featureFlags ?? {},
         sortOrder: data.sortOrder ?? 99,
       };
