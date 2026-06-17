@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { isMobileDevice } from "@/lib/device/device-access";
 import { useAuthStore } from "@/store/auth-store";
 import { usePackageStore } from "@/store/package-store";
@@ -14,10 +14,18 @@ import { Loader2 } from "lucide-react";
  */
 export function MobileGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
+  const pathname = usePathname();
   const [checking, setChecking] = useState(true);
   const [allowed, setAllowed] = useState(false);
 
   useEffect(() => {
+    // P0: /mobile-locked MUST always render — prevent infinite redirect loop
+    if (pathname === "/mobile-locked") {
+      setAllowed(true);
+      setChecking(false);
+      return;
+    }
+
     // Desktop always allowed
     if (!isMobileDevice()) {
       setAllowed(true);
@@ -42,7 +50,12 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
 
         // Get tenant's package_id via Supabase
         const { supabase } = await import("@/lib/supabase/client");
-        if (!supabase) { setAllowed(true); setChecking(false); return; }
+        if (!supabase) {
+          // P1: fail-closed — no supabase means can't verify, lock access
+          router.replace("/mobile-locked");
+          setChecking(false);
+          return;
+        }
 
         const { data: tenant } = await (supabase as any)
           .from("tenants")
@@ -59,14 +72,14 @@ export function MobileGuard({ children }: { children: React.ReactNode }) {
           router.replace("/mobile-locked");
         }
       } catch {
-        // On error, allow through
-        setAllowed(true);
+        // P1: fail-closed — on error, lock access
+        router.replace("/mobile-locked");
       }
       setChecking(false);
     };
 
     checkPackage();
-  }, [router]);
+  }, [router, pathname]);
 
   if (checking) {
     return (
