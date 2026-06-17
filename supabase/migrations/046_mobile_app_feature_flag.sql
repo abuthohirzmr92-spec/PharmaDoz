@@ -9,7 +9,7 @@ ALTER TABLE tenant_packages
   ADD COLUMN IF NOT EXISTS mobile_app_enabled BOOLEAN NOT NULL DEFAULT false;
 
 COMMENT ON COLUMN tenant_packages.mobile_app_enabled IS
-  'When true, tenant users can access the dashboard via PWA-installed mobile app';
+  'When true, tenant users can access the dashboard from mobile devices';
 
 -- Enable for Enterprise by default (set existing enterprise packages)
 UPDATE tenant_packages
