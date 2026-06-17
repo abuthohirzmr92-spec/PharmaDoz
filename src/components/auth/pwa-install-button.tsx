@@ -10,6 +10,12 @@ interface BeforeInstallPromptEvent extends Event {
   userChoice: Promise<{ outcome: "accepted" | "dismissed" }>;
 }
 
+declare global {
+  interface Window {
+    deferredPrompt?: BeforeInstallPromptEvent;
+  }
+}
+
 /* ------------------------------------------------------------------ */
 /*  Platform detection                                                  */
 /* ------------------------------------------------------------------ */
@@ -28,7 +34,7 @@ function isStandalone(): boolean {
   if (typeof window === "undefined") return false;
   return (
     window.matchMedia("(display-mode: standalone)").matches ||
-    (navigator as any).standalone === true // iOS standalone
+    (navigator as any).standalone === true
   );
 }
 
@@ -37,10 +43,8 @@ function isStandalone(): boolean {
 /* ------------------------------------------------------------------ */
 
 export function PwaInstallButton() {
-  const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [showGuide, setShowGuide] = useState(false);
   const [installed, setInstalled] = useState(false);
-  const [promptAvailable, setPromptAvailable] = useState(false);
 
   const branding = usePlatformBrandingStore();
   const appName = branding.getAppName();
@@ -56,19 +60,18 @@ export function PwaInstallButton() {
     // iOS: never fires beforeinstallprompt
     if (platform === "ios") return;
 
-    // Capture beforeinstallprompt
+    // Capture beforeinstallprompt into global window.deferredPrompt
     const handler = (e: Event) => {
       e.preventDefault();
-      setInstallPrompt(e as BeforeInstallPromptEvent);
-      setPromptAvailable(true);
+      window.deferredPrompt = e as BeforeInstallPromptEvent;
+      console.log("[PWA] INSTALL EVENT FIRED — stored in window.deferredPrompt");
     };
     window.addEventListener("beforeinstallprompt", handler);
 
     // Detect successful install
     const installedHandler = () => {
       setInstalled(true);
-      setInstallPrompt(null);
-      setPromptAvailable(false);
+      window.deferredPrompt = undefined;
       toast.success(`${appName} berhasil diinstal!`);
     };
     window.addEventListener("appinstalled", installedHandler);
@@ -87,40 +90,18 @@ export function PwaInstallButton() {
       return;
     }
 
-    // Native prompt available — use it immediately
-    if (installPrompt) {
-      installPrompt.prompt();
-      const { outcome } = await installPrompt.userChoice;
+    // Use global deferredPrompt — persists across renders
+    if (window.deferredPrompt) {
+      await window.deferredPrompt.prompt();
+      const { outcome } = await window.deferredPrompt.userChoice;
       if (outcome === "accepted") setInstalled(true);
-      setInstallPrompt(null);
-      setPromptAvailable(false);
+      window.deferredPrompt = undefined;
       return;
     }
 
-    // beforeinstallprompt may not have fired yet — wait briefly for it
-    // Chrome sometimes fires the event with a delay on first visit
-    const waited = await new Promise<BeforeInstallPromptEvent | null>((resolve) => {
-      let resolved = false;
-      const timeout = setTimeout(() => { if (!resolved) { resolved = true; resolve(null); } }, 2000);
-
-      const captureOnce = (e: Event) => {
-        e.preventDefault();
-        window.removeEventListener("beforeinstallprompt", captureOnce);
-        if (!resolved) { resolved = true; clearTimeout(timeout); resolve(e as BeforeInstallPromptEvent); }
-      };
-      window.addEventListener("beforeinstallprompt", captureOnce);
-    });
-
-    if (waited) {
-      waited.prompt();
-      const { outcome } = await waited.userChoice;
-      if (outcome === "accepted") setInstalled(true);
-      return;
-    }
-
-    // Still no native prompt — fallback to platform-specific guide
+    // No native prompt — fallback to platform-specific guide
     setShowGuide(true);
-  }, [platform, installPrompt]);
+  }, [platform]);
 
   // ---- Button label ----
   const buttonLabel = installed
