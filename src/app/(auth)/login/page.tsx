@@ -158,14 +158,14 @@ export default function LoginPage() {
             <img
               src={branding.getLogoUrl()!}
               alt={branding.getAppName()}
-              className="h-14 w-14 rounded-2xl object-contain shadow-lg"
+              className="h-14 w-14 md:h-32 md:w-32 rounded-2xl object-contain shadow-lg"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
             />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
-              <Pill className="h-7 w-7" />
+            <div className="flex h-14 w-14 md:h-32 md:w-32 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
+              <Pill className="h-7 w-7 md:h-16 md:w-16" />
             </div>
           )}
           <div className="text-center">

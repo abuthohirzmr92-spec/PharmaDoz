@@ -136,10 +136,10 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
         <div className="mb-6 flex flex-col items-center gap-3">
           {branding.logoUrl ? (
             <img src={branding.logoUrl} alt={branding.companyName}
-              className="h-14 w-14 rounded-xl object-contain" />
+              className="h-14 w-14 md:h-32 md:w-32 rounded-xl object-contain" />
           ) : (
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
-              <Pill className="h-7 w-7" />
+            <div className="flex h-14 w-14 md:h-32 md:w-32 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
+              <Pill className="h-7 w-7 md:h-16 md:w-16" />
             </div>
           )}
           <div className="text-center">
