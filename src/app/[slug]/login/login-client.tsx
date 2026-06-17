@@ -133,20 +133,20 @@ export function SluggifiedLoginPage({ tenantName, branding }: Props) {
     <div className="flex min-h-screen items-center justify-center bg-neutral-50 p-4 dark:bg-neutral-950">
       <div className="w-full max-w-lg">
         {/* Branding — tenant-specific */}
-        <div className="mb-6 flex flex-col items-center gap-3">
+        <div className="mb-6 md:mb-8 flex flex-col items-center gap-3 md:gap-4">
           {branding.logoUrl ? (
             <img src={branding.logoUrl} alt={branding.companyName}
-              className="h-14 w-14 md:h-32 md:w-32 rounded-xl object-contain" />
+              className="h-14 w-14 md:h-36 md:w-36 rounded-xl object-contain" />
           ) : (
-            <div className="flex h-14 w-14 md:h-32 md:w-32 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
+            <div className="flex h-14 w-14 md:h-36 md:w-36 items-center justify-center rounded-2xl bg-brand-600 text-white shadow-lg">
               <Pill className="h-7 w-7 md:h-16 md:w-16" />
             </div>
           )}
           <div className="text-center">
-            <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+            <h1 className="text-2xl md:text-4xl font-bold text-neutral-900 dark:text-neutral-50">
               {branding.companyName}
             </h1>
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm md:text-lg text-neutral-500">
               {hasSupabase
                 ? "Masuk dengan akun Anda"
                 : isDemo
