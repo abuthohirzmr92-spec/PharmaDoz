@@ -14,6 +14,7 @@ import { useBranchStore } from "@/store/branch-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { ArrowLeft, Store } from "lucide-react";
 import type { MetricFilter } from "@/hooks/use-owner-metrics";
+import { MobileDashboard } from "@/components/mobile/mobile-dashboard";
 
 /* ------------------------------------------------------------------ */
 /*  Lazy-loaded existing dashboard components (unchanged)               */
@@ -239,8 +240,13 @@ export default function DashboardPage() {
   );
 
   return (
-    <Container>
-      <OnboardingBanner />
+    <>
+      {/* ─── MOBILE DASHBOARD ─── */}
+      <MobileDashboard />
+
+      {/* ─── DESKTOP DASHBOARD ─── */}
+      <Container className="hidden md:block">
+        <OnboardingBanner />
 
       {/* Global Filter Bar + Dashboard Scope Selector */}
       <div className="mb-6 space-y-3">
@@ -269,5 +275,6 @@ export default function DashboardPage() {
         />
       )}
     </Container>
+    </>
   );
 }
