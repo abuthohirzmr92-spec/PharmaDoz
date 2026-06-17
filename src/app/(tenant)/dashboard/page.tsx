@@ -15,6 +15,7 @@ import { useTransactionStore } from "@/store/transaction-store";
 import { ArrowLeft, Store } from "lucide-react";
 import type { MetricFilter } from "@/hooks/use-owner-metrics";
 import { MobileDashboard } from "@/components/mobile/mobile-dashboard";
+import { isMobileDevice } from "@/lib/device/device-access";
 
 /* ------------------------------------------------------------------ */
 /*  Lazy-loaded existing dashboard components (unchanged)               */
@@ -239,13 +240,44 @@ export default function DashboardPage() {
     [selectedBranchId, branches],
   );
 
-  return (
-    <>
-      {/* ─── MOBILE DASHBOARD ─── */}
-      <MobileDashboard />
+  const isMobile = typeof window !== "undefined" ? isMobileDevice() : false;
 
-      {/* ─── DESKTOP DASHBOARD — TEMPORARILY DISABLED FOR DEBUG ─── */}
-      {/* <Container className="hidden md:block"> ... all widgets disabled ... </Container> */}
-    </>
+  // ─── MOBILE: conditional mount, not CSS hide ───
+  if (isMobile) {
+    return <MobileDashboard />;
+  }
+
+  // ─── DESKTOP: original layout ───
+  return (
+    <Container>
+      <OnboardingBanner />
+
+      {/* Global Filter Bar + Dashboard Scope Selector */}
+      <div className="mb-6 space-y-3">
+        <GlobalFilterBar filter={filter} onChange={setFilter} />
+        <BranchContextSelector
+          value={selectedBranchId ?? "all"}
+          onChange={(id) => setSelectedBranchId(id === "all" ? null : id)}
+        />
+      </div>
+
+      {/* LEVEL 2: Branch Detail Dashboard */}
+      {selectedBranchId && selectedBranch && (
+        <BranchDashboard
+          branchId={selectedBranchId}
+          branchName={selectedBranch.name}
+          filter={filter}
+          onBack={() => setSelectedBranchId(null)}
+        />
+      )}
+
+      {/* LEVEL 1: Global Dashboard */}
+      {selectedBranchId === null && (
+        <GlobalDashboard
+          filter={filter}
+          onSelectBranch={setSelectedBranchId}
+        />
+      )}
+    </Container>
   );
 }
