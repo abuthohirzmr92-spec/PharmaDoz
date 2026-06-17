@@ -21,6 +21,7 @@ export default function CreatePackagePage() {
   const [maxProducts, setMaxProducts] = useState(200);
   const [monthlyPrice, setMonthlyPrice] = useState(0);
   const [features, setFeatures] = useState<Record<string, boolean>>({});
+  const [mobileAppEnabled, setMobileAppEnabled] = useState(false);
   const [error, setError] = useState("");
 
   // Also check load error
@@ -52,6 +53,7 @@ export default function CreatePackagePage() {
       maxProducts,
       monthlyPrice,
       featureFlags: features,
+      mobileAppEnabled,
     });
 
     if (result) router.push("/platform/packages");
@@ -120,6 +122,20 @@ export default function CreatePackagePage() {
             <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Harga per Bulan (Rp)</label>
             <input type="number" value={monthlyPrice} onChange={(e) => setMonthlyPrice(Number(e.target.value))} min={0}
               className="mt-1 block w-full max-w-[200px] rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-50" />
+          </div>
+
+          {/* Mobile App Toggle */}
+          <div className="rounded-xl border border-neutral-200 bg-white p-5 dark:border-neutral-800 dark:bg-neutral-950">
+            <div className="flex items-center justify-between">
+              <div className="flex-1">
+                <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Mobile App</h3>
+                <p className="text-xs text-neutral-500 mt-0.5">Mengizinkan akses dashboard via PWA terinstall.</p>
+              </div>
+              <button type="button" onClick={() => setMobileAppEnabled(!mobileAppEnabled)}
+                className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ${mobileAppEnabled ? "bg-brand-600" : "bg-neutral-200 dark:bg-neutral-700"}`}>
+                <span className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-white shadow ring-0 transition duration-200 ${mobileAppEnabled ? "translate-x-5" : "translate-x-0"}`} />
+              </button>
+            </div>
           </div>
 
           {/* Feature Toggles */}
