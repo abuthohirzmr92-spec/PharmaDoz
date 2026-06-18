@@ -18,6 +18,22 @@ export const colorTokens = {
     950: "#172554",
   },
 
+  // Mobile — Medisync turquoise-cyan-blue gradient palette
+  mobile: {
+    turquoise: "#12D6B5",
+    cyan: "#18B7C8",
+    blue: "#1E88E5",
+    deepBlue: "#1557D5",
+    turquoiseLight: "#11C5B4",
+  },
+
+  // Backgrounds
+  background: {
+    light: "#F7F9FC",
+    dark: "#0F172A",
+    cardDark: "#1E293B",
+  },
+
   // Neutral / slate
   neutral: {
     50: "#f8fafc",
@@ -91,6 +107,7 @@ export const radiusTokens = {
   lg: "0.5rem",
   xl: "0.75rem",
   "2xl": "1rem",
+  "3xl": "1.5rem",
   full: "9999px",
 } as const;
 
@@ -99,4 +116,6 @@ export const shadowTokens = {
   md: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
   lg: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
   xl: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+  hero: "0 16px 40px rgba(30,136,229,0.25)",
+  card: "0 2px 12px rgba(0,0,0,0.04)",
 } as const;

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { TrendingUp, Package, Truck, ClipboardList, Users, FileText } from "lucide-react";
 import { MobileHeader } from "./mobile-header";
 import { useTransactionStore } from "@/store/transaction-store";
+import { colorTokens, shadowTokens } from "@/theme/tokens";
 
 function formatRupiah(n: number): string {
   if (n >= 1_000_000) return `Rp ${(n / 1_000_000).toFixed(1)}M`;
@@ -24,8 +25,8 @@ export function MobileDashboard() {
         <div
           className="rounded-3xl p-5 text-white shadow-xl"
           style={{
-            background: "linear-gradient(135deg, #12D6B5 0%, #1E88E5 100%)",
-            boxShadow: "0 16px 40px rgba(30,136,229,0.25)",
+            background: `linear-gradient(135deg, ${colorTokens.mobile.turquoise} 0%, ${colorTokens.mobile.blue} 100%)`,
+            boxShadow: shadowTokens.hero,
           }}
         >
           <div className="flex items-center justify-between">
@@ -61,7 +62,8 @@ export function MobileDashboard() {
                 className="flex flex-col items-center gap-2 rounded-2xl bg-white p-4 shadow-sm transition active:scale-95 dark:bg-[#1E293B]"
                 style={{ minHeight: "88px" }}
               >
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-[#12D6B5] to-[#1E88E5]">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl"
+                  style={{ background: `linear-gradient(135deg, ${colorTokens.mobile.turquoise}, ${colorTokens.mobile.blue})` }}>
                   <Icon className="h-5 w-5 text-white" />
                 </div>
                 <span className="text-[11px] font-semibold text-neutral-700 dark:text-neutral-200 text-center leading-tight">
