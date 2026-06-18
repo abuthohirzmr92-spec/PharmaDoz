@@ -13,3 +13,5 @@ export { DeviceProfile, getDeviceProfile, getTabletProfile } from "./device-prof
 export { surfaceTokens } from "./surfaces";
 export { motionTokens } from "./motion";
 export { zIndexTokens } from "./z-index";
+export { semanticTheme } from "./semantic-theme";
+export { layoutTokens } from "./layout";
