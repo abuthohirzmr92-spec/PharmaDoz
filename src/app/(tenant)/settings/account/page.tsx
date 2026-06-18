@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor } from "lucide-react";
+import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor, Palette } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
@@ -14,6 +14,7 @@ const ACCOUNT_TABS = [
   { label: "Profil", href: "/settings/account", icon: User },
   { label: "Keamanan", href: "/settings/account/security", icon: Lock },
   { label: "Session", href: "/settings/account/session", icon: Monitor },
+  { label: "Tema", href: "/settings/account/theme", icon: Palette },
 ];
 
 export default function ProfilePage() {
