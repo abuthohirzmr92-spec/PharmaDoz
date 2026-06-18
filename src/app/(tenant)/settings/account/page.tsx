@@ -3,11 +3,10 @@
 import { useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor, Palette, Shield, Building2, Hash } from "lucide-react";
+import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor, Palette, Shield, Building2 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
-import { usePlatformBrandingStore } from "@/store/platform-branding-store";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 import { AppCard } from "@/components/ui/app-card";
 import { AppBadge } from "@/components/ui/app-badge";
@@ -23,7 +22,6 @@ export default function ProfilePage() {
   const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const refreshUserProfile = useAuthStore((s) => s.refreshUserProfile);
-  const branding = usePlatformBrandingStore();
 
   const [displayName, setDisplayName] = useState(user?.displayName ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
