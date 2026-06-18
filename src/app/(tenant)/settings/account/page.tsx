@@ -1,15 +1,17 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor, Palette, Shield, Building2 } from "lucide-react";
+import { usePathname, useRouter } from "next/navigation";
+import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor, Palette, Shield, Building2, LogOut } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
 import { isSupabaseConnected } from "@/lib/supabase/client";
 import { AppCard } from "@/components/ui/app-card";
 import { AppBadge } from "@/components/ui/app-badge";
+import { AvatarUpload } from "@/components/profile/avatar-upload";
+import { uploadAvatar, removeAvatar } from "@/lib/storage/avatar-storage";
 
 const ACCOUNT_TABS = [
   { label: "Profil", href: "/settings/account", icon: User },
@@ -28,26 +30,110 @@ export default function ProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isDone, setIsDone] = useState(false);
 
+  // Avatar — holds the selected File for P0.6 upload (page owns business logic)
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+
+  const handleAvatarChange = useCallback((file: File | null) => {
+    setAvatarFile(file);
+  }, []);
+
   const handleSave = async () => {
     if (!displayName.trim()) { toast.error("Nama tidak boleh kosong."); return; }
     setIsSaving(true);
+
+    let newAvatarUrl: string | undefined;
+    const oldAvatarUrl = user?.avatarUrl ?? null;
+
     try {
       if (isSupabaseConnected()) {
         const { supabase } = await import("@/lib/supabase/client");
-        if (supabase) {
-          const { error } = await supabase.auth.updateUser({
-            data: { display_name: displayName.trim(), phone: phone.trim() || null },
+        if (supabase && user?.id) {
+          // -------------------------------------------------------------------
+          // Avatar upload (only on Save, not on file select)
+          // -------------------------------------------------------------------
+          if (avatarFile) {
+            newAvatarUrl = await uploadAvatar(user.id, avatarFile);
+          }
+
+          // -------------------------------------------------------------------
+          // Update profile metadata
+          // -------------------------------------------------------------------
+          const profileUpdate: Record<string, unknown> = {
+            display_name: displayName.trim(),
+            phone: phone.trim() || null,
+            updated_at: new Date().toISOString(),
+          };
+          if (newAvatarUrl) {
+            profileUpdate.avatar_url = newAvatarUrl;
+          }
+
+          // Update auth.users metadata
+          const { error: authErr } = await supabase.auth.updateUser({
+            data: profileUpdate,
           });
-          if (error) throw error;
+          if (authErr) {
+            // Profile update failed — clean up newly uploaded file
+            if (newAvatarUrl) {
+              try { await removeAvatar(newAvatarUrl); } catch { /* best-effort */ }
+            }
+            throw authErr;
+          }
+
+          // Update profiles table
+          const { error: profileErr } = await (supabase as any)
+            .from("profiles")
+            .upsert({ id: user.id, ...profileUpdate }, { onConflict: "id" });
+
+          if (profileErr) {
+            // Profile update failed — clean up newly uploaded file
+            if (newAvatarUrl) {
+              try { await removeAvatar(newAvatarUrl); } catch { /* best-effort */ }
+            }
+            throw profileErr;
+          }
+
+          // -------------------------------------------------------------------
+          // Remove old avatar (only after successful update)
+          // -------------------------------------------------------------------
+          if (newAvatarUrl && oldAvatarUrl) {
+            try { await removeAvatar(oldAvatarUrl); } catch { /* best-effort cleanup */ }
+          }
         }
       }
+
       await refreshUserProfile();
       setIsDone(true);
       toast.success("Profil berhasil disimpan.");
       setTimeout(() => setIsDone(false), 2000);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal menyimpan profil.");
-    } finally { setIsSaving(false); }
+    } finally {
+      // Reset avatar file state after save (success or failure)
+      setAvatarFile(null);
+      setIsSaving(false);
+    }
+  };
+
+  // -----------------------------------------------------------------------
+  // Logout
+  // -----------------------------------------------------------------------
+
+  const router = useRouter();
+  const logout = useAuthStore((s) => s.logout);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
+  const handleLogout = async () => {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logout();
+      toast.success("Berhasil keluar.");
+      router.push("/login");
+    } catch {
+      toast.error("Gagal keluar. Coba lagi.");
+    } finally {
+      setIsLoggingOut(false);
+    }
   };
 
   return (
@@ -69,11 +155,13 @@ export default function ProfilePage() {
 
       {/* Profile Header */}
       <AppCard variant="elevated">
-        <div className="flex items-center gap-4">
-          <div className="flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-lg font-bold text-brand-600 dark:bg-brand-900 dark:text-brand-400">
-            {user?.displayName?.charAt(0)?.toUpperCase() ?? "?"}
-          </div>
-          <div className="flex-1 min-w-0">
+        <div className="flex items-start gap-4">
+          <AvatarUpload
+            imageUrl={user?.avatarUrl}
+            name={displayName}
+            onChange={handleAvatarChange}
+          />
+          <div className="flex-1 min-w-0 pt-1">
             <div className="flex items-center gap-2">
               <h2 className="text-lg font-bold text-neutral-900 dark:text-neutral-50 truncate">{user?.displayName ?? "—"}</h2>
               <AppBadge variant="success">Aktif</AppBadge>
@@ -148,6 +236,34 @@ export default function ProfilePage() {
           <div className="flex items-center gap-2"><AppBadge variant="success">Aktif</AppBadge><span className="text-xs text-neutral-500">Akun aktif</span></div>
           <div className="flex items-center gap-2"><AppBadge variant={isSupabaseConnected() ? "success" : "danger"}>{isSupabaseConnected() ? "Online" : "Offline"}</AppBadge><span className="text-xs text-neutral-500">Supabase</span></div>
         </div>
+      </AppCard>
+
+      {/* Logout */}
+      <AppCard>
+        <div className="mb-3 flex items-center gap-2">
+          <LogOut className="h-5 w-5 text-red-500" />
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Keluar dari Akun</h3>
+        </div>
+        <p className="mb-3 text-xs text-neutral-500">
+          Keluar dari perangkat ini dan kembali ke halaman login.
+        </p>
+        <button
+          type="button"
+          onClick={handleLogout}
+          disabled={isLoggingOut}
+          className={cn(
+            "inline-flex w-full items-center justify-center gap-2 rounded-lg px-4 py-2.5 text-sm font-semibold transition",
+            "bg-red-50 text-red-700 hover:bg-red-100",
+            "dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900",
+            "disabled:opacity-50",
+          )}
+        >
+          {isLoggingOut ? (
+            <><Loader2 className="h-4 w-4 animate-spin" />Keluar...</>
+          ) : (
+            <><LogOut className="h-4 w-4" />Keluar</>
+          )}
+        </button>
       </AppCard>
     </div>
   );

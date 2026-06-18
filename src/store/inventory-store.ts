@@ -141,7 +141,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     inventoryRepo.setBranchContext(bid);
     transactionRepo.setBranchContext(bid);
     supplierRepo.setBranchContext(bid);
-    productRepo.setBranchContext(bid);
+    // productRepo branch context managed per-operation with finally cleanup
+    // to prevent singleton leakage across pages (P0.1 fix)
   },
 
   /* ---- UI ---- */
@@ -286,6 +287,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         console.error('DB purchase failed, falling back to demo mode:', e);
         set({ isSubmitting: false });
         // Fall through to existing demo logic
+      } finally {
+        productRepo.setBranchContext(undefined);
       }
     }
 
@@ -480,6 +483,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       } catch (e) {
         console.error('DB opname failed, falling back to demo:', e);
         set({ isSubmitting: false });
+      } finally {
+        productRepo.setBranchContext(undefined);
       }
     }
 
@@ -570,6 +575,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       } catch (e) {
         console.error('DB write-off failed, falling back to demo:', e);
         set({ isSubmitting: false });
+      } finally {
+        productRepo.setBranchContext(undefined);
       }
     }
 
@@ -665,6 +672,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           return;
         } catch (e) {
           console.error('DB payment failed, falling back to demo:', e);
+        } finally {
+          productRepo.setBranchContext(undefined);
         }
       }
     }
@@ -858,6 +867,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         );
         set({ isSubmitting: false });
         // Fall through to demo-mode logic
+      } finally {
+        productRepo.setBranchContext(undefined);
       }
     }
 
@@ -896,7 +907,6 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         transactionRepo.setBranchContext(branchId);
         supplierRepo.setBranchContext(branchId);
         productRepo.setBranchContext(branchId);
-        productRepo.setBranchContext(branchId);
       }
 
       try {
@@ -933,6 +943,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           e,
         );
         get()._loadDemoFallback();
+      } finally {
+        productRepo.setBranchContext(undefined);
       }
     } else {
       get()._loadDemoFallback();
