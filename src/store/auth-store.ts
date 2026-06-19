@@ -22,6 +22,7 @@ import { useCashierStore } from "@/store/cashier-store";
 import { useTransactionStore } from "@/store/transaction-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useHoldCartStore } from "@/store/hold-cart-store";
+import { useBranchStore } from "@/store/branch-store";
 
 /* ------------------------------------------------------------------ */
 /*  Dev logging (stripped in production)                               */
@@ -113,6 +114,7 @@ export function clearDomainStores() {
     isSubmitting: false,
   });
   useHoldCartStore.setState({ heldCarts: [], isHoldListOpen: false });
+  useBranchStore.getState().clear();
 }
 
 function fetchAndSetUserOverrides(tenantId: string, userId: string) {
