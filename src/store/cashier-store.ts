@@ -1,7 +1,5 @@
 "use client";
 
-console.log("===== P0.4 BUILD 9d8f099 LOADED =====");
-
 import { create } from "zustand";
 import type { Transaction } from "@/types/transaction";
 import { useAuthStore } from "@/store/auth-store";
@@ -217,16 +215,6 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
     const now = new Date().toISOString();
     const cashierName = auth.user?.displayName ?? "Kasir";
     const activeBranch = useBranchStore.getState().activeBranch;
-    console.log("[P0.4 ACTIVE BRANCH OBJECT]", JSON.parse(JSON.stringify(activeBranch)));
-    console.log("[P0.4 ACTIVE BRANCH ID VARIABLE]", activeBranch?.id);
-    console.log("[P0.4 BRANCH STORE STATE]", JSON.parse(JSON.stringify({
-      branches: useBranchStore.getState().branches.map(b => ({ id: b.id, name: b.name, tenantId: b.tenantId, isActive: b.isActive })),
-    })));
-    console.log("[P0.4 STORE IDS]", {
-      activeBranch_id: useBranchStore.getState().activeBranch?.id,
-      activeBranch_name: useBranchStore.getState().activeBranch?.name,
-      localStorageValue: typeof window !== "undefined" ? localStorage.getItem("activeBranchId") : null,
-    });
     if (!activeBranch?.id) {
       set({ isSubmitting: false, submitError: "Cabang aktif harus dipilih sebelum membuat transaksi." });
       return { success: false, error: "Cabang aktif harus dipilih sebelum membuat transaksi." };
@@ -278,14 +266,6 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
             cashierName: transaction.cashierName,
             pharmacyId: transaction.pharmacyId,
           };
-          console.log("[P0.4 FINAL PAYLOAD PHARMACY]", {
-            activeBranchId: pharmacyId,
-            activeBranchObjectId: activeBranch?.id,
-            branchStoreActiveBranchId: useBranchStore.getState().activeBranch?.id,
-            transactionPharmacyId: transaction.pharmacyId,
-          });
-          console.log("===== P0.4 BEFORE CREATE =====");
-          alert("P0.4 BUILD 9d8f099");
           dbTransaction = await transactionRepo.createTransaction(createPayload);
           // Use the DB-returned ID (dbTransaction.id) for subsequent operations
         } catch (dbErr) {
