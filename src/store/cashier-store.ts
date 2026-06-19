@@ -215,6 +215,15 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
     const now = new Date().toISOString();
     const cashierName = auth.user?.displayName ?? "Kasir";
     const activeBranch = useBranchStore.getState().activeBranch;
+    console.log("[P0.2 CASHIER BEFORE CREATE]", {
+      activeBranch,
+      activeBranchId: activeBranch?.id,
+      activeBranchTenantId: activeBranch?.tenantId,
+      branchStoreState: {
+        branchesCount: useBranchStore.getState().branches.length,
+        branchIds: useBranchStore.getState().branches.map(b => b.id),
+      }
+    });
     if (!activeBranch?.id) {
       set({ isSubmitting: false, submitError: "Cabang aktif harus dipilih sebelum membuat transaksi." });
       return { success: false, error: "Cabang aktif harus dipilih sebelum membuat transaksi." };
@@ -255,7 +264,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       let dbTransaction: Transaction | null = null;
       if (isSupabaseConnected()) {
         try {
-          dbTransaction = await transactionRepo.createTransaction({
+          const createPayload = {
             invoiceNumber: transaction.invoiceNumber,
             items: transaction.items,
             payments: transaction.payments,
@@ -265,7 +274,9 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
             total: transaction.total,
             cashierName: transaction.cashierName,
             pharmacyId: transaction.pharmacyId,
-          });
+          };
+          console.log("[P0.2 CREATE INPUT]", createPayload);
+          dbTransaction = await transactionRepo.createTransaction(createPayload);
           // Use the DB-returned ID (dbTransaction.id) for subsequent operations
         } catch (dbErr) {
           console.error("DB transaction persist failed:", dbErr);

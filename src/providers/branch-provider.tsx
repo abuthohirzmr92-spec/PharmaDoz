@@ -72,6 +72,14 @@ export function BranchProvider({ children }: { children: ReactNode }) {
       const { branches: currentBranches } = useBranchStore.getState();
 
       // Only restore / auto-select if no active branch is already set
+      console.log("[P0.2 BRANCH-PROVIDER]", {
+        tenantId: resolvedTenantId,
+        branchesLoaded: currentBranches.length,
+        activeBranch: useBranchStore.getState().activeBranch
+          ? { id: useBranchStore.getState().activeBranch!.id, name: useBranchStore.getState().activeBranch!.name }
+          : null,
+        willRestore: !useBranchStore.getState().activeBranch,
+      });
       if (!useBranchStore.getState().activeBranch) {
         const isOwnerOrAdmin = user?.role === "tenant_owner" || user?.role === "admin";
 

@@ -98,6 +98,11 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
       }
 
       const branches = (data ?? []).map(mapBranchRowToBranch);
+      console.log("[P0.2 LOAD BRANCHES]", {
+        tenantId,
+        branchesLoaded: branches.length,
+        branchIds: branches.map(b => ({ id: b.id, name: b.name, isMain: b.isMain })),
+      });
       set({ branches, isLoading: false });
     } catch (e) {
       set({
@@ -122,6 +127,7 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
     // Persist to localStorage
     if (typeof window !== "undefined") {
       try {
+        console.log("[P0.2 LOCALSTORAGE WRITE]", { key: STORAGE_KEY, branchId: branch.id, branchName: branch.name });
         localStorage.setItem(STORAGE_KEY, branch.id);
       } catch {
         // Silently ignore storage errors
@@ -145,18 +151,25 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
     if (typeof window === "undefined") return;
 
     const { branches, activeBranch } = get();
+    const storedId = typeof window !== "undefined" ? localStorage.getItem(STORAGE_KEY) : null;
+    console.log("[P0.2 RESTORE ACTIVE BRANCH]", {
+      activeBranchState: activeBranch ? { id: activeBranch.id, name: activeBranch.name, tenantId: activeBranch.tenantId } : null,
+      localStorageBranchId: storedId,
+      branches: branches.map(b => ({ id: b.id, name: b.name, tenantId: b.tenantId, isActive: b.isActive })),
+    });
 
     // Already set — nothing to do
     if (activeBranch) return;
 
     try {
-      const storedId = localStorage.getItem(STORAGE_KEY);
       if (storedId) {
         const match = branches.find((b) => b.id === storedId && b.isActive);
         if (match) {
+          console.log("[P0.2 RESTORE ACTIVE BRANCH] ✅ restored from localStorage:", match.id);
           set({ activeBranch: match });
           return;
         }
+        console.log("[P0.2 RESTORE ACTIVE BRANCH] ⚠️ storedId not found in branches:", storedId);
       }
     } catch {
       // Corrupt storage — ignore
@@ -165,6 +178,7 @@ export const useBranchStore = create<BranchState>()((set, get) => ({
     // Fallback: auto-select first active branch
     const firstActive = branches.find((b) => b.isActive);
     if (firstActive) {
+      console.log("[P0.2 RESTORE ACTIVE BRANCH] ✅ fallback to first active:", firstActive.id, firstActive.name);
       set({ activeBranch: firstActive });
     }
   },

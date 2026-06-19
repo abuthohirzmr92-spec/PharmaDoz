@@ -230,6 +230,13 @@ export class TransactionRepository extends BaseRepository {
     }
 
     console.log("[TXN-TRACE] STEP 2: inserting transactions header, payload:", JSON.stringify(txnInsert));
+    console.log("[P0.2 REPO]", {
+      dataPharmacyId: data.pharmacyId,
+      branchIdMemory: this.branchId,
+      tenantIdMemory: this.getTenantId(),
+      finalPharmacyId: data.pharmacyId ?? this.branchId,
+      finalTenantId: this.getTenantId(),
+    });
     const { data: txn, error: txnError } = await this.client
       .from("transactions")
       .insert(txnInsert)

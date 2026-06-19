@@ -63,6 +63,11 @@ export class BaseRepository {
   }
 
   setBranchContext(branchId: string | undefined): void {
+    console.log("[P0.2 SET BRANCH CONTEXT]", {
+      className: this.constructor.name,
+      oldBranchId: this.branchId,
+      newBranchId: branchId,
+    });
     this.branchId = branchId;
   }
 
