@@ -90,26 +90,3 @@ export function groupDuplicates(
   return { bothMatched, oneMatched, noneMatched };
 }
 
-/**
- * Suggest merge strategy for a duplicate group.
- * - If all items have same matchedProductId → MERGE (combine qty)
- * - If some matched, some not → keep matched, flag unmatched for review
- * - If none matched → keep separate (need manual matching first)
- */
-export function suggestMerge(
-  group: DuplicateGroup,
-): "auto_merge" | "review" | "keep_separate" {
-  const matchedIds = new Set(
-    group.items
-      .filter((i) => i.matchedProductId)
-      .map((i) => i.matchedProductId),
-  );
-
-  if (matchedIds.size === 1 && matchedIds.has(group.items[0]?.matchedProductId ?? null)) {
-    return "auto_merge";
-  }
-  if (matchedIds.size === 0) {
-    return "keep_separate";
-  }
-  return "review";
-}

@@ -71,6 +71,28 @@ export function mergeWeightedPrice(
 }
 
 /**
+ * Decide merge strategy for a duplicate group.
+ * - All items share same matchedProductId → auto_merge
+ * - No items matched → keep_separate (need manual matching)
+ * - Mixed → review
+ */
+export function suggestMerge(
+  items: PurchaseDraftItem[],
+): "auto_merge" | "review" | "keep_separate" {
+  const matchedIds = new Set(
+    items.filter((i) => i.matchedProductId).map((i) => i.matchedProductId),
+  );
+
+  if (matchedIds.size === 1 && matchedIds.has(items[0]?.matchedProductId ?? null)) {
+    return "auto_merge";
+  }
+  if (matchedIds.size === 0) {
+    return "keep_separate";
+  }
+  return "review";
+}
+
+/**
  * Merge warnings from multiple items, deduplicating by code.
  */
 export function mergeWarnings(
