@@ -374,6 +374,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       batches: updatedBatches,
       purchaseInvoices: [invoice, ...state.purchaseInvoices],
       stockMovements: [...newMovements, ...state.stockMovements],
+      dataSource: "demo",
+      isDemoMode: true,
     });
   },
 
@@ -529,6 +531,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       stockOpnames: [opname, ...state.stockOpnames],
       stockMovements: [...newMovements, ...state.stockMovements],
       batches: updatedBatches,
+      dataSource: "demo",
+      isDemoMode: true,
     });
   },
 
@@ -615,6 +619,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     set({
       batches: updatedBatches,
       stockMovements: [...newMovements, ...state.stockMovements],
+      dataSource: "demo",
+      isDemoMode: true,
     });
   },
 
@@ -688,6 +694,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           newPaid > 0 ? "partial" : "unpaid";
         return { ...inv, paidAmount: newPaid, status: newStatus };
       }),
+      dataSource: "demo",
+      isDemoMode: true,
     });
   },
 
@@ -876,6 +884,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     set({
       batches: updatedBatches,
       stockMovements: [...newMovements, ...state.stockMovements],
+      dataSource: "demo",
+      isDemoMode: true,
     });
   },
 
