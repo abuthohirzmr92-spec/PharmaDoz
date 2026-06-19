@@ -1,0 +1,183 @@
+/**
+ * P0.8E — Warning Engine
+ *
+ * Pure functions for generating and categorizing warnings on draft items.
+ * Extensible: price, expiry, OCR, duplicate, low-confidence, etc.
+ * NO state. NO side effects. NO set().
+ */
+
+import type { PurchaseDraftItem, DraftWarning } from "@/types/purchase-draft";
+
+// ---------------------------------------------------------------------------
+// Price Warnings
+// ---------------------------------------------------------------------------
+
+export function generatePriceWarnings(item: PurchaseDraftItem): DraftWarning[] {
+  const warnings: DraftWarning[] = [];
+
+  if (
+    item.previousBuyPrice != null &&
+    item.previousBuyPrice > 0 &&
+    item.enteredBuyPrice > 0
+  ) {
+    const change = ((item.enteredBuyPrice - item.previousBuyPrice) / item.previousBuyPrice) * 100;
+
+    if (change > 15) {
+      warnings.push({
+        level: "warning",
+        itemId: item.id,
+        code: "PRICE_INCREASE",
+        message: `Harga naik ${change.toFixed(0)}% dari pembelian terakhir (Rp ${item.previousBuyPrice.toLocaleString("id-ID")}).`,
+      });
+    } else if (change < -20) {
+      warnings.push({
+        level: "info",
+        itemId: item.id,
+        code: "PRICE_DECREASE",
+        message: `Harga turun ${Math.abs(change).toFixed(0)}% dari pembelian terakhir.`,
+      });
+    }
+  }
+
+  if (item.enteredBuyPrice <= 0) {
+    warnings.push({
+      level: "critical",
+      itemId: item.id,
+      code: "MISSING_PRICE",
+      message: "Harga beli belum diisi.",
+    });
+  }
+
+  return warnings;
+}
+
+// ---------------------------------------------------------------------------
+// Expiry Warnings
+// ---------------------------------------------------------------------------
+
+export function generateExpiryWarnings(
+  item: PurchaseDraftItem,
+  today: Date = new Date(),
+): DraftWarning[] {
+  const warnings: DraftWarning[] = [];
+
+  if (!item.expiredDate) {
+    warnings.push({
+      level: "critical",
+      itemId: item.id,
+      code: "MISSING_EXPIRED",
+      message: "Tanggal kadaluarsa wajib diisi.",
+    });
+    return warnings;
+  }
+
+  const expDate = new Date(item.expiredDate);
+  if (isNaN(expDate.getTime())) {
+    warnings.push({
+      level: "critical",
+      itemId: item.id,
+      code: "INVALID_DATE",
+      message: `Format tanggal tidak valid: "${item.expiredDate}".`,
+    });
+    return warnings;
+  }
+
+  if (expDate <= today) {
+    warnings.push({
+      level: "critical",
+      itemId: item.id,
+      code: "EXPIRED_PAST",
+      message: "Tanggal kadaluarsa sudah lewat.",
+    });
+    return warnings;
+  }
+
+  const daysUntilExpiry = Math.ceil(
+    (expDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24),
+  );
+  if (daysUntilExpiry < 90) {
+    warnings.push({
+      level: "warning",
+      itemId: item.id,
+      code: "EXPIRED_NEAR",
+      message: `Expired dalam ${daysUntilExpiry} hari.`,
+    });
+  }
+
+  return warnings;
+}
+
+// ---------------------------------------------------------------------------
+// Match Warnings
+// ---------------------------------------------------------------------------
+
+export function generateMatchWarnings(item: PurchaseDraftItem): DraftWarning[] {
+  const warnings: DraftWarning[] = [];
+
+  if (!item.matchedProductId || item.matchMethod === "unmatched") {
+    warnings.push({
+      level: "critical",
+      itemId: item.id,
+      code: "NO_MATCH",
+      message: `Produk "${item.rawProductName}" belum dicocokkan.`,
+    });
+    return warnings;
+  }
+
+  if (item.matchConfidence > 0 && item.matchConfidence < 70) {
+    warnings.push({
+      level: "warning",
+      itemId: item.id,
+      code: "LOW_CONFIDENCE",
+      message: `Match confidence rendah: ${item.matchConfidence}%.`,
+      detail: `Matched via ${item.matchMethod}`,
+    });
+  }
+
+  return warnings;
+}
+
+// ---------------------------------------------------------------------------
+// Combine All Warnings
+// ---------------------------------------------------------------------------
+
+export function generateWarnings(
+  item: PurchaseDraftItem,
+  today: Date = new Date(),
+): DraftWarning[] {
+  return [
+    ...generateMatchWarnings(item),
+    ...generatePriceWarnings(item),
+    ...generateExpiryWarnings(item, today),
+  ];
+}
+
+// ---------------------------------------------------------------------------
+// Categorization + Counting
+// ---------------------------------------------------------------------------
+
+export function categorizeWarnings(
+  warnings: DraftWarning[],
+): { info: DraftWarning[]; warning: DraftWarning[]; critical: DraftWarning[] } {
+  return {
+    info: warnings.filter((w) => w.level === "info"),
+    warning: warnings.filter((w) => w.level === "warning"),
+    critical: warnings.filter((w) => w.level === "critical"),
+  };
+}
+
+export function countWarnings(warnings: DraftWarning[]): {
+  info: number;
+  warning: number;
+  critical: number;
+} {
+  const counts = { info: 0, warning: 0, critical: 0 };
+  for (const w of warnings) {
+    counts[w.level]++;
+  }
+  return counts;
+}
+
+export function hasCriticalWarnings(warnings: DraftWarning[]): boolean {
+  return warnings.some((w) => w.level === "critical");
+}

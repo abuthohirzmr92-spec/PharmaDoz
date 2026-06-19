@@ -29,7 +29,7 @@ interface PurchaseDraftState {
   addItem: (draftId: string, item: PurchaseDraftItem) => void;
   updateItem: (draftId: string, itemId: string, updates: Partial<PurchaseDraftItem>) => void;
   removeItem: (draftId: string, itemId: string) => void;
-  mergeItems: (draftId: string, sourceIds: string[], targetId: string) => void;
+  replaceItems: (draftId: string, items: PurchaseDraftItem[]) => void;
 }
 
 /* ------------------------------------------------------------------ */
@@ -91,9 +91,10 @@ export const usePurchaseDraftStore = create<PurchaseDraftState>()((set, get) => 
   getDraft: (id) => get().drafts.find((d) => d.id === id),
 
   saveDraft: (draft) => {
-    draft.updatedAt = new Date().toISOString();
     set((s) => ({
-      drafts: s.drafts.map((d) => (d.id === draft.id ? { ...draft } : d)),
+      drafts: s.drafts.map((d) =>
+        d.id === draft.id ? { ...draft, updatedAt: new Date().toISOString() } : d,
+      ),
     }));
   },
 
@@ -104,14 +105,13 @@ export const usePurchaseDraftStore = create<PurchaseDraftState>()((set, get) => 
     })),
 
   archiveDraft: (id) => {
-    const draft = get().drafts.find((d) => d.id === id);
-    if (draft) {
-      draft.status = "cancelled";
-      draft.updatedAt = new Date().toISOString();
-      set((s) => ({
-        drafts: s.drafts.map((d) => (d.id === id ? { ...draft } : d)),
-      }));
-    }
+    set((s) => ({
+      drafts: s.drafts.map((d) =>
+        d.id === id
+          ? { ...d, status: "cancelled" as const, updatedAt: new Date().toISOString() }
+          : d,
+      ),
+    }));
   },
 
   updateDraftStatus: (id, status) => {
@@ -165,42 +165,11 @@ export const usePurchaseDraftStore = create<PurchaseDraftState>()((set, get) => 
     }));
   },
 
-  mergeItems: (draftId, sourceIds, targetId) => {
+  replaceItems: (draftId, items) => {
     set((s) => ({
-      drafts: s.drafts.map((d) => {
-        if (d.id !== draftId) return d;
-        const items = [...d.items];
-        const target = items.find((i) => i.id === targetId);
-        if (!target) return d;
-
-        let mergedQty = target.quantity;
-        for (const srcId of sourceIds) {
-          const src = items.find((i) => i.id === srcId);
-          if (src && src.id !== targetId) {
-            mergedQty += src.quantity;
-            // Mark source as merged
-            const srcIdx = items.findIndex((i) => i.id === srcId);
-            if (srcIdx >= 0) {
-              items[srcIdx] = {
-                ...items[srcIdx]!,
-                status: "merged" as const,
-              };
-            }
-          }
-        }
-
-        // Update target with merged quantity
-        const targetIdx = items.findIndex((i) => i.id === targetId);
-        if (targetIdx >= 0) {
-          items[targetIdx] = {
-            ...items[targetIdx]!,
-            quantity: mergedQty,
-            mergedFromIds: [...(items[targetIdx]!.mergedFromIds || []), ...sourceIds],
-          };
-        }
-
-        return { ...d, items, updatedAt: new Date().toISOString() };
-      }),
+      drafts: s.drafts.map((d) =>
+        d.id === draftId ? { ...d, items, updatedAt: new Date().toISOString() } : d,
+      ),
     }));
   },
 }));
