@@ -217,6 +217,7 @@ export class ProductRepository extends BaseRepository {
     isActive?: boolean;
   }): Promise<Product> {
     if (!this.isConnected) throw new Error("Not connected");
+    this.requireTenant();
 
     const insertData: Record<string, unknown> = {
       category_id: data.categoryId,

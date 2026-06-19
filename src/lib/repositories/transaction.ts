@@ -212,6 +212,7 @@ export class TransactionRepository extends BaseRepository {
     pharmacyId?: string;
   }): Promise<Transaction> {
     if (!this.isConnected) throw new Error("Not connected");
+    this.requireTenant();
 
     console.log("[TXN-TRACE] STEP 1: begin createTransaction, items:", data.items.length, "payments:", data.payments.length);
 
