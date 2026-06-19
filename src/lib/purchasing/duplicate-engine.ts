@@ -284,15 +284,16 @@ export function detectDuplicates(
   }
 
   const final: DuplicateGroup[] = [];
-  let idCounter = 0;
   for (const idx of keptIndices) {
     const group = allGroups[idx]!;
     const keptItems = group.items.filter(
       (item) => itemToBest.get(item.id)?.groupIdx === idx,
     );
     if (keptItems.length >= 2) {
-      idCounter++;
-      final.push({ ...group, id: `dup-${idCounter}`, items: keptItems });
+      // Deterministic ID: dup-{type}-{sorted-item-ids}
+      const sortedIds = keptItems.map((i) => i.id.slice(0, 8)).sort().join("-");
+      const id = `dup-${group.duplicateType}-${sortedIds}`;
+      final.push({ ...group, id, items: keptItems });
     }
   }
 
