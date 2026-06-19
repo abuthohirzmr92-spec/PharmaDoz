@@ -798,7 +798,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     }
 
     // 4. Persist — DB or in-memory
-    if (state.dataSource === "database") {
+    if (get().dataSource === "database") {
       set({ isSubmitting: true });
 
       // Sync branch context before DB queries
