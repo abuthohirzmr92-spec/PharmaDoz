@@ -34,12 +34,6 @@ export interface DuplicateGroup {
 // Helpers
 // ---------------------------------------------------------------------------
 
-let _groupCounter = 0;
-function nextGroupId(): string {
-  _groupCounter++;
-  return `dup-${_groupCounter}`;
-}
-
 /**
  * Normalize product name for comparison.
  */
@@ -82,7 +76,7 @@ function detectBarcodeDuplicates(
   for (const [barcode, items] of groups) {
     if (items.length > 1) {
       results.push({
-        id: nextGroupId(),
+        id: "",
         items,
         reason: `Barcode sama: ${barcode}`,
         confidence: 100,
@@ -113,7 +107,7 @@ function detectMatchedProductDuplicates(
   for (const [productId, items] of groups) {
     if (items.length > 1) {
       results.push({
-        id: nextGroupId(),
+        id: "",
         items,
         reason: `Produk sama: ${items[0]?.rawProductName ?? productId}`,
         confidence: 90,
@@ -144,7 +138,7 @@ function detectExactNameDuplicates(
   for (const [name, items] of groups) {
     if (items.length > 1) {
       results.push({
-        id: nextGroupId(),
+        id: "",
         items,
         reason: `Nama produk sama: "${items[0]?.rawProductName ?? name}"`,
         confidence: 95,
@@ -175,7 +169,7 @@ function detectNormalizedNameDuplicates(
   for (const [name, items] of groups) {
     if (items.length > 1) {
       results.push({
-        id: nextGroupId(),
+        id: "",
         items,
         reason: `Nama produk mirip setelah normalisasi`,
         confidence: 85,
@@ -221,7 +215,7 @@ function detectTokenSimilarityDuplicates(
         seen.add(key);
 
         results.push({
-          id: nextGroupId(),
+          id: "",
           items: [a, b],
           reason: `Token mirip: "${a.rawProductName}" ≈ "${b.rawProductName}"`,
           confidence: Math.round(overlap * 100),
@@ -256,9 +250,6 @@ function detectTokenSimilarityDuplicates(
 export function detectDuplicates(
   items: PurchaseDraftItem[],
 ): DuplicateGroup[] {
-  // Reset counter for deterministic IDs per call
-  _groupCounter = 0;
-
   const activeItems = items.filter(
     (i) => i.status !== "merged" && i.status !== "deleted",
   );
@@ -293,13 +284,15 @@ export function detectDuplicates(
   }
 
   const final: DuplicateGroup[] = [];
+  let idCounter = 0;
   for (const idx of keptIndices) {
     const group = allGroups[idx]!;
     const keptItems = group.items.filter(
       (item) => itemToBest.get(item.id)?.groupIdx === idx,
     );
     if (keptItems.length >= 2) {
-      final.push({ ...group, items: keptItems });
+      idCounter++;
+      final.push({ ...group, id: `dup-${idCounter}`, items: keptItems });
     }
   }
 
