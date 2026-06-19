@@ -1,5 +1,7 @@
 "use client";
 
+console.log("===== P0.4 BUILD 9d8f099 LOADED =====");
+
 import { create } from "zustand";
 import type { Transaction } from "@/types/transaction";
 import { useAuthStore } from "@/store/auth-store";
@@ -282,6 +284,8 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
             branchStoreActiveBranchId: useBranchStore.getState().activeBranch?.id,
             transactionPharmacyId: transaction.pharmacyId,
           });
+          console.log("===== P0.4 BEFORE CREATE =====");
+          alert("P0.4 BUILD 9d8f099");
           dbTransaction = await transactionRepo.createTransaction(createPayload);
           // Use the DB-returned ID (dbTransaction.id) for subsequent operations
         } catch (dbErr) {
