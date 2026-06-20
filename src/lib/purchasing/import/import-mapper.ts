@@ -33,7 +33,7 @@ export function mapRowToDraftItem(
     discountPercent: 0,
 
     quantity: row.quantity,
-    unit: "pcs",
+    unit: row.unit,
 
     batchNumber: row.batchNumber ?? null,
     expiredDate: row.expiredDate ?? null,

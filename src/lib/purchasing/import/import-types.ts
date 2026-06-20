@@ -10,6 +10,7 @@
 export const IMPORT_COLUMNS = [
   "nama_produk",
   "qty",
+  "satuan",
   "harga_beli",
   "batch_number",
   "expired_date",
@@ -29,6 +30,8 @@ export interface ImportRow {
   productName: string;
   /** Required: quantity */
   quantity: number;
+  /** Required: unit (tablet, kapsul, botol, strip, tube, pcs, etc.) */
+  unit: string;
   /** Required: unit buy price */
   buyPrice: number;
   /** Optional: pre-assigned batch number */

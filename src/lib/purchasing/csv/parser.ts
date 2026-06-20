@@ -113,10 +113,10 @@ function parseLine(
   rowNumber: number,
 ): { row: ImportRow | null; error: ImportParseError | null } {
   const values = splitCsvLine(line);
-  if (values.length < 3) {
+  if (values.length < 4) {
     return {
       row: null,
-      error: { rowNumber, field: "line", message: `Hanya ${values.length} kolom, minimal 3 (nama_produk, qty, harga_beli).` },
+      error: { rowNumber, field: "line", message: `Hanya ${values.length} kolom, minimal 4 (nama_produk, qty, satuan, harga_beli).` },
     };
   }
 
@@ -136,7 +136,15 @@ function parseLine(
     };
   }
 
-  const buyPrice = parseFloat(trimValue(values[2]));
+  const unit = trimValue(values[2]);
+  if (!unit) {
+    return {
+      row: null,
+      error: { rowNumber, field: "satuan", message: "Satuan wajib diisi." },
+    };
+  }
+
+  const buyPrice = parseFloat(trimValue(values[3]));
   if (isNaN(buyPrice) || buyPrice < 0) {
     return {
       row: null,
@@ -148,9 +156,10 @@ function parseLine(
     rowNumber,
     productName,
     quantity: qty,
+    unit,
     buyPrice,
-    batchNumber: trimValue(values[3]) || undefined,
-    expiredDate: trimValue(values[4]) || undefined,
+    batchNumber: trimValue(values[4]) || undefined,
+    expiredDate: trimValue(values[5]) || undefined,
   };
 
   return { row, error: null };

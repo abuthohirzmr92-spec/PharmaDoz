@@ -162,7 +162,15 @@ function parseExcelRow(
     };
   }
 
-  const buyPrice = parseFloat((values[2] ?? "0").replace(/[^\d.]/g, ""));
+  const unit = (values[2] ?? "").trim();
+  if (!unit) {
+    return {
+      row: null,
+      error: { rowNumber, field: "satuan", message: "Satuan wajib diisi." },
+    };
+  }
+
+  const buyPrice = parseFloat((values[3] ?? "0").replace(/[^\d.]/g, ""));
   if (isNaN(buyPrice) || buyPrice < 0) {
     return {
       row: null,
@@ -171,7 +179,7 @@ function parseExcelRow(
   }
 
   // Convert Excel serial date to ISO string if needed
-  const expiredRaw = values[4] ?? "";
+  const expiredRaw = values[5] ?? "";
   let expiredDate: string | undefined;
 
   if (expiredRaw) {
@@ -197,8 +205,9 @@ function parseExcelRow(
     rowNumber,
     productName,
     quantity: qty,
+    unit,
     buyPrice,
-    batchNumber: (values[3] ?? "") || undefined,
+    batchNumber: (values[4] ?? "") || undefined,
     expiredDate,
   };
 

@@ -100,11 +100,11 @@ export function InventoryPurchasePanel() {
   };
 
   const downloadTemplateCsv = () => {
-    const header = "nama_produk,qty,harga_beli,batch_number,expired_date";
+    const header = "nama_produk,qty,satuan,harga_beli,batch_number,expired_date";
     const rows = [
-      "Paracetamol 500mg,10,15000,BATCH-001,2027-06-19",
-      "Amoxicillin 500mg,20,25000,,2027-12-31",
-      "Vitamin C,50,8500,,",
+      "Paracetamol 500mg,10,strip,15000,BATCH-001,2027-06-19",
+      "Amoxicillin 500mg,20,tablet,25000,,2027-12-31",
+      "Vitamin C,50,botol,8500,,",
     ];
     const csv = [header, ...rows].join("\r\n") + "\r\n";
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
@@ -120,10 +120,10 @@ export function InventoryPurchasePanel() {
   const downloadTemplateExcel = async () => {
     const { utils, writeFile } = await import("xlsx");
     const data: (string | number)[][] = [
-      ["nama_produk", "qty", "harga_beli", "batch_number", "expired_date"],
-      ["Paracetamol 500mg", 10, 15000, "BATCH-001", "2027-06-19"],
-      ["Amoxicillin 500mg", 20, 25000, "", "2027-12-31"],
-      ["Vitamin C", 50, 8500, "", ""],
+      ["nama_produk", "qty", "satuan", "harga_beli", "batch_number", "expired_date"],
+      ["Paracetamol 500mg", 10, "strip", 15000, "BATCH-001", "2027-06-19"],
+      ["Amoxicillin 500mg", 20, "tablet", 25000, "", "2027-12-31"],
+      ["Vitamin C", 50, "botol", 8500, "", ""],
     ];
     const ws = utils.aoa_to_sheet(data);
     const wb = utils.book_new();
