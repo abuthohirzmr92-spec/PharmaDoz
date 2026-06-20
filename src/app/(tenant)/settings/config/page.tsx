@@ -168,21 +168,6 @@ export default function TenantConfigPage() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Upload Logo</label>
-              <div className="mt-1 flex items-center gap-3">
-                <label className="cursor-pointer rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800">
-                  {uploading ? "Mengupload..." : "Pilih File"}
-                  <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleLogoUpload} disabled={uploading} className="hidden" />
-                </label>
-                {logoUrl && (
-                  <button type="button" onClick={() => setLogoUrl("")} className="text-xs text-red-500 hover:text-red-700">Hapus</button>
-                )}
-              </div>
-              <p className="mt-1 text-xs text-neutral-400">JPG, PNG, atau WebP — maksimal 150 KB.</p>
-              {uploadError && <p className="mt-1 text-xs text-red-500">{uploadError}</p>}
-            </div>
-
-            <div>
               <label className="block text-sm font-medium text-neutral-700 dark:text-neutral-300">Alamat</label>
               <textarea value={address} onChange={(e) => setAddress(e.target.value)}
                 placeholder="Jl. Merdeka No. 123, Jakarta"
@@ -234,6 +219,22 @@ export default function TenantConfigPage() {
                 <h3 className="text-lg font-bold text-neutral-900 dark:text-neutral-50">
                   {companyName || user?.pharmacyName || "Nama Apotek"}
                 </h3>
+              </div>
+
+              {/* Upload Logo — below preview */}
+              <div className="border-t border-neutral-200 dark:border-neutral-700 pt-5 mt-3 space-y-3">
+                <p className="text-xs font-medium text-neutral-600 dark:text-neutral-400">Upload Logo</p>
+                <div className="flex items-center gap-2">
+                  <label className="cursor-pointer rounded-lg border border-neutral-300 bg-white px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-900 dark:text-neutral-300 dark:hover:bg-neutral-800">
+                    {uploading ? "Mengupload..." : "Pilih File"}
+                    <input type="file" accept=".jpg,.jpeg,.png,.webp" onChange={handleLogoUpload} disabled={uploading} className="hidden" />
+                  </label>
+                  {logoUrl && (
+                    <button type="button" onClick={() => setLogoUrl("")} className="rounded-lg border border-red-200 bg-red-50 px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-100 dark:border-red-800 dark:bg-red-950 dark:text-red-400 dark:hover:bg-red-900">Hapus</button>
+                  )}
+                </div>
+                <p className="text-xs text-neutral-400">JPG, PNG, atau WebP — maksimal 150 KB.</p>
+                {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
               </div>
 
               {/* Address + Phone */}
