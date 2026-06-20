@@ -14,7 +14,7 @@ export default function SettingsLayout({ children }: { children: React.ReactNode
   const pathname = usePathname();
 
   return (
-    <div className="mx-auto max-w-2xl space-y-6 px-4 py-6">
+    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
       {/* Header */}
       <div className="flex items-center gap-3">
         <Link
