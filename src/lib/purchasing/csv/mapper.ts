@@ -1,25 +1,20 @@
 /**
- * P0.9A.1 — CSV Mapper (Hardened)
+ * P0.9A.2 — CSV Mapper (Architecture Hardened)
  *
- * Converts CSV rows into PurchaseDraftItem objects.
+ * Converts import rows into PurchaseDraftItem objects.
+ * Uses shared ImportMapperDeps for ID strategy (shared with Excel/OCR).
  * NO matching. NO warnings. NO repositories. NO store.
- * NO random ID generation — accepts deps for ID strategy.
  * Pure functions only.
  */
 
-import type { CsvRow } from "./types";
+import type { ImportRow, ImportMapperDeps } from "../import/import-types";
 import type { PurchaseDraftItem } from "@/types/purchase-draft";
 
-export interface MapperDeps {
-  /** Generate a unique ID for each draft item */
-  generateItemId: () => string;
-}
-
 /**
- * Convert a CsvRow to a PurchaseDraftItem.
+ * Convert an ImportRow to a PurchaseDraftItem.
  * All items start as "pending" — matching and warnings run later.
  */
-export function mapCsvRowToDraftItem(row: CsvRow, deps: MapperDeps): PurchaseDraftItem {
+export function mapRowToDraftItem(row: ImportRow, deps: ImportMapperDeps): PurchaseDraftItem {
   return {
     id: deps.generateItemId(),
     rawProductName: row.productName,
@@ -50,8 +45,8 @@ export function mapCsvRowToDraftItem(row: CsvRow, deps: MapperDeps): PurchaseDra
 }
 
 /**
- * Convert all parsed CSV rows into PurchaseDraftItem array.
+ * Convert all parsed rows into PurchaseDraftItem array.
  */
-export function mapCsvRowsToDraftItems(rows: CsvRow[], deps: MapperDeps): PurchaseDraftItem[] {
-  return rows.map((row) => mapCsvRowToDraftItem(row, deps));
+export function mapRowsToDraftItems(rows: ImportRow[], deps: ImportMapperDeps): PurchaseDraftItem[] {
+  return rows.map((row) => mapRowToDraftItem(row, deps));
 }

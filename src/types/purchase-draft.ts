@@ -32,7 +32,7 @@ export type DraftItemStatus =
 
 // ─── Match Method ───
 
-export type MatchMethod = "barcode" | "code" | "exact" | "token_match" | "fuzzy" | "manual" | "unmatched";
+export type MatchMethod = "barcode" | "product_code" | "exact_name" | "token" | "fuzzy" | "manual" | "unmatched";
 
 // ─── Warning ───
 

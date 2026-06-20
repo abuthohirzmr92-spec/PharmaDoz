@@ -1,28 +1,21 @@
 /**
- * P0.9A.1 — CSV Parser (Hardened)
+ * P0.9A.2 — CSV Parser (Architecture Hardened)
  *
  * Pure functions only. NO store. NO side effects. NO DB.
+ * Uses shared IMPORT_COLUMNS from import/import-types.
  */
 
-import type { CsvRow, CsvParseResult, CsvParseError } from "./types";
-
-// Expected CSV header columns (must match exactly after trim)
-const EXPECTED_HEADER = "nama_produk,qty,harga_beli,batch_number,expired_date";
+import { IMPORT_COLUMNS, EXPECTED_HEADER } from "../import/import-types";
+import type { ImportRow, ImportParseResult, ImportParseError } from "../import/import-types";
 
 /**
- * Parse CSV text into structured rows.
+ * Parse CSV text into structured import rows.
  *
  * Expected format:
  *   nama_produk,qty,harga_beli,batch_number,expired_date
  *   Paracetamol 500mg,10,15000,BATCH-001,2027-06-19
- *
- * Rules:
- * - First row MUST match expected header (case-insensitive, trimmed)
- * - Empty lines are skipped
- * - productName, qty, buyPrice are required
- * - batchNumber and expiredDate are optional
  */
-export function parseCsv(text: string): CsvParseResult {
+export function parseCsv(text: string): ImportParseResult {
   const lines = text
     .split(/\r?\n/)
     .map((l) => l.trim())
@@ -37,7 +30,7 @@ export function parseCsv(text: string): CsvParseResult {
     };
   }
 
-  // Validate header
+  // Validate header — array-based comparison (SSOT: IMPORT_COLUMNS)
   const headerErrors = validateHeader(lines[0]!);
   if (headerErrors.length > 0) {
     return { rows: [], totalRows: 0, invalidRows: 0, errors: headerErrors };
@@ -45,8 +38,8 @@ export function parseCsv(text: string): CsvParseResult {
 
   // Parse data rows (skip header)
   const dataLines = lines.slice(1);
-  const rows: CsvRow[] = [];
-  const errors: CsvParseError[] = [];
+  const rows: ImportRow[] = [];
+  const errors: ImportParseError[] = [];
 
   for (let i = 0; i < dataLines.length; i++) {
     const line = dataLines[i]!;
@@ -70,32 +63,55 @@ export function parseCsv(text: string): CsvParseResult {
 }
 
 /**
- * Validate CSV header against expected columns.
- * Case-insensitive comparison after trimming.
+ * Validate CSV header against IMPORT_COLUMNS.
+ * Array-based comparison — robust, reusable by Excel importer.
  */
-function validateHeader(headerLine: string): CsvParseError[] {
-  const actual = headerLine.toLowerCase().replace(/\s+/g, ""); // normalize
-  const expected = EXPECTED_HEADER.toLowerCase().replace(/\s+/g, "");
+function validateHeader(headerLine: string): ImportParseError[] {
+  const actualColumns = normalizeHeader(headerLine);
 
-  if (actual !== expected) {
+  if (actualColumns.length !== IMPORT_COLUMNS.length) {
     return [
       {
         rowNumber: 1,
         field: "header",
-        message: `Header tidak sesuai. Diharapkan: "${EXPECTED_HEADER}". Diterima: "${headerLine}".`,
+        message: `Jumlah kolom tidak sesuai. Diharapkan ${IMPORT_COLUMNS.length} kolom: "${EXPECTED_HEADER}". Diterima: ${actualColumns.length} kolom.`,
       },
     ];
   }
+
+  for (let i = 0; i < IMPORT_COLUMNS.length; i++) {
+    if (actualColumns[i] !== IMPORT_COLUMNS[i]) {
+      return [
+        {
+          rowNumber: 1,
+          field: "header",
+          message: `Kolom ke-${i + 1} tidak sesuai. Diharapkan: "${IMPORT_COLUMNS[i]}". Diterima: "${actualColumns[i]}".`,
+        },
+      ];
+    }
+  }
+
   return [];
 }
 
 /**
- * Parse a single CSV line into a CsvRow.
+ * Normalize header: lowercase, trim whitespace around each column.
+ * Supports: "nama_produk, qty , harga_beli" → ["nama_produk","qty","harga_beli"]
+ * Shared by CSV and Excel importers.
  */
+export function normalizeHeader(headerLine: string): string[] {
+  return splitCsvLine(headerLine)
+    .map((col) => col.trim().toLowerCase());
+}
+
+// ---------------------------------------------------------------------------
+// Line parsing
+// ---------------------------------------------------------------------------
+
 function parseLine(
   line: string,
   rowNumber: number,
-): { row: CsvRow | null; error: CsvParseError | null } {
+): { row: ImportRow | null; error: ImportParseError | null } {
   const values = splitCsvLine(line);
   if (values.length < 3) {
     return {
@@ -128,7 +144,7 @@ function parseLine(
     };
   }
 
-  const row: CsvRow = {
+  const row: ImportRow = {
     rowNumber,
     productName,
     quantity: qty,
@@ -147,6 +163,11 @@ function trimValue(val: string | undefined): string {
 /**
  * Split a CSV line respecting basic quoting.
  * Handles: "Quoted, Value",10,15000 → ["Quoted, Value", "10", "15000"]
+ *
+ * Limitations (documented in P0.9A.2-parser-contract.md):
+ * - No multiline quoted fields
+ * - No escaped quotes ("" → ")
+ * - Semicolon separator not supported
  */
 function splitCsvLine(line: string): string[] {
   const result: string[] = [];
