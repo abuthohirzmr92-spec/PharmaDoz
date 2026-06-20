@@ -99,16 +99,37 @@ export function InventoryPurchasePanel() {
     }
   };
 
-  const handleDownloadTemplate = () => {
-    const csv = "nama_produk,qty,harga_beli,batch_number,expired_date\nParacetamol 500mg,10,15000,BATCH-001,2027-06-19\nAmoxicillin 500mg,20,25000,,2027-12-31\nVitamin C,50,8500,,\n";
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const downloadTemplateCsv = () => {
+    const header = "nama_produk,qty,harga_beli,batch_number,expired_date";
+    const rows = [
+      "Paracetamol 500mg,10,15000,BATCH-001,2027-06-19",
+      "Amoxicillin 500mg,20,25000,,2027-12-31",
+      "Vitamin C,50,8500,,",
+    ];
+    const csv = [header, ...rows].join("\r\n") + "\r\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
     a.download = "template-pembelian.csv";
     a.click();
     URL.revokeObjectURL(url);
-    toast.success("Template berhasil diunduh.");
+    toast.success("Template CSV berhasil diunduh.");
+  };
+
+  const downloadTemplateExcel = async () => {
+    const { utils, writeFile } = await import("xlsx");
+    const data: (string | number)[][] = [
+      ["nama_produk", "qty", "harga_beli", "batch_number", "expired_date"],
+      ["Paracetamol 500mg", 10, 15000, "BATCH-001", "2027-06-19"],
+      ["Amoxicillin 500mg", 20, 25000, "", "2027-12-31"],
+      ["Vitamin C", 50, 8500, "", ""],
+    ];
+    const ws = utils.aoa_to_sheet(data);
+    const wb = utils.book_new();
+    utils.book_append_sheet(wb, ws, "template-pembelian");
+    writeFile(wb, "template-pembelian.xlsx");
+    toast.success("Template Excel berhasil diunduh.");
   };
 
   useEffect(() => {
@@ -343,11 +364,18 @@ export function InventoryPurchasePanel() {
           </label>
 
           <button
-            onClick={handleDownloadTemplate}
+            onClick={downloadTemplateCsv}
             className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors"
           >
             <Download className="h-3.5 w-3.5" />
-            Download Template
+            Template CSV
+          </button>
+          <button
+            onClick={downloadTemplateExcel}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Template Excel
           </button>
         </div>
       </div>
