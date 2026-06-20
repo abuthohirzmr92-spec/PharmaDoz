@@ -145,9 +145,10 @@ export function calculateDraftTotals(draft: PurchaseDraft): {
 
 const VALID_TRANSITIONS: Record<DraftStatus, DraftStatus[]> = {
   draft: ["ready", "has_warning", "has_error", "cancelled"],
-  ready: ["confirmed", "cancelled", "has_error"],
-  has_warning: ["confirmed", "cancelled", "has_error", "ready"],
-  has_error: ["ready", "has_warning", "cancelled"],
+  ready: ["confirmed", "confirming", "cancelled", "has_error"],
+  has_warning: ["confirmed", "confirming", "cancelled", "has_error", "ready"],
+  has_error: ["ready", "has_warning", "confirming", "cancelled"],
+  confirming: ["completed", "has_error"],
   confirmed: ["completed", "has_error"],
   completed: [],
   cancelled: [],

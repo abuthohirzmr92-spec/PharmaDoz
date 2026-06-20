@@ -13,6 +13,7 @@ export type DraftStatus =
   | "ready"
   | "has_warning"
   | "has_error"
+  | "confirming"          // double-submit prevention lock
   | "confirmed"
   | "completed"
   | "cancelled";
