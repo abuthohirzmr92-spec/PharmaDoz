@@ -22,7 +22,7 @@ export type MatchMethod =
   | "unmatched";
 
 export interface MatchCandidate {
-  id: string;                // "candidate-{productId}" — deterministic
+  id?: string;               // set by service: candidate-{itemId}-{productId}
   productId: string;
   productName: string;
   confidence: number;       // 0–100
@@ -108,10 +108,6 @@ function levenshteinDistance(a: string, b: string): number {
 // Matching Functions (priority order)
 // ---------------------------------------------------------------------------
 
-function candidateId(productId: string): string {
-  return `candidate-${productId}`;
-}
-
 /**
  * 1. Barcode exact match — confidence 100
  */
@@ -129,7 +125,6 @@ function matchByBarcode(
       method: "barcode",
       candidates: [
         {
-          id: candidateId(match.id),
           productId: match.id,
           productName: match.name,
           confidence: 100,
@@ -160,7 +155,6 @@ function matchByCode(
       method: "product_code",
       candidates: [
         {
-          id: candidateId(match.id),
           productId: match.id,
           productName: match.name,
           confidence: 100,
@@ -191,7 +185,6 @@ function matchByExactName(
       method: "exact_name",
       candidates: [
         {
-          id: candidateId(match.id),
           productId: match.id,
           productName: match.name,
           confidence: 100,
@@ -235,7 +228,6 @@ function matchByToken(
       const confidence = Math.round(overlapRatio * 95);
       if (confidence >= 80) {
         candidates.push({
-          id: candidateId(product.id),
           productId: product.id,
           productName: product.name,
           confidence,
@@ -272,7 +264,6 @@ function matchByFuzzy(
 
     if (similarity >= 70) {
       candidates.push({
-        id: candidateId(product.id),
         productId: product.id,
         productName: product.name,
         confidence: Math.round(similarity),

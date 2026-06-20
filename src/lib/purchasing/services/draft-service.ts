@@ -12,6 +12,26 @@ import { generateWarnings } from "../warning-engine";
 import { detectDuplicates } from "../duplicate-engine";
 import { mergeItems, suggestMerge } from "../merge-engine";
 import type { PurchaseDraft } from "@/types/purchase-draft";
+import type { MatchCandidate } from "../match-engine";
+
+// ---------------------------------------------------------------------------
+// Candidate ID Assignment (service layer — has item context)
+// ---------------------------------------------------------------------------
+
+/**
+ * Assign deterministic IDs to match candidates.
+ * Must run at service layer because match-engine has no item context.
+ * Format: candidate-{itemId}-{productId}
+ */
+export function assignCandidateIds(
+  itemId: string,
+  candidates: MatchCandidate[],
+): MatchCandidate[] {
+  return candidates.map((c) => ({
+    ...c,
+    id: `candidate-${itemId}-${c.productId}`,
+  }));
+}
 
 // ---------------------------------------------------------------------------
 // Merge Duplicate Items
