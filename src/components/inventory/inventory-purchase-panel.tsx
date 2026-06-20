@@ -13,6 +13,9 @@ import {
   PlusCircle,
   X,
   ScanLine,
+  Upload,
+  FileSpreadsheet,
+  Download,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -51,6 +54,62 @@ export function InventoryPurchasePanel() {
   const [newSupplierName, setNewSupplierName] = useState("");
   const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<{ id: string; remaining: number } | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  // ─── Import handlers ───
+
+  const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const { importCsvToDraft } = await import("@/lib/purchasing/csv/csv-service");
+      const text = await file.text();
+      const result = importCsvToDraft(text, productList.map(p => ({ id: p.id, name: p.name })), {
+        tenantId: "", branchId: null, userId: null,
+        generateDraftId: () => crypto.randomUUID(),
+        generateItemId: () => crypto.randomUUID(),
+      });
+      toast.success(`CSV berhasil diimpor. ${result.draft.items.length} item siap direview.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengimpor CSV.");
+    } finally {
+      setImporting(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleImportExcel = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setImporting(true);
+    try {
+      const { importExcelToDraft } = await import("@/lib/purchasing/excel/excel-service");
+      const result = await importExcelToDraft(file, productList.map(p => ({ id: p.id, name: p.name })), {
+        tenantId: "", branchId: null, userId: null,
+        generateDraftId: () => crypto.randomUUID(),
+        generateItemId: () => crypto.randomUUID(),
+      });
+      toast.success(`Excel berhasil diimpor. ${result.draft.items.length} item siap direview.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Gagal mengimpor Excel.");
+    } finally {
+      setImporting(false);
+      if (e.target) e.target.value = "";
+    }
+  };
+
+  const handleDownloadTemplate = () => {
+    const csv = "nama_produk,qty,harga_beli,batch_number,expired_date\nParacetamol 500mg,10,15000,BATCH-001,2027-06-19\nAmoxicillin 500mg,20,25000,,2027-12-31\nVitamin C,50,8500,,\n";
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "template-pembelian.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Template berhasil diunduh.");
+  };
 
   useEffect(() => {
     if (productRepo.isConnected) {
@@ -228,6 +287,67 @@ export function InventoryPurchasePanel() {
             className="shrink-0 rounded-lg bg-neutral-200 px-3 py-1.5 text-[11px] font-medium text-neutral-400 cursor-not-allowed dark:bg-neutral-800 dark:text-neutral-500"
           >
             Scan Faktur
+          </button>
+        </div>
+      </div>
+
+      {/* Import Pembelian */}
+      <div className="mb-4 rounded-xl border border-neutral-200 bg-white p-4 dark:border-neutral-700 dark:bg-neutral-900">
+        <div className="flex items-center gap-3 mb-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-brand-50 dark:bg-brand-950">
+            <Upload className="h-5 w-5 text-brand-600 dark:text-brand-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
+              Import Pembelian
+            </h3>
+            <p className="mt-0.5 text-[11px] text-neutral-500">
+              Import data supplier dari file CSV atau Excel
+            </p>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap gap-2">
+          {/* Hidden file inputs */}
+          <input
+            type="file"
+            accept=".csv"
+            onChange={handleImportCsv}
+            className="hidden"
+            id="csv-upload"
+            disabled={importing}
+          />
+          <input
+            type="file"
+            accept=".xlsx,.xls"
+            onChange={handleImportExcel}
+            className="hidden"
+            id="excel-upload"
+            disabled={importing}
+          />
+
+          <label
+            htmlFor="csv-upload"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-50 cursor-pointer dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            {importing ? "Mengimpor..." : "Import CSV"}
+          </label>
+
+          <label
+            htmlFor="excel-upload"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-xs font-medium text-neutral-600 hover:bg-neutral-50 cursor-pointer dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <FileSpreadsheet className="h-3.5 w-3.5" />
+            {importing ? "Mengimpor..." : "Import Excel"}
+          </label>
+
+          <button
+            onClick={handleDownloadTemplate}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-dashed border-neutral-300 bg-neutral-50 px-3 py-2 text-xs font-medium text-neutral-500 hover:bg-neutral-100 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700 transition-colors"
+          >
+            <Download className="h-3.5 w-3.5" />
+            Download Template
           </button>
         </div>
       </div>
