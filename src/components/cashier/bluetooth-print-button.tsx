@@ -64,9 +64,9 @@ export function BluetoothPrintButton({ printData, onPrinted, disabled }: Props) 
         type="button"
         onClick={() => setShowFallback(true)}
         disabled={disabled}
-        className="flex items-center gap-1 rounded border border-amber-200 bg-amber-50 px-2 py-1.5 text-[10px] font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-2xl border border-amber-200 bg-amber-50 px-5 h-16 text-base font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50"
       >
-        <Bluetooth className="h-3 w-3" />
+        <Bluetooth className="h-6 w-6" />
         Bluetooth
       </button>
     );
@@ -78,12 +78,12 @@ export function BluetoothPrintButton({ printData, onPrinted, disabled }: Props) 
         type="button"
         onClick={handleBluetoothPrint}
         disabled={disabled || isBusy}
-        className="flex items-center gap-1 rounded border border-brand-200 bg-brand-50 px-2 py-1.5 text-[10px] font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-2xl border border-brand-200 bg-brand-50 px-5 h-16 text-base font-medium text-brand-700 hover:bg-brand-100 disabled:opacity-50"
       >
         {isBusy ? (
-          <Loader2 className="h-3 w-3 animate-spin" />
+          <Loader2 className="h-6 w-6 animate-spin" />
         ) : (
-          <Bluetooth className="h-3 w-3" />
+          <Bluetooth className="h-6 w-6" />
         )}
         {isBusy ? "Mencari..." : "Bluetooth"}
       </button>

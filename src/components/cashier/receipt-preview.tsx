@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { createPortal } from "react-dom";
-import { Printer, X } from "lucide-react";
+import { Printer, X, CheckCircle2 } from "lucide-react";
 import { useCashierStore } from "@/store/cashier-store";
 import { useAuthStore } from "@/store/auth-store";
 import { useBranchStore } from "@/store/branch-store";
@@ -207,74 +207,104 @@ export function ReceiptPreview({ open, onClose, invoiceNumber }: ReceiptPreviewP
           document.body,
         )}
 
-      {/* SCREEN LAYER — preview modal */}
+      {/* SCREEN LAYER — preview modal (desktop optimized) */}
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 print:hidden">
-        <div className="w-full max-w-[200px] rounded-lg border border-neutral-200 bg-white shadow-lg">
+        <div className="w-[95%] sm:w-[90%] md:max-w-xl rounded-3xl border border-neutral-200 bg-white shadow-2xl dark:border-neutral-800 dark:bg-neutral-900 overflow-hidden">
           {/* Close button */}
-          <div className="flex justify-end px-2 pt-2">
-            <button onClick={onClose} className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100">
-              <X className="h-3.5 w-3.5" />
+          <div className="flex justify-end px-4 pt-4">
+            <button onClick={onClose} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800">
+              <X className="h-5 w-5" />
             </button>
           </div>
 
+          {/* Success indicator */}
+          <div className="flex justify-center -mt-2 mb-4">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
+              <CheckCircle2 className="h-9 w-9 text-green-600 dark:text-green-400" />
+            </div>
+          </div>
+
           {/* Receipt content */}
-          <div className="px-3 pb-3 text-[9px] font-mono text-neutral-800 leading-tight">
-            <div className="text-center mb-2">
-              <div className="text-[11px] font-bold">{pharmacyName}</div>
-              {address && <div className="text-[8px] text-neutral-500">{address}</div>}
+          <div className="px-8 pb-6 space-y-6">
+            {/* Header */}
+            <div className="text-center space-y-1">
+              <h2 className="text-3xl md:text-4xl font-bold text-neutral-900 dark:text-neutral-50">
+                {pharmacyName}
+              </h2>
+              {address && <p className="text-base text-neutral-500">{address}</p>}
             </div>
 
-            <div className="flex justify-between text-[8px] text-neutral-500 mb-1">
-              <span>{invoiceNumber ?? "—"}</span>
-              <span>{dateStr} {timeStr}</span>
+            {/* Invoice info */}
+            <div className="flex justify-center gap-8 text-base text-neutral-600 dark:text-neutral-400">
+              <span>No: <strong className="text-neutral-900 dark:text-neutral-100">{invoiceNumber ?? "—"}</strong></span>
+              <span>{dateStr} · {timeStr}</span>
             </div>
 
-            <div className="border-t border-neutral-300 pt-1 mt-0.5">
+            {/* Item list */}
+            <div className="border-t border-neutral-200 dark:border-neutral-800 pt-4 space-y-2">
               {cart.map((item, idx) => (
-                <div key={idx} className="flex justify-between text-[9px] py-0.5">
-                  <span className="truncate max-w-[100px]">{item.productName}</span>
-                  <span className="tabular-nums">
+                <div key={idx} className="flex justify-between items-baseline text-base">
+                  <span className="font-medium text-neutral-800 dark:text-neutral-200 truncate max-w-[60%]">
+                    {item.productName}
+                  </span>
+                  <span className="tabular-nums text-neutral-600 dark:text-neutral-400">
                     {item.quantity} × {Math.round(item.unitPrice).toLocaleString("id-ID")}
                   </span>
                 </div>
               ))}
             </div>
 
+            {/* Payment section */}
             {payments.length > 0 && (
-              <div className="border-t border-neutral-200 pt-0.5 mt-0.5">
+              <div className="border-t border-neutral-200 dark:border-neutral-800 pt-4 space-y-1">
                 {payments.map((p, idx) => {
                   const method = getPaymentMethodLabel(p.method);
                   const walletName = getWalletName((p as any).walletId);
                   return (
-                    <div key={idx} className="flex justify-between text-[8px] text-neutral-500">
-                      <span>
-                        {method}{walletName ? ` (${walletName})` : ""}
-                      </span>
+                    <div key={idx} className="flex justify-between text-base text-neutral-600 dark:text-neutral-400">
+                      <span>{method}{walletName ? ` (${walletName})` : ""}</span>
                       <span className="tabular-nums">{Math.round(p.amount).toLocaleString("id-ID")}</span>
                     </div>
                   );
                 })}
+                {change > 0 && (
+                  <div className="flex justify-between text-base text-green-600 dark:text-green-400 font-medium">
+                    <span>Kembali</span>
+                    <span className="tabular-nums">{Math.round(change).toLocaleString("id-ID")}</span>
+                  </div>
+                )}
               </div>
             )}
-            <div className="flex justify-between font-bold border-t border-neutral-300 pt-0.5 mt-0.5 text-[10px]">
-              <span>TOTAL</span>
-              <span className="tabular-nums">{Math.round(cartTotal).toLocaleString("id-ID")}</span>
+
+            {/* Total */}
+            <div className="border-t-2 border-neutral-300 dark:border-neutral-700 pt-4 text-center space-y-1">
+              <p className="text-base font-medium text-neutral-500 uppercase tracking-wider">Total</p>
+              <p className="text-4xl md:text-5xl font-bold text-brand-600 dark:text-brand-400 tabular-nums">
+                {formatCurrency(cartTotal)}
+              </p>
             </div>
-            <div className="text-center mt-2 text-[8px] text-neutral-400">--- Terima Kasih ---</div>
+
+            {/* Footer */}
+            <div className="text-center space-y-2">
+              <p className="text-lg text-neutral-400 dark:text-neutral-500 tracking-wide">
+                — Terima Kasih —
+              </p>
+              <p className="text-sm text-neutral-400">{receiptFooter}</p>
+            </div>
           </div>
 
           {/* Buttons */}
-          <div className="flex gap-1.5 px-3 pb-3">
+          <div className="flex gap-3 px-8 pb-8">
             <button onClick={handlePrint}
-              className="flex items-center gap-1 rounded border border-neutral-300 px-2 py-1.5 text-[10px] font-medium text-neutral-600 hover:bg-neutral-50">
-              <Printer className="h-3 w-3" />Cetak
+              className="flex items-center gap-2 rounded-2xl border border-neutral-300 px-5 h-16 text-base font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800">
+              <Printer className="h-6 w-6" />Cetak
             </button>
             <BluetoothPrintButton
               printData={escposData}
               onPrinted={handleBluetoothPrinted}
             />
             <button onClick={handleNew}
-              className="flex-1 rounded bg-brand-600 px-3 py-1.5 text-[10px] font-medium text-white hover:bg-brand-700">
+              className="flex-1 flex items-center justify-center gap-2 rounded-2xl bg-brand-600 h-16 text-lg font-semibold text-white hover:bg-brand-700 transition-colors">
               Transaksi Baru
             </button>
           </div>
