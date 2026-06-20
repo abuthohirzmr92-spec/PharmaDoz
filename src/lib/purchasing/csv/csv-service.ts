@@ -1,5 +1,5 @@
 /**
- * P0.9A — CSV Service
+ * P0.9A.1 — CSV Service (Hardened)
  *
  * Orchestration layer for CSV → Purchase Draft pipeline.
  * Coordinates: parser → mapper → match-engine → warning-engine → draft.
@@ -12,10 +12,12 @@ import { parseCsv } from "./parser";
 import { mapCsvRowsToDraftItems } from "./mapper";
 import { matchProduct } from "../match-engine";
 import { generateWarnings } from "../warning-engine";
+import { calculateDraftTotals } from "../draft-engine";
+import type { MapperDeps } from "./mapper";
 import type { ProductReference } from "../match-engine";
 import type { PurchaseDraft, PurchaseDraftItem } from "@/types/purchase-draft";
 
-export interface CsvImportDeps {
+export interface CsvImportDeps extends MapperDeps {
   /** Generate a draft ID */
   generateDraftId: () => string;
   /** Tenant ID for the draft */
@@ -35,10 +37,11 @@ export interface CsvImportResult {
  * Full CSV → Draft pipeline:
  *
  *   1. Parse CSV text → CsvRow[]
- *   2. Map rows → PurchaseDraftItem[]
+ *   2. Map rows → PurchaseDraftItem[] (via mapper with deps)
  *   3. Run match-engine on each item
  *   4. Run warning-engine on each item
- *   5. Create PurchaseDraft with results
+ *   5. Calculate totals via draft-engine
+ *   6. Create PurchaseDraft with results
  *
  * Does NOT call addPurchase(). Draft is returned for human review.
  */
@@ -50,20 +53,18 @@ export function importCsvToDraft(
   // 1. Parse CSV
   const parseResult = parseCsv(csvText);
 
-  // 2. Map to draft items
-  const draftItems = mapCsvRowsToDraftItems(parseResult.rows);
+  // 2. Map to draft items (mapper deps for ID strategy)
+  const draftItems = mapCsvRowsToDraftItems(parseResult.rows, deps);
 
   // 3. Run match-engine on each item
   const matchedItems: PurchaseDraftItem[] = draftItems.map((item) => {
     const match = matchProduct(item.rawProductName, products, item.rawBarcode);
+    const status: PurchaseDraftItem["status"] =
+      match.matchedProductId
+        ? match.confidence >= 90 ? "matched" : "fuzzy_match"
+        : "unmatched";
 
-    return {
-      ...item,
-      matchedProductId: match.matchedProductId,
-      matchConfidence: match.confidence,
-      matchMethod: match.method,
-      status: match.matchedProductId ? (match.confidence >= 90 ? "matched" : "fuzzy_match") : "unmatched",
-    } as PurchaseDraftItem;
+    return { ...item, matchedProductId: match.matchedProductId, matchConfidence: match.confidence, matchMethod: match.method as PurchaseDraftItem["matchMethod"], status };
   });
 
   // 4. Run warning-engine on each item
@@ -71,22 +72,20 @@ export function importCsvToDraft(
     const warnings = generateWarnings(item);
     const hasCritical = warnings.some((w) => w.level === "critical");
     const hasWarning = warnings.some((w) => w.level === "warning");
+    const status: PurchaseDraftItem["status"] =
+      hasCritical ? "error" : hasWarning ? "warning" : item.status;
 
-    return {
-      ...item,
-      warnings,
-      status: hasCritical ? "error" : hasWarning ? "warning" : item.status,
-    };
+    return { ...item, warnings, status };
   });
 
-  // 5. Build draft
+  // 5. Build draft with source reference
   const now = new Date().toISOString();
   const draft: PurchaseDraft = {
     id: deps.generateDraftId(),
     tenantId: deps.tenantId,
     branchId: deps.branchId,
     sourceType: "csv",
-    sourceReference: null,
+    sourceReference: "csv-import",
     supplierId: null,
     supplierName: null,
     invoiceNumber: null,
@@ -105,6 +104,12 @@ export function importCsvToDraft(
     createdAt: now,
     updatedAt: now,
   };
+
+  // 6. Calculate proper totals via draft-engine
+  const totals = calculateDraftTotals(draft);
+  draft.subtotal = totals.subtotal;
+  draft.discountTotal = totals.discountTotal;
+  draft.grandTotal = totals.grandTotal;
 
   return { draft, parseErrors: parseResult.invalidRows };
 }

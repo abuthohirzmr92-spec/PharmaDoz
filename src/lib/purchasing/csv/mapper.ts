@@ -1,24 +1,27 @@
 /**
- * P0.9A — CSV Mapper
+ * P0.9A.1 — CSV Mapper (Hardened)
  *
  * Converts CSV rows into PurchaseDraftItem objects.
  * NO matching. NO warnings. NO repositories. NO store.
+ * NO random ID generation — accepts deps for ID strategy.
  * Pure functions only.
  */
 
 import type { CsvRow } from "./types";
 import type { PurchaseDraftItem } from "@/types/purchase-draft";
 
+export interface MapperDeps {
+  /** Generate a unique ID for each draft item */
+  generateItemId: () => string;
+}
+
 /**
  * Convert a CsvRow to a PurchaseDraftItem.
- * IDs are generated deterministically via crypto.randomUUID().
  * All items start as "pending" — matching and warnings run later.
  */
-export function mapCsvRowToDraftItem(row: CsvRow): PurchaseDraftItem {
-  const id = crypto.randomUUID();
-
+export function mapCsvRowToDraftItem(row: CsvRow, deps: MapperDeps): PurchaseDraftItem {
   return {
-    id,
+    id: deps.generateItemId(),
     rawProductName: row.productName,
     rawBarcode: null,
     matchedProductId: null,
@@ -49,6 +52,6 @@ export function mapCsvRowToDraftItem(row: CsvRow): PurchaseDraftItem {
 /**
  * Convert all parsed CSV rows into PurchaseDraftItem array.
  */
-export function mapCsvRowsToDraftItems(rows: CsvRow[]): PurchaseDraftItem[] {
-  return rows.map(mapCsvRowToDraftItem);
+export function mapCsvRowsToDraftItems(rows: CsvRow[], deps: MapperDeps): PurchaseDraftItem[] {
+  return rows.map((row) => mapCsvRowToDraftItem(row, deps));
 }
