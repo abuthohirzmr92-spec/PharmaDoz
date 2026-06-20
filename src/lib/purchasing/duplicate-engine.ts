@@ -35,6 +35,18 @@ export interface DuplicateGroup {
 // ---------------------------------------------------------------------------
 
 /**
+ * Deterministic hash for ID generation.
+ * Simple djb2 variant — no external packages, no Math.random().
+ */
+function hashString(input: string): string {
+  let hash = 5381;
+  for (let i = 0; i < input.length; i++) {
+    hash = ((hash << 5) + hash + input.charCodeAt(i)) | 0;
+  }
+  return Math.abs(hash).toString(16).padStart(8, "0");
+}
+
+/**
  * Normalize product name for comparison.
  */
 export function normalizeName(name: string): string {
@@ -290,9 +302,9 @@ export function detectDuplicates(
       (item) => itemToBest.get(item.id)?.groupIdx === idx,
     );
     if (keptItems.length >= 2) {
-      // Deterministic ID: dup-{type}-{full-sorted-item-ids}
-      const sortedIds = keptItems.map((i) => i.id).sort().join("-");
-      const id = `dup-${group.duplicateType}-${sortedIds}`;
+      // Deterministic ID: dup-{type}-{hash(sorted-ids)}
+      const sortedIds = keptItems.map((i) => i.id).sort().join(",");
+      const id = `dup-${group.duplicateType}-${hashString(sortedIds)}`;
       final.push({ ...group, id, items: keptItems });
     }
   }
