@@ -22,6 +22,7 @@ export type MatchMethod =
   | "unmatched";
 
 export interface MatchCandidate {
+  id?: string;               // "candidate-{itemId}-{productId}" — deterministic
   productId: string;
   productName: string;
   confidence: number;       // 0–100

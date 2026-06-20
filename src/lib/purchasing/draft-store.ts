@@ -37,10 +37,7 @@ interface PurchaseDraftState {
 /* ------------------------------------------------------------------ */
 
 function generateId(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `draft-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return crypto.randomUUID();
 }
 
 function newDraft(source: DraftSource, tenantId: string, branchId?: string | null): PurchaseDraft {

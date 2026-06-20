@@ -38,6 +38,7 @@ export type MatchMethod = "barcode" | "code" | "exact" | "token_match" | "fuzzy"
 export type WarningLevel = "info" | "warning" | "critical";
 
 export interface DraftWarning {
+  id: string;                       // "warning-{itemId}-{code}"
   level: WarningLevel;
   itemId: string;
   code: string;

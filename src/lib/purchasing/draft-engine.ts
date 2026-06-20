@@ -47,6 +47,7 @@ export function validateDraft(draft: PurchaseDraft, today: Date = new Date()): {
     canConfirm = false;
     confirmBlockerReason = "Tidak ada item dalam draft.";
     allErrors.push({
+      id: `warning--NO_ITEMS`,
       level: "critical",
       itemId: "",
       code: "NO_ITEMS",
@@ -58,6 +59,7 @@ export function validateDraft(draft: PurchaseDraft, today: Date = new Date()): {
     canConfirm = false;
     confirmBlockerReason = confirmBlockerReason || "Supplier belum dipilih.";
     allErrors.push({
+      id: `warning--NO_SUPPLIER`,
       level: "critical",
       itemId: "",
       code: "NO_SUPPLIER",

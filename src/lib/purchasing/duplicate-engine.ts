@@ -290,8 +290,8 @@ export function detectDuplicates(
       (item) => itemToBest.get(item.id)?.groupIdx === idx,
     );
     if (keptItems.length >= 2) {
-      // Deterministic ID: dup-{type}-{sorted-item-ids}
-      const sortedIds = keptItems.map((i) => i.id.slice(0, 8)).sort().join("-");
+      // Deterministic ID: dup-{type}-{full-sorted-item-ids}
+      const sortedIds = keptItems.map((i) => i.id).sort().join("-");
       const id = `dup-${group.duplicateType}-${sortedIds}`;
       final.push({ ...group, id, items: keptItems });
     }

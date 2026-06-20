@@ -9,6 +9,14 @@
 import type { PurchaseDraftItem, DraftWarning } from "@/types/purchase-draft";
 
 // ---------------------------------------------------------------------------
+// Helpers
+// ---------------------------------------------------------------------------
+
+function warningId(itemId: string, code: string): string {
+  return `warning-${itemId}-${code}`;
+}
+
+// ---------------------------------------------------------------------------
 // Price Warnings
 // ---------------------------------------------------------------------------
 
@@ -24,6 +32,7 @@ export function generatePriceWarnings(item: PurchaseDraftItem): DraftWarning[] {
 
     if (change > 15) {
       warnings.push({
+        id: warningId(item.id, "PRICE_INCREASE"),
         level: "warning",
         itemId: item.id,
         code: "PRICE_INCREASE",
@@ -31,6 +40,7 @@ export function generatePriceWarnings(item: PurchaseDraftItem): DraftWarning[] {
       });
     } else if (change < -20) {
       warnings.push({
+        id: warningId(item.id, "PRICE_DECREASE"),
         level: "info",
         itemId: item.id,
         code: "PRICE_DECREASE",
@@ -41,6 +51,7 @@ export function generatePriceWarnings(item: PurchaseDraftItem): DraftWarning[] {
 
   if (item.enteredBuyPrice <= 0) {
     warnings.push({
+      id: warningId(item.id, "MISSING_PRICE"),
       level: "critical",
       itemId: item.id,
       code: "MISSING_PRICE",
@@ -63,6 +74,7 @@ export function generateExpiryWarnings(
 
   if (!item.expiredDate) {
     warnings.push({
+      id: warningId(item.id, "MISSING_EXPIRED"),
       level: "critical",
       itemId: item.id,
       code: "MISSING_EXPIRED",
@@ -74,6 +86,7 @@ export function generateExpiryWarnings(
   const expDate = new Date(item.expiredDate);
   if (isNaN(expDate.getTime())) {
     warnings.push({
+      id: warningId(item.id, "INVALID_DATE"),
       level: "critical",
       itemId: item.id,
       code: "INVALID_DATE",
@@ -84,6 +97,7 @@ export function generateExpiryWarnings(
 
   if (expDate <= today) {
     warnings.push({
+      id: warningId(item.id, "EXPIRED_PAST"),
       level: "critical",
       itemId: item.id,
       code: "EXPIRED_PAST",
@@ -97,6 +111,7 @@ export function generateExpiryWarnings(
   );
   if (daysUntilExpiry < 90) {
     warnings.push({
+      id: warningId(item.id, "EXPIRED_NEAR"),
       level: "warning",
       itemId: item.id,
       code: "EXPIRED_NEAR",
@@ -116,6 +131,7 @@ export function generateMatchWarnings(item: PurchaseDraftItem): DraftWarning[] {
 
   if (!item.matchedProductId || item.matchMethod === "unmatched") {
     warnings.push({
+      id: warningId(item.id, "NO_MATCH"),
       level: "critical",
       itemId: item.id,
       code: "NO_MATCH",
@@ -126,6 +142,7 @@ export function generateMatchWarnings(item: PurchaseDraftItem): DraftWarning[] {
 
   if (item.matchConfidence > 0 && item.matchConfidence < 70) {
     warnings.push({
+      id: warningId(item.id, "LOW_CONFIDENCE"),
       level: "warning",
       itemId: item.id,
       code: "LOW_CONFIDENCE",
