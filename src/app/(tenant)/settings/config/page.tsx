@@ -17,11 +17,11 @@ export default function TenantConfigPage() {
   const canEditSettings = usePermission("settings.edit");
   const { branding } = useTenantBranding();
 
-  const [companyName, setCompanyName] = useState("");
-  const [logoUrl, setLogoUrl] = useState("");
-  const [address, setAddress] = useState("");
-  const [phone, setPhone] = useState("");
-  const [receiptFooter, setReceiptFooter] = useState("");
+  const [companyName, setCompanyName] = useState(branding?.companyName ?? "");
+  const [logoUrl, setLogoUrl] = useState(branding?.logoUrl ?? "");
+  const [address, setAddress] = useState(branding?.address ?? "");
+  const [phone, setPhone] = useState(branding?.phone ?? "");
+  const [receiptFooter, setReceiptFooter] = useState(branding?.receiptFooter ?? "");
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -74,6 +74,7 @@ export default function TenantConfigPage() {
     }
   };
 
+  // Sync branding changes into form state (e.g. after save → reload)
   useEffect(() => {
     if (branding) {
       setCompanyName(branding.companyName ?? "");
