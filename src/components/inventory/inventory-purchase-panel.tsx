@@ -12,6 +12,7 @@ import {
   Plus,
   PlusCircle,
   X,
+  ScanLine,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -203,6 +204,34 @@ export function InventoryPurchasePanel() {
 
   return (
     <div>
+      {/* OCR Faktur — Coming Soon */}
+      <div className="mb-4 rounded-xl border border-dashed border-neutral-300 bg-neutral-50 p-4 dark:border-neutral-700 dark:bg-neutral-900/50">
+        <div className="flex items-center gap-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-neutral-200 dark:bg-neutral-800">
+            <ScanLine className="h-5 w-5 text-neutral-400" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2">
+              <h3 className="text-sm font-semibold text-neutral-400 dark:text-neutral-500">
+                OCR Faktur
+              </h3>
+              <span className="inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-medium text-amber-700 dark:bg-amber-900/30 dark:text-amber-400">
+                Coming Soon
+              </span>
+            </div>
+            <p className="mt-0.5 text-[11px] text-neutral-400 dark:text-neutral-500">
+              Scan faktur supplier dan otomatis membuat draft pembelian akan tersedia pada update berikutnya.
+            </p>
+          </div>
+          <button
+            disabled
+            className="shrink-0 rounded-lg bg-neutral-200 px-3 py-1.5 text-[11px] font-medium text-neutral-400 cursor-not-allowed dark:bg-neutral-800 dark:text-neutral-500"
+          >
+            Scan Faktur
+          </button>
+        </div>
+      </div>
+
       {/* Add Purchase Button & Form */}
       {canCreatePurchase && (
         <div className="mb-4">
