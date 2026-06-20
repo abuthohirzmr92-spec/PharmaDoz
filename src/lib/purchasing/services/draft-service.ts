@@ -23,7 +23,7 @@ import type { MatchCandidate } from "../match-engine";
  * Must run at service layer because match-engine has no item context.
  * Format: candidate-{itemId}-{productId}
  */
-export function assignCandidateIds(
+function assignCandidateIds(
   itemId: string,
   candidates: MatchCandidate[],
 ): MatchCandidate[] {
