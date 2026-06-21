@@ -146,9 +146,10 @@ function parseLine(
     };
   }
 
-  // Optional: selling price (harga_jual)
+  // Optional: selling price (harga_jual) — reject NaN, empty, non-numeric
   const sellingPriceRaw = trimValue(values[4]);
-  const sellingPrice = sellingPriceRaw ? parseFloat(sellingPriceRaw) : undefined;
+  const sellingPriceParsed = sellingPriceRaw ? parseFloat(sellingPriceRaw.replace(/[^\d.]/g, "")) : NaN;
+  const sellingPrice = !isNaN(sellingPriceParsed) ? sellingPriceParsed : undefined;
 
   const row: ImportRow = {
     rowNumber,
@@ -156,7 +157,7 @@ function parseLine(
     quantity: qty,
     unit,
     buyPrice,
-    sellingPrice: sellingPrice && !isNaN(sellingPrice) ? sellingPrice : undefined,
+    sellingPrice,
     batchNumber: trimValue(values[5]) || undefined,
     expiredDate: trimValue(values[6]) || undefined,
   };

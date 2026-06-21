@@ -173,15 +173,10 @@ function parseExcelRow(
     };
   }
 
-  // Optional selling price (harga_jual)
+  // Optional selling price (harga_jual) — reject NaN, empty, non-numeric
   const sellingPriceRaw = (values[4] ?? "").trim();
-  const sellingPrice = sellingPriceRaw ? parseFloat(sellingPriceRaw.replace(/[^\d.]/g, "")) : undefined;
-  if (isNaN(buyPrice) || buyPrice < 0) {
-    return {
-      row: null,
-      error: { rowNumber, field: "harga_beli", message: "Harga beli harus angka >= 0." },
-    };
-  }
+  const sellingPriceParsed = sellingPriceRaw ? parseFloat(sellingPriceRaw.replace(/[^\d.]/g, "")) : NaN;
+  const sellingPrice = !isNaN(sellingPriceParsed) ? sellingPriceParsed : undefined;
 
   // Convert Excel serial date to ISO string if needed
   const expiredRaw = values[6] ?? "";
@@ -212,7 +207,7 @@ function parseExcelRow(
     quantity: qty,
     unit,
     buyPrice,
-    sellingPrice: sellingPrice && !isNaN(sellingPrice) ? sellingPrice : undefined,
+    sellingPrice,
     batchNumber: (values[5] ?? "") || undefined,
     expiredDate,
   };
