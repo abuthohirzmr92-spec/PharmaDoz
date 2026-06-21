@@ -18,7 +18,8 @@ export function enrichImportedItems(
   items: PurchaseDraftItem[],
   products: ProductReference[],
 ): PurchaseDraftItem[] {
-  return items.map((item) => {
+  console.log("[P0.9Q IMPORT] products available for matching:", products.length);
+  const result: PurchaseDraftItem[] = items.map((item) => {
     // 1. Match
     const match = matchProduct(item.rawProductName, products, item.rawBarcode);
     const matchStatus: PurchaseDraftItem["status"] = match.matchedProductId
@@ -46,4 +47,10 @@ export function enrichImportedItems(
       status: hasCritical ? "error" : hasWarning ? "warning" : matchStatus,
     };
   });
+
+  const matched = result.filter((i) => i.matchedProductId).length;
+  const unmatched = result.filter((i) => !i.matchedProductId).length;
+  console.log("[P0.9Q MATCH RATE]", { total: result.length, matched, unmatched, sampleUnmatched: result.filter((i) => !i.matchedProductId).slice(0, 5).map((i) => i.rawProductName) });
+
+  return result;
 }
