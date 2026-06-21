@@ -64,8 +64,16 @@ export const useTransactionStore = create<TransactionState>()((set, get) => ({
       transactionRepo.setBranchContext(branchId);
     }
 
+    console.log("[DASHBOARD DEBUG] loadDemoTransactions", {
+      isLoaded: get().isLoaded,
+      branchId,
+      tenantId: transactionRepo.getTenantId(),
+      isConnected: transactionRepo.isConnected,
+    });
+
     // No tenant context — skip Supabase query (e.g. super admin with no tenant)
     if (transactionRepo.isConnected && !transactionRepo.getTenantId()) {
+      console.log("[DASHBOARD DEBUG] loadDemoTransactions SKIPPING — no tenant context");
       set({ isLoaded: true, isDemoMode: false, isLoading: false });
       return;
     }

@@ -902,7 +902,15 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
     // No tenant context — skip Supabase query (e.g. super admin with no tenant).
     // Without tenant_id the query is unfiltered and may hit RLS blocks.
+    console.log("[DASHBOARD DEBUG] loadDemoData", {
+      isConnected: productRepo.isConnected,
+      tenantId: productRepo.getTenantId(),
+      dataSource: state.dataSource,
+      batchesCount: state.batches.length,
+      isLoading: state.isLoading,
+    });
     if (productRepo.isConnected && !productRepo.getTenantId()) {
+      console.log("[DASHBOARD DEBUG] loadDemoData SKIPPING — no tenant context");
       set({ dataSource: "database", isLoading: false });
       return;
     }

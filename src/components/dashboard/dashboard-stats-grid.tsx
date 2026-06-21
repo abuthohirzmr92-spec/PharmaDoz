@@ -63,7 +63,6 @@ const StatCardComponent = memo(function StatCardComponent({
 /* ------------------------------------------------------------------ */
 
 export function DashboardStatsGrid() {
-  if (typeof window !== "undefined") console.log("[MOUNT-CHECK] DashboardStatsGrid mounted on", window.innerWidth < 768 ? "MOBILE" : "DESKTOP");
   const loadTxns = useTransactionStore((s) => s.loadDemoTransactions);
   const isTxnsLoaded = useTransactionStore((s) => s.isLoaded);
   const todaySales = useTransactionStore((s) => s.getTodaySalesTotal());
@@ -76,12 +75,28 @@ export function DashboardStatsGrid() {
   const getNearExpiry = useInventoryStore((s) => s.getNearExpiryBatches);
 
   useEffect(() => {
-    if (!isTxnsLoaded) loadTxns();
+    console.log("[DASHBOARD DEBUG] StatsGrid mounted", {
+      isTxnsLoaded,
+      batchesCount: batches.length,
+      dataSource: useInventoryStore.getState().dataSource,
+      isInventoryLoading: useInventoryStore.getState().isLoading,
+      branchId: useTransactionStore.getState().branchId,
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!isTxnsLoaded) {
+      console.log("[DASHBOARD DEBUG] calling loadTxns(), isTxnsLoaded:", isTxnsLoaded);
+      loadTxns();
+    }
   }, [isTxnsLoaded, loadTxns]);
 
   useEffect(() => {
-    if (batches.length === 0) loadInv();
-  }, [batches.length, loadInv]);
+    if (batches.length === 0 && !isLoading) {
+      console.log("[DASHBOARD DEBUG] calling loadInv(), batches:", batches.length, "isLoading:", isLoading);
+      loadInv();
+    }
+  }, [batches.length, loadInv, isLoading]);
 
   const lowStockCount = useMemo(() => getLowStock().length, [getLowStock, batches]);
   const nearExpiryCount = useMemo(() => getNearExpiry(30).length, [getNearExpiry, batches]);
