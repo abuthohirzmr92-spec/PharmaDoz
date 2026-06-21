@@ -24,6 +24,7 @@ import { cn } from "@/lib/cn";
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo, supplierRepo } from "@/lib/repository-instances";
 import { useWalletStore } from "@/store/wallet-store";
+import { usePurchaseDraftStore } from "@/lib/purchasing/draft-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
@@ -70,7 +71,8 @@ export function InventoryPurchasePanel() {
         generateDraftId: () => crypto.randomUUID(),
         generateItemId: () => crypto.randomUUID(),
       });
-      toast.success(`CSV berhasil diimpor. ${result.draft.items.length} item siap direview.`);
+      usePurchaseDraftStore.getState().saveDraft(result.draft);
+      toast.success(`CSV berhasil diimpor. ${result.draft.items.length} item tersimpan sebagai draft.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor CSV.");
     } finally {
@@ -90,7 +92,8 @@ export function InventoryPurchasePanel() {
         generateDraftId: () => crypto.randomUUID(),
         generateItemId: () => crypto.randomUUID(),
       });
-      toast.success(`Excel berhasil diimpor. ${result.draft.items.length} item siap direview.`);
+      usePurchaseDraftStore.getState().saveDraft(result.draft);
+      toast.success(`Excel berhasil diimpor. ${result.draft.items.length} item tersimpan sebagai draft.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor Excel.");
     } finally {

@@ -3,8 +3,10 @@
 import { useState, useMemo, useEffect, memo, useCallback } from "react";
 import { Search, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
+import { productRepo } from "@/lib/repository-instances";
 import { cn } from "@/lib/cn";
 import { getDaysUntilExpiry, buildInventoryProducts } from "@/lib/inventory-demo";
+import type { InventoryProduct } from "@/types/inventory";
 
 /* ------------------------------------------------------------------ */
 /*  Stock Row (memoized)                                               */
@@ -182,11 +184,37 @@ export function InventoryStockTable() {
   const setSearchQuery = useInventoryStore((s) => s.setSearchQuery);
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
-  const products = useMemo(() => buildInventoryProducts(batches), [batches]);
+  const [catalogProducts, setCatalogProducts] = useState<InventoryProduct[]>([]);
 
   useEffect(() => {
     if (batches.length === 0) loadDemoData();
   }, [batches.length, loadDemoData]);
+
+  // Load product catalog for zero-stock products
+  useEffect(() => {
+    if (productRepo.isConnected) {
+      productRepo.getProducts().then(setCatalogProducts).catch(() => {});
+    }
+  }, [batches]);
+
+  // Merge batch-derived products with catalog products (show zero-stock items)
+  const products = useMemo(() => {
+    const batchProducts = buildInventoryProducts(batches);
+    const batchIds = new Set(batchProducts.map((p) => p.id));
+
+    // Add catalog products that have no batches (stock = 0)
+    for (const cat of catalogProducts) {
+      if (!batchIds.has(cat.id)) {
+        batchProducts.push({
+          ...cat,
+          totalStock: 0,
+          batches: [],
+        });
+      }
+    }
+
+    return batchProducts;
+  }, [batches, catalogProducts]);
 
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
 
