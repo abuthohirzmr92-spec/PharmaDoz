@@ -64,6 +64,16 @@ export function InventoryPurchasePanel() {
     return 11;
   });
   const [showTaxModal, setShowTaxModal] = useState(false);
+  // Quick-create for import: category + unit selection
+  const [showImportCreate, setShowImportCreate] = useState(false);
+  const [importCreateItemId, setImportCreateItemId] = useState("");
+  const [importCreateName, setImportCreateName] = useState("");
+  const [importCreateCategory, setImportCreateCategory] = useState("");
+  const [importCreateUnit, setImportCreateUnit] = useState("Pcs");
+  const [categories, setCategories] = useState<string[]>([]);
+  const [units, setUnits] = useState<string[]>(["Pcs","Tablet","Kapsul","Botol","Strip","Tube","Vial","Ampul","Sachet","Box"]);
+  // Store category + unit for import items (used during auto-create on save)
+  const [importItemMeta, setImportItemMeta] = useState<Record<string, { category: string; unit: string }>>({});
 
   // ─── Import handlers — hydrate existing purchase form ───
 
@@ -277,10 +287,11 @@ export function InventoryPurchasePanel() {
         resolvedItems[i] = { ...it, productId: existing.id, productName: existing.name };
       } else if (productRepo.isConnected) {
         try {
+          const meta = importItemMeta[it.id];
           const created = await productRepo.createProduct({
-            categoryId: "",
+            categoryId: meta?.category ?? "",
             name: it.productName.trim(),
-            unit: "Pcs",
+            unit: meta?.unit ?? "Pcs",
             defaultPrice: it.unitPrice,
             defaultSellingPrice: it.sellingPrice,
             isActive: true,
@@ -675,7 +686,17 @@ export function InventoryPurchasePanel() {
                           <select value="" onChange={(e) => {
                             const v = e.target.value;
                             if (v === "match") setShowQuickCreate(true);
-                            else if (v === "force") handleItemChange(item.id, "forceCreate" as any, true as any);
+                            else if (v === "force") {
+                              setImportCreateItemId(item.id);
+                              setImportCreateName(item.productName);
+                              setImportCreateCategory("");
+                              setImportCreateUnit("Pcs");
+                              if (productRepo.isConnected) {
+                                productRepo.getCategories().then(cats => setCategories(cats.map(c => c.name))).catch(() => {});
+                                productRepo.getUnits().then(u => setUnits(u.map(x => x.name))).catch(() => {});
+                              }
+                              setShowImportCreate(true);
+                            }
                             else if (v === "remove") handleRemoveItem(item.id);
                           }}
                           className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
@@ -940,6 +961,45 @@ export function InventoryPurchasePanel() {
       remaining={payingInvoice?.remaining ?? 0}
       onClose={() => setPayingInvoice(null)}
     />
+
+    {/* Import Quick-Create Modal — category + unit only */}
+    {showImportCreate && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowImportCreate(false)}>
+        <div className="w-full max-w-xs rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-900" onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Produk Baru — Import</h3>
+          <p className="mt-0.5 text-[11px] text-neutral-500 truncate">{importCreateName}</p>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Kategori</label>
+              <select value={importCreateCategory} onChange={(e) => setImportCreateCategory(e.target.value)}
+                className="mt-1 w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50">
+                <option value="">Pilih kategori...</option>
+                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Satuan</label>
+              <select value={importCreateUnit} onChange={(e) => setImportCreateUnit(e.target.value)}
+                className="mt-1 w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50">
+                {units.map((u) => <option key={u} value={u}>{u}</option>)}
+              </select>
+            </div>
+          </div>
+          <div className="mt-5 flex gap-2">
+            <button onClick={() => setShowImportCreate(false)}
+              className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800">Batal</button>
+            <button onClick={() => {
+              if (!importCreateCategory) { toast.error("Pilih kategori terlebih dahulu."); return; }
+              handleItemChange(importCreateItemId, "forceCreate" as any, true as any);
+              setImportItemMeta((prev) => ({ ...prev, [importCreateItemId]: { category: importCreateCategory, unit: importCreateUnit } }));
+              setShowImportCreate(false);
+              toast.success("Produk akan dibuat otomatis saat Simpan Pembelian.");
+            }}
+              className="flex-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700">Konfirmasi</button>
+          </div>
+        </div>
+      </div>
+    )}
 
     {/* Tax Settings Modal */}
     {showTaxModal && (
