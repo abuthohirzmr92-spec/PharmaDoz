@@ -59,19 +59,24 @@ export function InventoryPurchasePanel() {
   // ─── Import handlers — hydrate existing purchase form ───
 
   const hydrateFormFromDraft = (draft: { items: Array<{ id: string; matchedProductId: string | null; rawProductName: string; quantity: number; enteredBuyPrice: number; currentSellingPrice: number; batchNumber: string | null; expiredDate: string | null }>; supplierId?: string | null }) => {
-    setFormSupplier(draft.supplierId ?? "");
-    setFormItems(draft.items.map((item) => ({
-      id: item.id,
-      tenantId: "",
-      productId: item.matchedProductId ?? "",
-      productName: item.rawProductName,
-      batchNumber: item.batchNumber ?? "",
-      expiredDate: item.expiredDate ?? "",
-      quantity: item.quantity,
-      unitPrice: item.enteredBuyPrice,
-      sellingPrice: item.currentSellingPrice,
-    })));
-    setShowForm(true);
+    try {
+      setFormSupplier(draft.supplierId ?? "");
+      setFormItems(draft.items.map((item) => ({
+        id: item.id,
+        tenantId: "",
+        productId: item.matchedProductId ?? "",
+        productName: item.rawProductName,
+        batchNumber: item.batchNumber ?? "",
+        expiredDate: item.expiredDate ?? "",
+        quantity: item.quantity,
+        unitPrice: item.enteredBuyPrice,
+        sellingPrice: item.currentSellingPrice,
+      })));
+      setShowForm(true);
+    } catch (e) {
+      console.error("[P0.9I CRASH] hydrateFormFromDraft", e instanceof Error ? e.stack : e);
+      throw e;
+    }
   };
 
   const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -89,6 +94,7 @@ export function InventoryPurchasePanel() {
       hydrateFormFromDraft(result.draft);
       toast.success(`CSV berhasil diimpor. ${result.draft.items.length} item dimuat ke form.`);
     } catch (err) {
+      console.error("[P0.9I CRASH] handleImportCsv", err instanceof Error ? err.stack : err);
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor CSV.");
     } finally {
       setImporting(false);
@@ -110,6 +116,7 @@ export function InventoryPurchasePanel() {
       hydrateFormFromDraft(result.draft);
       toast.success(`Excel berhasil diimpor. ${result.draft.items.length} item dimuat ke form.`);
     } catch (err) {
+      console.error("[P0.9I CRASH] handleImportExcel", err instanceof Error ? err.stack : err);
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor Excel.");
     } finally {
       setImporting(false);
