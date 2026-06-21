@@ -16,6 +16,7 @@ import {
   Upload,
   FileSpreadsheet,
   Download,
+  Settings,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -55,6 +56,14 @@ export function InventoryPurchasePanel() {
   const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<{ id: string; remaining: number } | null>(null);
   const [importing, setImporting] = useState(false);
+  const [purchaseTaxPercent, setPurchaseTaxPercent] = useState(() => {
+    if (typeof window !== "undefined") {
+      const s = localStorage.getItem("purchaseTaxPercent");
+      return s ? parseInt(s, 10) : 11;
+    }
+    return 11;
+  });
+  const [showTaxModal, setShowTaxModal] = useState(false);
 
   // ─── Import handlers — hydrate existing purchase form ───
 
@@ -466,12 +475,17 @@ export function InventoryPurchasePanel() {
                 <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                   Tambah Pembelian
                 </h3>
-                <button
-                  onClick={() => setShowForm(false)}
+                <div className="flex items-center gap-2">
+                  <button onClick={() => { setShowTaxModal(true); }}
+                    className="rounded p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300" title="Pengaturan PPN">
+                    <Settings className="h-4 w-4" />
+                  </button>
+                  <button onClick={() => setShowForm(false)}
                   className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
                 >
                   <X className="h-4 w-4" />
                 </button>
+              </div>
               </div>
 
               {/* Supplier + Due Date */}
@@ -578,126 +592,104 @@ export function InventoryPurchasePanel() {
                         Hrg Beli
                       </th>
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
+                        HPP
+                      </th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
                         Hrg Jual
                       </th>
-                      <th className="px-2 py-1.5 w-8" />
+                      <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">
+                        Status
+                      </th>
+                      <th className="px-2 py-1.5 w-[80px]" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    {formItems.map((item) => (
+                    {formItems.map((item) => {
+                      const hpp = Math.round(item.unitPrice * (1 + purchaseTaxPercent / 100));
+                      const badge = item.productId
+                        ? { label: "MATCHED", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" }
+                        : item.forceCreate
+                          ? { label: "AUTO CREATE", cls: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" }
+                          : { label: "NEW", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" };
+                      return (
                       <tr key={item.id}>
                         <td className="px-2 py-1">
-                          <div className="flex items-center gap-1">
-                            <select
-                              value={item.productId || (item.productName ? "__imported__" : "")}
-                              onChange={(e) =>
-                                handleItemChange(item.id, "productId", e.target.value)
-                              }
-                              className="flex-1 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                            >
-                              {!item.productId && item.productName ? (
-                                <option value="__imported__" disabled>
-                                  {item.productName}
-                                </option>
-                              ) : (
-                                <option value="">Pilih produk...</option>
-                              )}
-                              {productList.map((p) => (
-                                <option key={p.id} value={p.id}>
-                                  {p.name}
-                                </option>
-                              ))}
-                            </select>
-                            <button
-                              type="button"
-                              onClick={() => setShowQuickCreate(true)}
-                              className="shrink-0 inline-flex items-center gap-0.5 rounded border border-dashed border-neutral-300 px-1.5 py-1 text-[10px] text-neutral-400 hover:border-brand-400 hover:text-brand-600 transition-colors dark:border-neutral-600 dark:hover:border-brand-500"
-                              title="Buat produk baru"
-                            >
-                              <PlusCircle className="h-3 w-3" />
-                              Baru
-                            </button>
-                          </div>
-                        </td>
-                        <td className="px-2 py-1">
-                          <input
-                            type="text"
-                            value={item.batchNumber}
-                            onChange={(e) =>
-                              handleItemChange(item.id, "batchNumber", e.target.value)
-                            }
-                            placeholder="Kosongkan untuk auto-generate"
-                            className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <input
-                            type="date"
-                            value={item.expiredDate}
-                            onChange={(e) =>
-                              handleItemChange(item.id, "expiredDate", e.target.value)
-                            }
+                          <select
+                            value={item.productId || (item.productName ? "__imported__" : "")}
+                            onChange={(e) => {
+                              if (e.target.value === "__new__") { setShowQuickCreate(true); return; }
+                              handleItemChange(item.id, "productId", e.target.value);
+                            }}
                             className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <input
-                            type="number"
-                            min={1}
-                            value={item.quantity}
-                            onChange={(e) =>
-                              handleItemChange(
-                                item.id,
-                                "quantity",
-                                parseInt(e.target.value) || 0,
-                              )
-                            }
-                            className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <input
-                            type="number"
-                            min={0}
-                            value={item.unitPrice || ""}
-                            onChange={(e) =>
-                              handleItemChange(
-                                item.id,
-                                "unitPrice",
-                                parseInt(e.target.value) || 0,
-                              )
-                            }
-                            placeholder="0"
-                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                          />
-                        </td>
-                        <td className="px-2 py-1">
-                          <input
-                            type="number"
-                            min={0}
-                            value={item.sellingPrice || ""}
-                            onChange={(e) =>
-                              handleItemChange(
-                                item.id,
-                                "sellingPrice",
-                                parseInt(e.target.value) || 0,
-                              )
-                            }
-                            placeholder="0"
-                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-                          />
-                        </td>
-                        <td className="px-2 py-1 text-center">
-                          <button
-                            onClick={() => handleRemoveItem(item.id)}
-                            disabled={formItems.length <= 1}
-                            className="rounded p-0.5 text-neutral-300 hover:text-red-500 disabled:opacity-20 disabled:cursor-not-allowed"
                           >
-                            <X className="h-3 w-3" />
-                          </button>
+                            {!item.productId && item.productName ? (
+                              <option value="__imported__" disabled>{item.productName}</option>
+                            ) : (
+                              <option value="">Pilih produk...</option>
+                            )}
+                            {productList.map((p) => (
+                              <option key={p.id} value={p.id}>{p.name}</option>
+                            ))}
+                            <option disabled>──────────</option>
+                            <option value="__new__" className="text-brand-600 font-medium">+ Buat Produk Baru</option>
+                          </select>
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="text" value={item.batchNumber}
+                            onChange={(e) => handleItemChange(item.id, "batchNumber", e.target.value)}
+                            placeholder="Kosongkan untuk auto-generate"
+                            className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="date" value={item.expiredDate}
+                            onChange={(e) => handleItemChange(item.id, "expiredDate", e.target.value)}
+                            className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" min={1} value={item.quantity}
+                            onChange={(e) => handleItemChange(item.id, "quantity", parseInt(e.target.value) || 0)}
+                            className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" min={0} value={item.unitPrice || ""}
+                            onChange={(e) => handleItemChange(item.id, "unitPrice", parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                        </td>
+                        {/* HPP — read-only */}
+                        <td className="px-2 py-1 text-right">
+                          <span className="text-[11px] tabular-nums text-neutral-500">{hpp.toLocaleString("id-ID")}</span>
+                        </td>
+                        <td className="px-2 py-1">
+                          <input type="number" min={0} value={item.sellingPrice || ""}
+                            onChange={(e) => handleItemChange(item.id, "sellingPrice", parseInt(e.target.value) || 0)}
+                            placeholder="0"
+                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                        </td>
+                        {/* Status badge */}
+                        <td className="px-2 py-1 text-center">
+                          <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}>{badge.label}</span>
+                        </td>
+                        {/* Actions */}
+                        <td className="px-2 py-1">
+                          <select value="" onChange={(e) => {
+                            const v = e.target.value;
+                            if (v === "match") setShowQuickCreate(true);
+                            else if (v === "force") handleItemChange(item.id, "forceCreate" as any, true as any);
+                            else if (v === "remove") handleRemoveItem(item.id);
+                          }}
+                          className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
+                            <option value="">▼</option>
+                            {!item.productId && (<>
+                              <option value="match">🔗 Sesuaikan Produk</option>
+                              <option value="force">➕ Tetap Produk Baru</option>
+                            </>)}
+                            <option value="remove">🗑 Hapus Item</option>
+                          </select>
                         </td>
                       </tr>
-                    ))}
+                    );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -948,6 +940,33 @@ export function InventoryPurchasePanel() {
       remaining={payingInvoice?.remaining ?? 0}
       onClose={() => setPayingInvoice(null)}
     />
+
+    {/* Tax Settings Modal */}
+    {showTaxModal && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowTaxModal(false)}>
+        <div className="w-full max-w-xs rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-900" onClick={(e) => e.stopPropagation()}>
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Pengaturan Pembelian</h3>
+          <div className="mt-4 space-y-3">
+            <div>
+              <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Persentase PPN Pembelian</label>
+              <div className="mt-1 flex items-center gap-2">
+                <input type="number" min={0} max={100} value={purchaseTaxPercent}
+                  onChange={(e) => { const v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0)); setPurchaseTaxPercent(v); if (typeof window !== "undefined") localStorage.setItem("purchaseTaxPercent", String(v)); }}
+                  className="w-20 rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                <span className="text-sm text-neutral-500">%</span>
+              </div>
+            </div>
+            <p className="text-[11px] text-neutral-500">HPP = Harga Beli × (1 + PPN/100)</p>
+          </div>
+          <div className="mt-5">
+            <button onClick={() => setShowTaxModal(false)}
+              className="w-full rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700">
+              Tutup
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
 
     </div>
   );

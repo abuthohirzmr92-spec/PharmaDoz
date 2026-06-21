@@ -48,6 +48,8 @@ export interface PurchaseItem {
   quantity: number;
   unitPrice: number;
   sellingPrice: number;
+  /** Auto-create product on save (import flow) */
+  forceCreate?: boolean;
 }
 
 export interface PurchaseInvoice {
