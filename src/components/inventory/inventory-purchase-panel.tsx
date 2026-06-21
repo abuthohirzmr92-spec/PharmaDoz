@@ -24,7 +24,6 @@ import { cn } from "@/lib/cn";
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo, supplierRepo } from "@/lib/repository-instances";
 import { useWalletStore } from "@/store/wallet-store";
-import { usePurchaseDraftStore } from "@/lib/purchasing/draft-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
@@ -57,7 +56,23 @@ export function InventoryPurchasePanel() {
   const [payingInvoice, setPayingInvoice] = useState<{ id: string; remaining: number } | null>(null);
   const [importing, setImporting] = useState(false);
 
-  // ─── Import handlers ───
+  // ─── Import handlers — hydrate existing purchase form ───
+
+  const hydrateFormFromDraft = (draft: { items: Array<{ id: string; matchedProductId: string | null; rawProductName: string; quantity: number; enteredBuyPrice: number; currentSellingPrice: number; batchNumber: string | null; expiredDate: string | null }>; supplierId?: string | null }) => {
+    setFormSupplier(draft.supplierId ?? "");
+    setFormItems(draft.items.map((item) => ({
+      id: item.id,
+      tenantId: "",
+      productId: item.matchedProductId ?? "",
+      productName: item.rawProductName,
+      batchNumber: item.batchNumber ?? "",
+      expiredDate: item.expiredDate ?? "",
+      quantity: item.quantity,
+      unitPrice: item.enteredBuyPrice,
+      sellingPrice: item.currentSellingPrice,
+    })));
+    setShowForm(true);
+  };
 
   const handleImportCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -71,8 +86,8 @@ export function InventoryPurchasePanel() {
         generateDraftId: () => crypto.randomUUID(),
         generateItemId: () => crypto.randomUUID(),
       });
-      usePurchaseDraftStore.getState().saveDraft(result.draft);
-      toast.success(`CSV berhasil diimpor. ${result.draft.items.length} item tersimpan sebagai draft.`);
+      hydrateFormFromDraft(result.draft);
+      toast.success(`CSV berhasil diimpor. ${result.draft.items.length} item dimuat ke form.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor CSV.");
     } finally {
@@ -92,8 +107,8 @@ export function InventoryPurchasePanel() {
         generateDraftId: () => crypto.randomUUID(),
         generateItemId: () => crypto.randomUUID(),
       });
-      usePurchaseDraftStore.getState().saveDraft(result.draft);
-      toast.success(`Excel berhasil diimpor. ${result.draft.items.length} item tersimpan sebagai draft.`);
+      hydrateFormFromDraft(result.draft);
+      toast.success(`Excel berhasil diimpor. ${result.draft.items.length} item dimuat ke form.`);
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Gagal mengimpor Excel.");
     } finally {
