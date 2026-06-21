@@ -190,12 +190,12 @@ export function InventoryStockTable() {
     if (batches.length === 0) loadDemoData();
   }, [batches.length, loadDemoData]);
 
-  // Load product catalog for zero-stock products
+  // Load product catalog once on mount — independent of batches (read-only)
   useEffect(() => {
     if (productRepo.isConnected) {
       productRepo.getProducts().then(setCatalogProducts).catch(() => {});
     }
-  }, [batches]);
+  }, []);
 
   // Merge batch-derived products with catalog products (show zero-stock items)
   const products = useMemo(() => {
