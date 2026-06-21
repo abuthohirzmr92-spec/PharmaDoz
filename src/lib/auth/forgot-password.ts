@@ -8,6 +8,17 @@ export async function sendPasswordResetEmail(email: string): Promise<{
     ? `https://${process.env.VERCEL_URL}`
     : process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
 
+  const redirectTo = `${appUrl}/auth/set-password`;
+
+  // TEMPORARY RUNTIME LOG — P0.AUTH.RESET-PASSWORD audit
+  console.log("=== P0.AUTH.RESET-PASSWORD RUNTIME ===");
+  console.log("VERCEL_URL:", process.env.VERCEL_URL);
+  console.log("NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
+  console.log("appUrl:", appUrl);
+  console.log("redirectTo sent:", redirectTo);
+  console.log("payload sent:", JSON.stringify({ email, options: { redirectTo } }, null, 2));
+  console.log("=== END P0.AUTH RUNTIME ===");
+
   // Supabase GoTrue /auth/v1/recover — correct parameter format (v2+)
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover`,
@@ -20,7 +31,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{
       body: JSON.stringify({
         email,
         options: {
-          redirectTo: `${appUrl}/auth/set-password`,
+          redirectTo,
         },
       }),
     },
