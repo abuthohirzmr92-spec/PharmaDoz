@@ -64,26 +64,6 @@ export function InventoryPurchasePanel() {
     return 11;
   });
   const [showTaxModal, setShowTaxModal] = useState(false);
-  // Per-item pricing mode: "margin" (user edits margin) or "sellingPrice" (user edits sell price)
-  const [pricingMode, setPricingMode] = useState<Record<string, "margin" | "sellingPrice">>({});
-  // Cached margin percent per item (when in sellingPrice mode, this is computed; when in margin mode, user sets it)
-  const [marginCache, setMarginCache] = useState<Record<string, number>>({});
-
-  // When tax changes, recalc sellingPrice for items in "margin" mode
-  useEffect(() => {
-    if (formItems.length === 0) return;
-    let changed = false;
-    const updated = formItems.map((item) => {
-      if (pricingMode[item.id] !== "margin") return item;
-      const m = marginCache[item.id] ?? 0;
-      if (m <= 0) return item;
-      const hpp = Math.round(item.unitPrice * (1 + purchaseTaxPercent / 100));
-      const newSell = Math.round(hpp * (1 + m / 100));
-      if (newSell !== item.sellingPrice) { changed = true; return { ...item, sellingPrice: newSell }; }
-      return item;
-    });
-    if (changed) setFormItems(updated);
-  }, [purchaseTaxPercent]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ─── Import handlers — hydrate existing purchase form ───
 
@@ -615,9 +595,6 @@ export function InventoryPurchasePanel() {
                         HPP
                       </th>
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        Margin%
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
                         Hrg Jual
                       </th>
                       <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">
@@ -683,33 +660,9 @@ export function InventoryPurchasePanel() {
                         <td className="px-2 py-1 text-right">
                           <span className="text-[11px] tabular-nums text-neutral-500">{hpp.toLocaleString("id-ID")}</span>
                         </td>
-                        {/* Margin% — editable, auto-updates sellingPrice */}
-                        <td className="px-2 py-1">
-                          <input type="number" min={0}
-                            value={(() => {
-                              const mode = pricingMode[item.id];
-                              if (mode === "margin") return marginCache[item.id] ?? 0;
-                              const m = hpp > 0 ? Math.round(((item.sellingPrice - hpp) / hpp) * 100) : 0;
-                              return m;
-                            })()}
-                            onChange={(e) => {
-                              const m = Math.max(0, parseInt(e.target.value) || 0);
-                              setPricingMode((prev) => ({ ...prev, [item.id]: "margin" }));
-                              setMarginCache((prev) => ({ ...prev, [item.id]: m }));
-                              const newSell = Math.round(hpp * (1 + m / 100));
-                              handleItemChange(item.id, "sellingPrice", newSell);
-                            }}
-                            placeholder="0"
-                            className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
-                        </td>
-                        {/* Selling Price — editable, auto-updates margin */}
                         <td className="px-2 py-1">
                           <input type="number" min={0} value={item.sellingPrice || ""}
-                            onChange={(e) => {
-                              const sp = Math.max(0, parseInt(e.target.value) || 0);
-                              setPricingMode((prev) => ({ ...prev, [item.id]: "sellingPrice" }));
-                              handleItemChange(item.id, "sellingPrice", sp);
-                            }}
+                            onChange={(e) => handleItemChange(item.id, "sellingPrice", parseInt(e.target.value) || 0)}
                             placeholder="0"
                             className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
                         </td>
