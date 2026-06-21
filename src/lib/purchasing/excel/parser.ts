@@ -79,8 +79,9 @@ export function parseExcel(file: File): Promise<ImportParseResult> {
             errors.push(result.error);
             continue;
           }
+          if (!result.row) continue; // skip empty rows (both row and error are null)
 
-          rows.push(result.row!);
+          rows.push(result.row);
         }
 
         resolve({
