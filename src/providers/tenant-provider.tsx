@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { useAuthStore } from "@/store/auth-store";
 import { authRepo } from "@/lib/repository-instances";
-import { productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
+import { productRepo, supplierRepo, inventoryRepo, transactionRepo, activityLogRepo } from "@/lib/repository-instances";
 import { isSuperAdmin } from "@/lib/auth/super-admin";
 import type { Tenant, AppRole, TenantContext } from "@/types";
 
@@ -54,6 +54,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
       supplierRepo.setTenantContext(undefined);
       inventoryRepo.setTenantContext(undefined);
       transactionRepo.setTenantContext(undefined);
+      activityLogRepo.setTenantContext(undefined);
       return;
     }
 
@@ -74,6 +75,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
     supplierRepo.setTenantContext(ctx);
     inventoryRepo.setTenantContext(ctx);
     transactionRepo.setTenantContext(ctx);
+    activityLogRepo.setTenantContext(ctx);
 
     setIsLoading(true);
     setError(null);
@@ -90,6 +92,7 @@ export function TenantProvider({ children }: { children: ReactNode }) {
           supplierRepo.setTenantContext(freshCtx);
           inventoryRepo.setTenantContext(freshCtx);
           transactionRepo.setTenantContext(freshCtx);
+          activityLogRepo.setTenantContext(freshCtx);
         } else if (tenantId) {
           // Fallback: use tenant info from user profile
           const fallback: Tenant = {

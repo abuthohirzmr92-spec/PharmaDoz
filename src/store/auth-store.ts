@@ -17,6 +17,7 @@ import {
   supplierRepo,
   inventoryRepo,
   transactionRepo,
+  activityLogRepo,
 } from "@/lib/repository-instances";
 import { useCashierStore } from "@/store/cashier-store";
 import { useTransactionStore } from "@/store/transaction-store";
@@ -78,6 +79,7 @@ export function syncRepositoryContext(user: UserProfile | null) {
     inventoryRepo.setTenantContext(ctx);
     transactionRepo.setTenantContext(ctx);
     authRepo.setTenantContext(ctx);
+    activityLogRepo.setTenantContext(ctx);
   } else if (user && user.pharmacyId) {
     const ctx = { tenantId: user.pharmacyId, role: user.role, userId: user.id };
     productRepo.setTenantContext(ctx);
@@ -85,12 +87,14 @@ export function syncRepositoryContext(user: UserProfile | null) {
     inventoryRepo.setTenantContext(ctx);
     transactionRepo.setTenantContext(ctx);
     authRepo.setTenantContext(ctx);
+    activityLogRepo.setTenantContext(ctx);
   } else {
     productRepo.setTenantContext(undefined);
     supplierRepo.setTenantContext(undefined);
     inventoryRepo.setTenantContext(undefined);
     transactionRepo.setTenantContext(undefined);
     authRepo.setTenantContext(undefined);
+    activityLogRepo.setTenantContext(undefined);
   }
 }
 
