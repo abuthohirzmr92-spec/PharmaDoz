@@ -10,16 +10,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{
 
   const redirectTo = `${appUrl}/auth/set-password`;
 
-  // TEMPORARY RUNTIME LOG — P0.AUTH.RESET-PASSWORD audit
-  console.log("=== P0.AUTH.RESET-PASSWORD RUNTIME ===");
-  console.log("VERCEL_URL:", process.env.VERCEL_URL);
-  console.log("NEXT_PUBLIC_APP_URL:", process.env.NEXT_PUBLIC_APP_URL);
-  console.log("appUrl:", appUrl);
-  console.log("redirectTo sent:", redirectTo);
-  console.log("payload sent:", JSON.stringify({ email, options: { redirectTo } }, null, 2));
-  console.log("=== END P0.AUTH RUNTIME ===");
-
-  // Supabase GoTrue /auth/v1/recover — correct parameter format (v2+)
+  // GoTrue REST API expects redirect_to at top level (snake_case), not nested in options
   const res = await fetch(
     `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/recover`,
     {
@@ -30,9 +21,7 @@ export async function sendPasswordResetEmail(email: string): Promise<{
       },
       body: JSON.stringify({
         email,
-        options: {
-          redirectTo,
-        },
+        redirect_to: redirectTo,
       }),
     },
   );
