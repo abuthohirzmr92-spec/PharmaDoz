@@ -249,6 +249,7 @@ export function InventoryPurchasePanel() {
   const handleSubmit = () => {
     const supplier = suppliers.find((s) => s.id === formSupplier);
     if (!supplier) { toast.error("Pilih supplier terlebih dahulu"); return; }
+    console.log("[P0.9O FORM ITEMS]", JSON.stringify(formItems.map(it => ({ productId: it.productId, productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice, sellingPrice: it.sellingPrice, expiredDate: it.expiredDate, batchNumber: it.batchNumber })), null, 2));
     const validItems = formItems.filter((it) => it.productId && it.productName && it.quantity > 0);
     if (validItems.length === 0) { toast.error("Isi minimal 1 item pembelian"); return; }
     for (const it of validItems) {
