@@ -69,6 +69,22 @@ export function InventoryPurchasePanel() {
   // Cached margin percent per item (when in sellingPrice mode, this is computed; when in margin mode, user sets it)
   const [marginCache, setMarginCache] = useState<Record<string, number>>({});
 
+  // When tax changes, recalc sellingPrice for items in "margin" mode
+  useEffect(() => {
+    if (formItems.length === 0) return;
+    let changed = false;
+    const updated = formItems.map((item) => {
+      if (pricingMode[item.id] !== "margin") return item;
+      const m = marginCache[item.id] ?? 0;
+      if (m <= 0) return item;
+      const hpp = Math.round(item.unitPrice * (1 + purchaseTaxPercent / 100));
+      const newSell = Math.round(hpp * (1 + m / 100));
+      if (newSell !== item.sellingPrice) { changed = true; return { ...item, sellingPrice: newSell }; }
+      return item;
+    });
+    if (changed) setFormItems(updated);
+  }, [purchaseTaxPercent]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // ─── Import handlers — hydrate existing purchase form ───
 
   const hydrateFormFromDraft = (draft: { items: Array<{ id: string; matchedProductId: string | null; rawProductName: string; quantity: number; enteredBuyPrice: number; currentSellingPrice: number; batchNumber: string | null; expiredDate: string | null }>; supplierId?: string | null }) => {
