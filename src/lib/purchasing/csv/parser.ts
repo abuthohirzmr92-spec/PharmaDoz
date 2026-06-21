@@ -113,10 +113,10 @@ function parseLine(
   rowNumber: number,
 ): { row: ImportRow | null; error: ImportParseError | null } {
   const values = splitCsvLine(line);
-  if (values.length < 4) {
+  if (values.length < 5) {
     return {
       row: null,
-      error: { rowNumber, field: "line", message: `Hanya ${values.length} kolom, minimal 4 (nama_produk, qty, satuan, harga_beli).` },
+      error: { rowNumber, field: "line", message: `Hanya ${values.length} kolom, minimal 5 (nama_produk, qty, satuan, harga_beli, harga_jual).` },
     };
   }
 
@@ -136,13 +136,7 @@ function parseLine(
     };
   }
 
-  const unit = trimValue(values[2]);
-  if (!unit) {
-    return {
-      row: null,
-      error: { rowNumber, field: "satuan", message: "Satuan wajib diisi." },
-    };
-  }
+  const unit = trimValue(values[2]) || "Pcs";
 
   const buyPrice = parseFloat(trimValue(values[3]));
   if (isNaN(buyPrice) || buyPrice < 0) {
@@ -152,14 +146,19 @@ function parseLine(
     };
   }
 
+  // Optional: selling price (harga_jual)
+  const sellingPriceRaw = trimValue(values[4]);
+  const sellingPrice = sellingPriceRaw ? parseFloat(sellingPriceRaw) : undefined;
+
   const row: ImportRow = {
     rowNumber,
     productName,
     quantity: qty,
     unit,
     buyPrice,
-    batchNumber: trimValue(values[4]) || undefined,
-    expiredDate: trimValue(values[5]) || undefined,
+    sellingPrice: sellingPrice && !isNaN(sellingPrice) ? sellingPrice : undefined,
+    batchNumber: trimValue(values[5]) || undefined,
+    expiredDate: trimValue(values[6]) || undefined,
   };
 
   return { row, error: null };

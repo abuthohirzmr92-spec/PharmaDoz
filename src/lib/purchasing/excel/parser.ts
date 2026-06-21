@@ -163,13 +163,7 @@ function parseExcelRow(
     };
   }
 
-  const unit = (values[2] ?? "").trim();
-  if (!unit) {
-    return {
-      row: null,
-      error: { rowNumber, field: "satuan", message: "Satuan wajib diisi." },
-    };
-  }
+  const unit = (values[2] ?? "").trim() || "Pcs";
 
   const buyPrice = parseFloat((values[3] ?? "0").replace(/[^\d.]/g, ""));
   if (isNaN(buyPrice) || buyPrice < 0) {
@@ -179,8 +173,18 @@ function parseExcelRow(
     };
   }
 
+  // Optional selling price (harga_jual)
+  const sellingPriceRaw = (values[4] ?? "").trim();
+  const sellingPrice = sellingPriceRaw ? parseFloat(sellingPriceRaw.replace(/[^\d.]/g, "")) : undefined;
+  if (isNaN(buyPrice) || buyPrice < 0) {
+    return {
+      row: null,
+      error: { rowNumber, field: "harga_beli", message: "Harga beli harus angka >= 0." },
+    };
+  }
+
   // Convert Excel serial date to ISO string if needed
-  const expiredRaw = values[5] ?? "";
+  const expiredRaw = values[6] ?? "";
   let expiredDate: string | undefined;
 
   if (expiredRaw) {
@@ -208,7 +212,8 @@ function parseExcelRow(
     quantity: qty,
     unit,
     buyPrice,
-    batchNumber: (values[4] ?? "") || undefined,
+    sellingPrice: sellingPrice && !isNaN(sellingPrice) ? sellingPrice : undefined,
+    batchNumber: (values[5] ?? "") || undefined,
     expiredDate,
   };
 

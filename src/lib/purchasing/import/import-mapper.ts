@@ -29,7 +29,7 @@ export function mapRowToDraftItem(
 
     enteredBuyPrice: row.buyPrice,
     previousBuyPrice: null,
-    currentSellingPrice: 0,
+    currentSellingPrice: row.sellingPrice ?? 0,
     discountPercent: 0,
 
     quantity: row.quantity,

@@ -12,6 +12,7 @@ export const IMPORT_COLUMNS = [
   "qty",
   "satuan",
   "harga_beli",
+  "harga_jual",
   "batch_number",
   "expired_date",
 ] as const;
@@ -34,6 +35,8 @@ export interface ImportRow {
   unit: string;
   /** Required: unit buy price */
   buyPrice: number;
+  /** Optional: selling price from import */
+  sellingPrice?: number;
   /** Optional: pre-assigned batch number */
   batchNumber?: string;
   /** Optional: expired date string */
