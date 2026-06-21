@@ -538,13 +538,19 @@ export function InventoryPurchasePanel() {
                         <td className="px-2 py-1">
                           <div className="flex items-center gap-1">
                             <select
-                              value={item.productId}
+                              value={item.productId || (item.productName ? "__imported__" : "")}
                               onChange={(e) =>
                                 handleItemChange(item.id, "productId", e.target.value)
                               }
                               className="flex-1 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                             >
-                              <option value="">Pilih produk...</option>
+                              {!item.productId && item.productName ? (
+                                <option value="__imported__" disabled>
+                                  {item.productName}
+                                </option>
+                              ) : (
+                                <option value="">Pilih produk...</option>
+                              )}
                               {productList.map((p) => (
                                 <option key={p.id} value={p.id}>
                                   {p.name}
