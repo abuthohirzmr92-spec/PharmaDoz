@@ -246,11 +246,51 @@ export function InventoryPurchasePanel() {
     }
   };
 
-  const handleSubmit = () => {
+  const handleSubmit = async () => {
     const supplier = suppliers.find((s) => s.id === formSupplier);
     if (!supplier) { toast.error("Pilih supplier terlebih dahulu"); return; }
-    console.log("[P0.9O FORM ITEMS]", JSON.stringify(formItems.map(it => ({ productId: it.productId, productName: it.productName, quantity: it.quantity, unitPrice: it.unitPrice, sellingPrice: it.sellingPrice, expiredDate: it.expiredDate, batchNumber: it.batchNumber })), null, 2));
-    const validItems = formItems.filter((it) => it.productId && it.productName && it.quantity > 0);
+
+    // Auto-create products for unmatched NEW items
+    let autoCreatedCount = 0;
+    const resolvedItems = [...formItems];
+
+    for (let i = 0; i < resolvedItems.length; i++) {
+      const it = resolvedItems[i]!;
+      // Skip items that already have a productId or don't have a name
+      if (it.productId || !it.productName || it.quantity <= 0) continue;
+
+      // Try to find by normalized name in existing product list
+      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
+      const normName = normalize(it.productName);
+      const existing = productList.find((p) => normalize(p.name) === normName);
+
+      if (existing) {
+        resolvedItems[i] = { ...it, productId: existing.id, productName: existing.name };
+      } else if (productRepo.isConnected) {
+        try {
+          const created = await productRepo.createProduct({
+            categoryId: "",
+            name: it.productName.trim(),
+            unit: "Pcs",
+            defaultPrice: it.unitPrice,
+            defaultSellingPrice: it.sellingPrice,
+            isActive: true,
+          });
+          resolvedItems[i] = { ...it, productId: created.id, productName: created.name };
+          // Add to productList so subsequent duplicate checks find it
+          setProductList((prev) => [...prev, { id: created.id, name: created.name, defaultPrice: it.unitPrice, defaultSellingPrice: it.sellingPrice }]);
+          autoCreatedCount++;
+        } catch {
+          toast.error(`Gagal membuat produk: ${it.productName}`);
+          return;
+        }
+      }
+    }
+
+    // Update formItems with resolved product IDs
+    setFormItems(resolvedItems);
+
+    const validItems = resolvedItems.filter((it) => it.productId && it.productName && it.quantity > 0);
     if (validItems.length === 0) { toast.error("Isi minimal 1 item pembelian"); return; }
     for (const it of validItems) {
       if (!it.expiredDate) { toast.error("Isi tanggal kadaluarsa untuk semua item"); return; }
@@ -278,8 +318,11 @@ export function InventoryPurchasePanel() {
       items: validItems,
     };
 
+    const msg = autoCreatedCount > 0
+      ? `Pembelian ${invoice.invoiceNumber} berhasil disimpan. ${autoCreatedCount} produk baru otomatis dibuat.`
+      : `Pembelian ${invoice.invoiceNumber} berhasil disimpan`;
     useInventoryStore.getState().addPurchase(invoice);
-    toast.success(`Pembelian ${invoice.invoiceNumber} berhasil disimpan`);
+    toast.success(msg);
     setShowForm(false);
     setFormSupplier("");
     setFormDueDate("");
@@ -658,6 +701,25 @@ export function InventoryPurchasePanel() {
                   </tbody>
                 </table>
               </div>
+
+              {/* Import Summary */}
+              {(() => {
+                const total = formItems.filter((it) => it.productName && it.quantity > 0).length;
+                const matched = formItems.filter((it) => it.productId && it.quantity > 0).length;
+                const unmatched = total - matched;
+                if (total === 0) return null;
+                return (
+                  <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
+                    <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200">Import Summary</p>
+                    <div className="mt-1 space-y-0.5 text-[10px] text-amber-700 dark:text-amber-300">
+                      <div>✓ Match otomatis : {matched}</div>
+                      {unmatched > 0 && (
+                        <div>🟡 Produk Baru (auto-create) : {unmatched}</div>
+                      )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Add item + Submit */}
               <div className="flex items-center justify-between">
