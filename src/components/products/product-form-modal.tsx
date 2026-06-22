@@ -31,19 +31,7 @@ const DEMO_CATEGORIES: CategoryOption[] = [
   { id: "demo-lainnya", name: "Lainnya" },
 ];
 
-const DEMO_UNITS = [
-  "Tablet",
-  "Botol",
-  "Strip",
-  "Sachet",
-  "Tube",
-  "Pcs",
-  "Kapsul",
-  "Vial",
-  "Ampul",
-  "Suppositoria",
-  "Inhaler",
-];
+import { BASE_UNITS, MIDDLE_UNITS, LARGE_UNITS } from "@/constants/unit-options";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -100,14 +88,14 @@ export function ProductFormModal({
 }: ProductFormModalProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
-  const [units, setUnits] = useState<string[]>(DEMO_UNITS);
+  const [units, setUnits] = useState<string[]>(BASE_UNITS);
   const [isScanning, setIsScanning] = useState(false);
   const [isDirty, setIsDirty] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sellingPriceWarning, setSellingPriceWarning] = useState(false);
 
-  /* ---- V2 Multi Unit — Level 2 & 3 state ---- */
+  /* ---- V2 Multi Unit — Kemasan Menengah & Besar state ---- */
   const [level2Name, setLevel2Name] = useState("");
   const [level2Contains, setLevel2Contains] = useState<number | "">("");
   const [level3Name, setLevel3Name] = useState("");
@@ -144,17 +132,17 @@ export function ProductFormModal({
           if (unitRows.length > 0) {
             setUnits(unitRows.map((u) => u.name));
           } else if (isDemoMode()) {
-            setUnits(DEMO_UNITS);
+            setUnits(BASE_UNITS);
           }
         } catch {
           if (isDemoMode()) {
             setCategories(DEMO_CATEGORIES);
-            setUnits(DEMO_UNITS);
+            setUnits(BASE_UNITS);
           }
         }
       } else if (isDemoMode()) {
         setCategories(DEMO_CATEGORIES);
-        setUnits(DEMO_UNITS);
+        setUnits(BASE_UNITS);
       }
     };
 
@@ -295,29 +283,29 @@ export function ProductFormModal({
     const l3n = level3Name.trim();
     const l3c = typeof level3Contains === "number" ? level3Contains : 0;
 
-    // Level 2 validation
+    // Kemasan Menengah validation
     if (l2n) {
       if (l2n.toLowerCase() === baseUnit) {
-        ulErrors.push(`Nama unit Level 2 tidak boleh sama dengan satuan dasar ("${form.unit}").`);
+        ulErrors.push(`Nama Kemasan Menengah tidak boleh sama dengan Satuan Dasar ("${form.unit}").`);
       }
       if (l2c <= 0) {
-        ulErrors.push("Level 2: isi harus lebih dari 0.");
+        ulErrors.push("Kemasan Menengah: isi harus lebih dari 0.");
       }
       if (l3n && l3n.toLowerCase() === l2n.toLowerCase()) {
-        ulErrors.push("Level 2 dan Level 3 tidak boleh memiliki nama unit yang sama.");
+        ulErrors.push("Kemasan Menengah dan Kemasan Besar tidak boleh memiliki nama unit yang sama.");
       }
     }
 
-    // Level 3 validation — only if Level 2 is filled
+    // Kemasan Besar validation — only if Kemasan Menengah is filled
     if (l3n) {
       if (!l2n) {
-        ulErrors.push("Level 2 harus diisi terlebih dahulu sebelum Level 3.");
+        ulErrors.push("Kemasan Menengah harus diisi terlebih dahulu sebelum Kemasan Besar.");
       }
       if (l3n.toLowerCase() === baseUnit) {
-        ulErrors.push(`Nama unit Level 3 tidak boleh sama dengan satuan dasar ("${form.unit}").`);
+        ulErrors.push(`Nama Kemasan Besar tidak boleh sama dengan Satuan Dasar ("${form.unit}").`);
       }
       if (l3c <= 0) {
-        ulErrors.push("Level 3: isi harus lebih dari 0.");
+        ulErrors.push("Kemasan Besar: isi harus lebih dari 0.");
       }
     }
 
@@ -705,7 +693,8 @@ export function ProductFormModal({
             level3Name={level3Name}
             level3Contains={level3Contains}
             errors={unitLevelErrors}
-            unitSuggestions={units.filter((u) => u !== form.unit)}
+            middleSuggestions={MIDDLE_UNITS.filter((u) => u !== form.unit)}
+            largeSuggestions={LARGE_UNITS.filter((u) => u !== form.unit)}
             onLevel2NameChange={(v) => { setLevel2Name(v); setIsDirty(true); }}
             onLevel2ContainsChange={(v) => { setLevel2Contains(v); setIsDirty(true); }}
             onLevel3NameChange={(v) => { setLevel3Name(v); setIsDirty(true); }}

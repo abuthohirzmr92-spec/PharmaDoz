@@ -24,8 +24,10 @@ export interface MultiUnitEditorProps {
   /** Daftar error validasi dari parent */
   errors: string[];
 
-  /** Daftar nama unit yang sudah ada (dari DB / demo list) untuk suggestions */
-  unitSuggestions: string[];
+  /** Daftar nama unit untuk suggestions Level 2 (Kemasan Menengah) */
+  middleSuggestions: string[];
+  /** Daftar nama unit untuk suggestions Level 3 (Kemasan Besar) */
+  largeSuggestions: string[];
 
   /** Callback saat Level 2 nama berubah (parent: set + setIsDirty) */
   onLevel2NameChange: (value: string) => void;
@@ -44,7 +46,8 @@ export function MultiUnitEditor({
   level3Name,
   level3Contains,
   errors,
-  unitSuggestions,
+  middleSuggestions,
+  largeSuggestions,
   onLevel2NameChange,
   onLevel2ContainsChange,
   onLevel3NameChange,
@@ -54,10 +57,10 @@ export function MultiUnitEditor({
 
   return (
     <>
-      {/* ── Level 2 (opsional) ── */}
+      {/* ── Kemasan Menengah (opsional) ── */}
       <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
         <p className="mb-2 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-          Level 2 (opsional)
+          Kemasan Menengah (opsional)
         </p>
         <div className="grid grid-cols-2 gap-2">
           <div>
@@ -70,7 +73,7 @@ export function MultiUnitEditor({
               onChange={(e) => onLevel2NameChange(e.target.value)}
               placeholder="contoh: Strip"
               className="w-full rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-sm placeholder-neutral-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder-neutral-500"
-              list="unit-suggestions"
+              list="middle-suggestions"
             />
           </div>
           <div>
@@ -97,11 +100,11 @@ export function MultiUnitEditor({
         </div>
       </div>
 
-      {/* ── Level 3 (opsional, hanya muncul jika Level 2 diisi) ── */}
+      {/* ── Kemasan Besar (opsional, hanya jika Kemasan Menengah diisi) ── */}
       {showLevel3 && (
         <div className="rounded-lg border border-neutral-200 bg-neutral-50 p-3 dark:border-neutral-700 dark:bg-neutral-800/50">
           <p className="mb-2 text-[11px] font-semibold text-neutral-700 dark:text-neutral-300">
-            Level 3 (opsional)
+            Kemasan Besar (opsional)
           </p>
           <div className="grid grid-cols-2 gap-2">
             <div>
@@ -114,7 +117,7 @@ export function MultiUnitEditor({
                 onChange={(e) => onLevel3NameChange(e.target.value)}
                 placeholder="contoh: Dus"
                 className="w-full rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-sm placeholder-neutral-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder-neutral-500"
-                list="unit-suggestions"
+                list="large-suggestions"
               />
             </div>
             <div>
@@ -134,7 +137,7 @@ export function MultiUnitEditor({
                   className="w-20 rounded border border-neutral-200 bg-white px-2.5 py-1.5 text-sm placeholder-neutral-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-600 dark:bg-neutral-800 dark:text-neutral-50 dark:placeholder-neutral-500 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                 />
                 <span className="text-[10px] text-neutral-500 dark:text-neutral-400 whitespace-nowrap">
-                  {level2Name.trim() || "Level 2"}
+                  {level2Name.trim() || "Kemasan Menengah"}
                 </span>
               </div>
             </div>
@@ -153,9 +156,14 @@ export function MultiUnitEditor({
         </div>
       )}
 
-      {/* ── Datalist suggestions ── */}
-      <datalist id="unit-suggestions">
-        {unitSuggestions.map((u) => (
+      {/* ── Datalist suggestions per level ── */}
+      <datalist id="middle-suggestions">
+        {middleSuggestions.map((u) => (
+          <option key={u} value={u} />
+        ))}
+      </datalist>
+      <datalist id="large-suggestions">
+        {largeSuggestions.map((u) => (
           <option key={u} value={u} />
         ))}
       </datalist>
