@@ -137,7 +137,8 @@ export interface InventoryProduct {
   categoryId?: string;             // FK UUID — for edit forms
   description?: string | null;     // product description — for edit forms
   barcode: string | null;
-  unit: string;                   // "Tablet", "Botol", "Strip", etc.
+  unit: string;                   // "Tablet", "Botol", "Strip", etc. (Level 1 base unit)
+  unitLevels?: import("./unit").UnitLevel[];  // V2 Multi Unit — Level 2 & 3
   defaultPrice: number;           // default purchase price (cost)
   defaultSellingPrice: number;    // default retail price
   minStock: number;

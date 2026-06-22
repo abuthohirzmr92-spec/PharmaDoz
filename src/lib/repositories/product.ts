@@ -1,5 +1,6 @@
 import { BaseRepository, mapRow, mapRows } from "./base";
 import type { InventoryProduct, ProductBatch } from "@/types/inventory";
+import type { UnitLevel } from "@/types/unit";
 
 /**
  * CamelCase representation of the `products` DB row.
@@ -76,7 +77,11 @@ export class ProductRepository extends BaseRepository {
     return grouped;
   }
 
-  private mapInventoryProduct(row: Record<string, unknown>, batches: ProductBatch[]): InventoryProduct {
+  private mapInventoryProduct(
+    row: Record<string, unknown>,
+    batches: ProductBatch[],
+    unitLevels: UnitLevel[] = [],
+  ): InventoryProduct {
     const r = row as any;
     const namedBatches = batches.map((batch) => ({ ...batch, productName: r.name }));
 
@@ -96,6 +101,7 @@ export class ProductRepository extends BaseRepository {
       batches: namedBatches,
       requiresPrescription: r.requires_prescription,
       isActive: r.is_active,
+      unitLevels,
     } as InventoryProduct;
   }
 
@@ -134,9 +140,19 @@ export class ProductRepository extends BaseRepository {
     if (error) return this.handleError(error, "getProducts");
 
     const rows = (data || []) as Record<string, unknown>[];
-    const batchesByProduct = await this.getScopedBatchesForProducts(rows.map((row) => row.id as string));
+    const productIds = rows.map((row) => row.id as string);
+    const [batchesByProduct, unitLevelsByProduct] = await Promise.all([
+      this.getScopedBatchesForProducts(productIds),
+      this.getUnitLevelsByProducts(productIds),
+    ]);
 
-    return rows.map((row) => this.mapInventoryProduct(row, batchesByProduct[row.id as string] ?? []));
+    return rows.map((row) =>
+      this.mapInventoryProduct(
+        row,
+        batchesByProduct[row.id as string] ?? [],
+        unitLevelsByProduct[row.id as string] ?? [],
+      ),
+    );
   }
 
   async getProductById(id: string): Promise<InventoryProduct | null> {
@@ -164,8 +180,15 @@ export class ProductRepository extends BaseRepository {
       return this.handleError(error, "getProductById");
     }
 
-    const batchesByProduct = await this.getScopedBatchesForProducts([data.id]);
-    return this.mapInventoryProduct(data as Record<string, unknown>, batchesByProduct[data.id] ?? []);
+    const [batchesByProduct, unitLevelsByProduct] = await Promise.all([
+      this.getScopedBatchesForProducts([data.id]),
+      this.getUnitLevelsByProducts([data.id]),
+    ]);
+    return this.mapInventoryProduct(
+      data as Record<string, unknown>,
+      batchesByProduct[data.id] ?? [],
+      unitLevelsByProduct[data.id] ?? [],
+    );
   }
 
   /* ------------------------------------------------------------------ */
@@ -215,6 +238,8 @@ export class ProductRepository extends BaseRepository {
     requiresPrescription?: boolean;
     minStock?: number;
     isActive?: boolean;
+    /** V2 Multi Unit — optional unit levels (Level 2 & 3) */
+    unitLevels?: UnitLevel[];
   }): Promise<Product> {
     if (!this.isConnected) throw new Error("Not connected");
     this.requireTenant();
@@ -248,7 +273,27 @@ export class ProductRepository extends BaseRepository {
 
     if (error) return this.handleError(error, "createProduct");
 
-    return mapRow<Product>(row as Record<string, unknown>);
+    const product = mapRow<Product>(row as Record<string, unknown>);
+
+    // V2 Multi Unit — insert unit levels if provided
+    if (data.unitLevels && data.unitLevels.length > 0) {
+      const { error: ulError } = await this.client
+        .from("product_unit_levels")
+        .insert(
+          data.unitLevels.map((ul) => ({
+            product_id: product.id,
+            level: ul.level,
+            unit_name: ul.unitName,
+            contains: ul.contains,
+          })),
+        );
+      if (ulError) {
+        // Best-effort: product already created, log error but don't rollback
+        console.error("Failed to insert unit levels for new product:", ulError);
+      }
+    }
+
+    return product;
   }
 
   async updateProduct(
@@ -265,6 +310,9 @@ export class ProductRepository extends BaseRepository {
       requiresPrescription: boolean;
       minStock: number;
       isActive: boolean;
+      /** V2 Multi Unit — optional unit levels (Level 2 & 3).
+       *  undefined = jangan sentuh. [] = hapus semua. [...]= sync diff. */
+      unitLevels: UnitLevel[];
     }>,
   ): Promise<Product> {
     if (!this.isConnected) throw new Error("Not connected");
@@ -303,6 +351,11 @@ export class ProductRepository extends BaseRepository {
     const { data: row, error } = await query.single();
 
     if (error) return this.handleError(error, "updateProduct");
+
+    // V2 Multi Unit — sync unit levels jika dikirim (undefined = jangan sentuh)
+    if (data.unitLevels !== undefined) {
+      await this.upsertUnitLevels(id, data.unitLevels);
+    }
 
     return mapRow<Product>(row as Record<string, unknown>);
   }
@@ -416,5 +469,167 @@ export class ProductRepository extends BaseRepository {
     if (error) return this.handleError(error, "getUnits");
 
     return (data || []) as { id: string; code: string; name: string }[];
+  }
+
+  /* ------------------------------------------------------------------ */
+  /*  V2 Multi Unit — Unit Levels                                        */
+  /* ------------------------------------------------------------------ */
+
+  /**
+   * Fetch all unit levels for a single product.
+   * Level 1 (base unit) is NOT stored here — it is `products.unit`.
+   */
+  async getUnitLevels(productId: string): Promise<UnitLevel[]> {
+    if (!this.isConnected) return [];
+
+    const { data, error } = await this.client
+      .from("product_unit_levels")
+      .select("id, level, unit_name, contains")
+      .eq("product_id", productId)
+      .order("level", { ascending: true });
+
+    if (error) return this.handleError(error, "getUnitLevels");
+
+    return (data || []).map(
+      (row: Record<string, unknown>): UnitLevel => ({
+        id: row.id as string,
+        level: row.level as number,
+        unitName: row.unit_name as string,
+        contains: row.contains as number,
+      }),
+    );
+  }
+
+  /**
+   * Batch fetch unit levels for multiple products.
+   * Returns a map keyed by product_id.
+   */
+  async getUnitLevelsByProducts(
+    productIds: string[],
+  ): Promise<Record<string, UnitLevel[]>> {
+    const result: Record<string, UnitLevel[]> = {};
+    if (!this.isConnected || productIds.length === 0) return result;
+
+    // Init empty arrays for all requested IDs
+    for (const pid of productIds) result[pid] = [];
+
+    const { data, error } = await this.client
+      .from("product_unit_levels")
+      .select("id, product_id, level, unit_name, contains")
+      .in("product_id", productIds)
+      .order("level", { ascending: true });
+
+    if (error) return this.handleError(error, "getUnitLevelsByProducts");
+
+    for (const row of data || []) {
+      const r = row as Record<string, unknown>;
+      const pid = r.product_id as string;
+      if (!result[pid]) result[pid] = [];
+      result[pid].push({
+        id: r.id as string,
+        level: r.level as number,
+        unitName: r.unit_name as string,
+        contains: r.contains as number,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Diff-based sync unit levels untuk satu produk.
+   *
+   * Strategi (BUKAN delete-all + insert-all):
+   *   1. Ambil existing unit levels
+   *   2. Bandingkan dengan data baru (key = unit_name, case-insensitive)
+   *   3. UPDATE yang masih ada tapi contains berubah
+   *   4. INSERT yang baru (tidak ada di existing)
+   *   5. DELETE yang dihapus (ada di existing, tidak ada di data baru)
+   *
+   * Jika unitLevels kosong, hapus semua existing (produk kembali ke base unit saja).
+   */
+  async upsertUnitLevels(
+    productId: string,
+    unitLevels: UnitLevel[],
+  ): Promise<void> {
+    if (!this.isConnected) return;
+
+    // 1. Ambil existing
+    const existing = await this.getUnitLevels(productId);
+
+    // Build map keyed by normalized unit_name → existing row
+    const existingByName = new Map<string, UnitLevel>();
+    for (const ul of existing) {
+      existingByName.set(ul.unitName.trim().toLowerCase(), ul);
+    }
+
+    // Build set of normalized incoming names
+    const incomingNames = new Set(
+      unitLevels.map((ul) => ul.unitName.trim().toLowerCase()),
+    );
+
+    const now = new Date().toISOString();
+
+    // 2. UPDATE existing yang masih ada (ada di incoming)
+    for (const incoming of unitLevels) {
+      const key = incoming.unitName.trim().toLowerCase();
+      const ex = existingByName.get(key);
+
+      if (ex) {
+        // Masih ada — update jika contains berubah
+        if (ex.contains !== incoming.contains || ex.level !== incoming.level) {
+          const { error } = await this.client
+            .from("product_unit_levels")
+            .update({
+              level: incoming.level,
+              unit_name: incoming.unitName,
+              contains: incoming.contains,
+              updated_at: now,
+            })
+            .eq("id", ex.id!);
+
+          if (error) this.handleError(error, "upsertUnitLevels - update");
+        }
+        // else: no change — skip
+      } else {
+        // 3. INSERT yang baru
+        const { error } = await this.client
+          .from("product_unit_levels")
+          .insert({
+            product_id: productId,
+            level: incoming.level,
+            unit_name: incoming.unitName,
+            contains: incoming.contains,
+          });
+
+        if (error) this.handleError(error, "upsertUnitLevels - insert");
+      }
+    }
+
+    // 4. DELETE yang dihapus (ada di existing, tidak ada di incoming)
+    for (const [key, ex] of existingByName) {
+      if (!incomingNames.has(key)) {
+        const { error } = await this.client
+          .from("product_unit_levels")
+          .delete()
+          .eq("id", ex.id!);
+
+        if (error) this.handleError(error, "upsertUnitLevels - delete");
+      }
+    }
+  }
+
+  /**
+   * Hapus semua unit levels untuk satu produk.
+   */
+  async deleteUnitLevels(productId: string): Promise<void> {
+    if (!this.isConnected) return;
+
+    const { error } = await this.client
+      .from("product_unit_levels")
+      .delete()
+      .eq("product_id", productId);
+
+    if (error) this.handleError(error, "deleteUnitLevels");
   }
 }

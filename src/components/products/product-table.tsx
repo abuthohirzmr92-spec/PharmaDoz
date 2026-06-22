@@ -1,14 +1,18 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, Fragment } from "react";
 import {
   Pencil,
   ToggleLeft,
   ToggleRight,
   Search,
   Pill,
+  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { cn } from "@/lib/cn";
+import type { UnitLevel } from "@/types/unit";
+import { ProductMultiUnitDisplay } from "@/components/products/product-multi-unit-display";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -20,6 +24,8 @@ export interface ProductRow {
   category: string;
   categoryId: string;
   unit: string;
+  /** V2 Multi Unit — Level 2 & 3 (optional, dari repository) */
+  unitLevels?: UnitLevel[];
   barcode: string | null;
   defaultPrice: number;
   defaultSellingPrice: number;
@@ -50,6 +56,16 @@ type SortDir = "asc" | "desc";
 export function ProductTable({ products, onEdit, onToggleActive }: ProductTableProps) {
   const [sortKey, setSortKey] = useState<SortKey>("name");
   const [sortDir, setSortDir] = useState<SortDir>("asc");
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (id: string) => {
+    setExpandedRows((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
 
   const handleSort = (key: SortKey) => {
     if (sortKey === key) {
@@ -105,45 +121,48 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
       <table className="w-full table-fixed">
         <thead>
           <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-            <th className={thClass} style={{ width: "28%" }} onClick={() => handleSort("name")}>
+            <th className={thClass} style={{ width: "26%" }} onClick={() => handleSort("name")}>
               Nama Produk<SortIcon column="name" />
             </th>
             <th
               className="hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500 cursor-pointer select-none hover:text-neutral-700 dark:hover:text-neutral-300"
-              style={{ width: "16%" }}
+              style={{ width: "14%" }}
               onClick={() => handleSort("category")}
             >
               Kategori<SortIcon column="category" />
             </th>
             <th
               className="hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500 cursor-pointer select-none hover:text-neutral-700 dark:hover:text-neutral-300"
-              style={{ width: "11%" }}
+              style={{ width: "8%" }}
               onClick={() => handleSort("unit")}
             >
-              Satuan<SortIcon column="unit" />
+              Unit Dasar<SortIcon column="unit" />
+            </th>
+            <th className="hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "14%" }}>
+              Multi Unit
             </th>
             <th
               className={thClassRight}
-              style={{ width: "15%" }}
+              style={{ width: "13%" }}
               onClick={() => handleSort("defaultSellingPrice")}
             >
               Harga Jual<SortIcon column="defaultSellingPrice" />
             </th>
             <th
               className={thClassRight}
-              style={{ width: "10%" }}
+              style={{ width: "8%" }}
               onClick={() => handleSort("totalStock")}
             >
               Stok<SortIcon column="totalStock" />
             </th>
             <th
               className={thClass}
-              style={{ width: "10%" }}
+              style={{ width: "8%" }}
               onClick={() => handleSort("isActive")}
             >
               Status<SortIcon column="isActive" />
             </th>
-            <th className="px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "10%" }}>
+            <th className="px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "9%" }}>
               Aksi
             </th>
           </tr>
@@ -152,7 +171,7 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
           {sorted.length === 0 ? (
             <tr>
               <td
-                colSpan={7}
+                colSpan={8}
                 className="px-4 py-12 text-center text-sm text-neutral-400"
               >
                 <Pill className="mx-auto mb-2 h-6 w-6 opacity-40" />
@@ -164,116 +183,159 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
               const isLowStock =
                 product.totalStock <= product.minStock && product.totalStock > 0;
               const isOutOfStock = product.totalStock === 0;
+              const isExpanded = expandedRows.has(product.id);
+              const hasMultiUnit = (product.unitLevels ?? []).length > 0;
 
               return (
-                <tr
-                  key={product.id}
-                  className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
-                >
-                  {/* Name */}
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
-                        {product.name}
+                <Fragment key={product.id}>
+                  <tr
+                    className="group hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors"
+                  >
+                    {/* Name */}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center gap-1.5">
+                        {/* Expand toggle — only visible if multi unit exists */}
+                        <button
+                          onClick={() => hasMultiUnit && toggleExpand(product.id)}
+                          disabled={!hasMultiUnit}
+                          className={cn(
+                            "shrink-0 rounded p-0.5 transition-colors",
+                            hasMultiUnit
+                              ? "text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
+                              : "text-transparent",
+                          )}
+                          title={hasMultiUnit ? (isExpanded ? "Sembunyikan detail" : "Tampilkan detail") : undefined}
+                        >
+                          {isExpanded ? (
+                            <ChevronDown className="h-3.5 w-3.5" />
+                          ) : (
+                            <ChevronRight className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                        <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
+                          {product.name}
+                        </span>
+                        {product.requiresPrescription && (
+                          <span className="shrink-0 rounded bg-red-50 px-1 py-0.5 text-[9px] font-semibold text-red-600 dark:bg-red-950/30">
+                            R
+                          </span>
+                        )}
+                      </div>
+                      {product.barcode && (
+                        <p className="mt-0.5 text-[10px] font-mono text-neutral-400 truncate">
+                          {product.barcode}
+                        </p>
+                      )}
+                    </td>
+
+                    {/* Category */}
+                    <td className="hidden sm:table-cell px-3 py-2.5">
+                      <span className="text-xs text-neutral-500">{product.category}</span>
+                    </td>
+
+                    {/* Unit Dasar */}
+                    <td className="hidden sm:table-cell px-3 py-2.5">
+                      <span className="text-xs text-neutral-500">{product.unit}</span>
+                    </td>
+
+                    {/* Multi Unit */}
+                    <td className="hidden sm:table-cell px-3 py-2.5">
+                      <ProductMultiUnitDisplay
+                        baseUnit={product.unit}
+                        unitLevels={product.unitLevels ?? []}
+                        expanded={false}
+                      />
+                    </td>
+
+                    {/* Harga Jual */}
+                    <td className="px-3 py-2.5 text-right">
+                      <span className="text-sm tabular-nums text-neutral-900 dark:text-neutral-50">
+                        Rp {product.defaultSellingPrice.toLocaleString("id-ID")}
                       </span>
-                      {product.requiresPrescription && (
-                        <span className="shrink-0 rounded bg-red-50 px-1 py-0.5 text-[9px] font-semibold text-red-600 dark:bg-red-950/30">
-                          R
+                    </td>
+
+                    {/* Stock */}
+                    <td className="px-3 py-2.5 text-right">
+                      <span
+                        className={cn(
+                          "text-sm font-semibold tabular-nums",
+                          isOutOfStock
+                            ? "text-red-500"
+                            : isLowStock
+                              ? "text-amber-600"
+                              : "text-neutral-900 dark:text-neutral-50",
+                        )}
+                      >
+                        {product.totalStock}
+                      </span>
+                      {isLowStock && (
+                        <span className="ml-1 text-[10px] text-amber-500 font-medium">
+                          MIN
                         </span>
                       )}
-                    </div>
-                    {product.barcode && (
-                      <p className="mt-0.5 text-[10px] font-mono text-neutral-400 truncate">
-                        {product.barcode}
-                      </p>
-                    )}
-                  </td>
-
-                  {/* Category */}
-                  <td className="hidden sm:table-cell px-3 py-2.5">
-                    <span className="text-xs text-neutral-500">{product.category}</span>
-                  </td>
-
-                  {/* Unit */}
-                  <td className="hidden sm:table-cell px-3 py-2.5">
-                    <span className="text-xs text-neutral-500">{product.unit}</span>
-                  </td>
-
-                  {/* Harga Jual */}
-                  <td className="px-3 py-2.5 text-right">
-                    <span className="text-sm tabular-nums text-neutral-900 dark:text-neutral-50">
-                      Rp {product.defaultSellingPrice.toLocaleString("id-ID")}
-                    </span>
-                  </td>
-
-                  {/* Stock */}
-                  <td className="px-3 py-2.5 text-right">
-                    <span
-                      className={cn(
-                        "text-sm font-semibold tabular-nums",
-                        isOutOfStock
-                          ? "text-red-500"
-                          : isLowStock
-                            ? "text-amber-600"
-                            : "text-neutral-900 dark:text-neutral-50",
+                      {isOutOfStock && (
+                        <span className="ml-1 text-[10px] text-red-500 font-medium">
+                          HABIS
+                        </span>
                       )}
-                    >
-                      {product.totalStock}
-                    </span>
-                    {isLowStock && (
-                      <span className="ml-1 text-[10px] text-amber-500 font-medium">
-                        MIN
-                      </span>
-                    )}
-                    {isOutOfStock && (
-                      <span className="ml-1 text-[10px] text-red-500 font-medium">
-                        HABIS
-                      </span>
-                    )}
-                  </td>
+                    </td>
 
-                  {/* Status */}
-                  <td className="px-3 py-2.5">
-                    {product.isActive ? (
-                      <span className="inline-block rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-950/30 dark:text-green-400">
-                        Aktif
-                      </span>
-                    ) : (
-                      <span className="inline-block rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
-                        Nonaktif
-                      </span>
-                    )}
-                  </td>
+                    {/* Status */}
+                    <td className="px-3 py-2.5">
+                      {product.isActive ? (
+                        <span className="inline-block rounded-full bg-green-50 px-2 py-0.5 text-[10px] font-medium text-green-700 dark:bg-green-950/30 dark:text-green-400">
+                          Aktif
+                        </span>
+                      ) : (
+                        <span className="inline-block rounded-full bg-neutral-100 px-2 py-0.5 text-[10px] font-medium text-neutral-500 dark:bg-neutral-800 dark:text-neutral-400">
+                          Nonaktif
+                        </span>
+                      )}
+                    </td>
 
-                  {/* Actions */}
-                  <td className="px-3 py-2.5">
-                    <div className="flex items-center justify-center gap-1">
-                      <button
-                        onClick={() => onEdit(product)}
-                        className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-brand-600 dark:hover:bg-neutral-800 dark:hover:text-brand-400 transition-colors"
-                        title="Edit produk"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                      <button
-                        onClick={() => onToggleActive(product)}
-                        className={cn(
-                          "rounded p-1.5 transition-colors",
-                          product.isActive
-                            ? "text-neutral-400 hover:bg-amber-100 hover:text-amber-600 dark:hover:bg-amber-900/30 dark:hover:text-amber-400"
-                            : "text-neutral-400 hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/30 dark:hover:text-green-400",
-                        )}
-                        title={product.isActive ? "Nonaktifkan" : "Aktifkan"}
-                      >
-                        {product.isActive ? (
-                          <ToggleRight className="h-3.5 w-3.5" />
-                        ) : (
-                          <ToggleLeft className="h-3.5 w-3.5" />
-                        )}
-                      </button>
-                    </div>
-                  </td>
-                </tr>
+                    {/* Actions */}
+                    <td className="px-3 py-2.5">
+                      <div className="flex items-center justify-center gap-1">
+                        <button
+                          onClick={() => onEdit(product)}
+                          className="rounded p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-brand-600 dark:hover:bg-neutral-800 dark:hover:text-brand-400 transition-colors"
+                          title="Edit produk"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          onClick={() => onToggleActive(product)}
+                          className={cn(
+                            "rounded p-1.5 transition-colors",
+                            product.isActive
+                              ? "text-neutral-400 hover:bg-amber-100 hover:text-amber-600 dark:hover:bg-amber-900/30 dark:hover:text-amber-400"
+                              : "text-neutral-400 hover:bg-green-100 hover:text-green-600 dark:hover:bg-green-900/30 dark:hover:text-green-400",
+                          )}
+                          title={product.isActive ? "Nonaktifkan" : "Aktifkan"}
+                        >
+                          {product.isActive ? (
+                            <ToggleRight className="h-3.5 w-3.5" />
+                          ) : (
+                            <ToggleLeft className="h-3.5 w-3.5" />
+                          )}
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+
+                  {/* Expanded detail row */}
+                  {isExpanded && hasMultiUnit && (
+                    <tr className="bg-neutral-50 dark:bg-neutral-800/30">
+                      <td colSpan={8} className="px-6 py-2">
+                        <ProductMultiUnitDisplay
+                          baseUnit={product.unit}
+                          unitLevels={product.unitLevels ?? []}
+                          expanded={true}
+                        />
+                      </td>
+                    </tr>
+                  )}
+                </Fragment>
               );
             })
           )}

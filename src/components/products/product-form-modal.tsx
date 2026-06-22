@@ -5,6 +5,7 @@ import { X, AlertTriangle, Scan, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { generateProductCode, validateBarcode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
+import { MultiUnitEditor } from "@/components/products/multi-unit-editor";
 import { isDemoMode } from "@/config/env";
 import { toast } from "sonner";
 import type { ProductRow } from "./product-table";
@@ -106,6 +107,13 @@ export function ProductFormModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sellingPriceWarning, setSellingPriceWarning] = useState(false);
 
+  /* ---- V2 Multi Unit — Level 2 & 3 state ---- */
+  const [level2Name, setLevel2Name] = useState("");
+  const [level2Contains, setLevel2Contains] = useState<number | "">("");
+  const [level3Name, setLevel3Name] = useState("");
+  const [level3Contains, setLevel3Contains] = useState<number | "">("");
+  const [unitLevelErrors, setUnitLevelErrors] = useState<string[]>([]);
+
   // Quick create category
   const [showNewCategory, setShowNewCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
@@ -177,7 +185,30 @@ export function ProductFormModal({
 
     setIsDirty(false);
     setErrors({});
+    setUnitLevelErrors([]);
     setSellingPriceWarning(false);
+
+    // V2 Multi Unit — populate unit levels when editing
+    if (editingProduct) {
+      productRepo.getUnitLevels(editingProduct.id).then((levels) => {
+        const l2 = levels.find((l) => l.level === 2);
+        const l3 = levels.find((l) => l.level === 3);
+        setLevel2Name(l2?.unitName ?? "");
+        setLevel2Contains(l2?.contains ?? "");
+        setLevel3Name(l3?.unitName ?? "");
+        setLevel3Contains(l3?.contains ?? "");
+      }).catch(() => {
+        setLevel2Name("");
+        setLevel2Contains("");
+        setLevel3Name("");
+        setLevel3Contains("");
+      });
+    } else {
+      setLevel2Name("");
+      setLevel2Contains("");
+      setLevel3Name("");
+      setLevel3Contains("");
+    }
 
     // Focus name field after modal opens
     const timer = setTimeout(() => nameRef.current?.focus(), 100);
@@ -253,13 +284,65 @@ export function ProductFormModal({
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [form]);
+
+    // V2 Multi Unit — validate unit levels
+    const ulErrors: string[] = [];
+    const baseUnit = form.unit.trim().toLowerCase();
+
+    // Pre-extract values
+    const l2n = level2Name.trim();
+    const l2c = typeof level2Contains === "number" ? level2Contains : 0;
+    const l3n = level3Name.trim();
+    const l3c = typeof level3Contains === "number" ? level3Contains : 0;
+
+    // Level 2 validation
+    if (l2n) {
+      if (l2n.toLowerCase() === baseUnit) {
+        ulErrors.push(`Nama unit Level 2 tidak boleh sama dengan satuan dasar ("${form.unit}").`);
+      }
+      if (l2c <= 0) {
+        ulErrors.push("Level 2: isi harus lebih dari 0.");
+      }
+      if (l3n && l3n.toLowerCase() === l2n.toLowerCase()) {
+        ulErrors.push("Level 2 dan Level 3 tidak boleh memiliki nama unit yang sama.");
+      }
+    }
+
+    // Level 3 validation — only if Level 2 is filled
+    if (l3n) {
+      if (!l2n) {
+        ulErrors.push("Level 2 harus diisi terlebih dahulu sebelum Level 3.");
+      }
+      if (l3n.toLowerCase() === baseUnit) {
+        ulErrors.push(`Nama unit Level 3 tidak boleh sama dengan satuan dasar ("${form.unit}").`);
+      }
+      if (l3c <= 0) {
+        ulErrors.push("Level 3: isi harus lebih dari 0.");
+      }
+    }
+
+    setUnitLevelErrors(ulErrors);
+    return Object.keys(newErrors).length === 0 && ulErrors.length === 0;
+  }, [form, level2Name, level2Contains, level3Name, level3Contains]);
 
   const handleSubmit = useCallback(async () => {
     if (!validate()) return;
 
     setIsSubmitting(true);
+
+    // V2 Multi Unit — build unitLevels array from form state
+    const unitLevels: import("@/types/unit").UnitLevel[] = [];
+    const l2n = level2Name.trim();
+    const l2c = typeof level2Contains === "number" ? level2Contains : 0;
+    const l3n = level3Name.trim();
+    const l3c = typeof level3Contains === "number" ? level3Contains : 0;
+
+    if (l2n && l2c > 0) {
+      unitLevels.push({ level: 2, unitName: l2n, contains: l2c });
+    }
+    if (l3n && l3c > 0 && unitLevels.length > 0) {
+      unitLevels.push({ level: 3, unitName: l3n, contains: l3c });
+    }
 
     try {
       if (productRepo.isConnected) {
@@ -275,6 +358,7 @@ export function ProductFormModal({
             requiresPrescription: form.requiresPrescription,
             minStock: form.minStock,
             isActive: form.isActive,
+            unitLevels: unitLevels.length > 0 ? unitLevels : undefined,
           });
         } else {
           await productRepo.createProduct({
@@ -288,6 +372,7 @@ export function ProductFormModal({
             requiresPrescription: form.requiresPrescription,
             minStock: form.minStock,
             isActive: form.isActive,
+            unitLevels: unitLevels.length > 0 ? unitLevels : undefined,
           });
         }
       }
@@ -594,10 +679,10 @@ export function ProductFormModal({
             )}
           </div>
 
-          {/* Satuan */}
+          {/* Satuan Dasar (Level 1) */}
           <div>
             <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-              Satuan
+              Satuan Dasar
             </label>
             <select
               value={form.unit}
@@ -611,6 +696,21 @@ export function ProductFormModal({
               ))}
             </select>
           </div>
+
+          {/* ── V2 Multi Unit Editor ── */}
+          <MultiUnitEditor
+            baseUnit={form.unit}
+            level2Name={level2Name}
+            level2Contains={level2Contains}
+            level3Name={level3Name}
+            level3Contains={level3Contains}
+            errors={unitLevelErrors}
+            unitSuggestions={units.filter((u) => u !== form.unit)}
+            onLevel2NameChange={(v) => { setLevel2Name(v); setIsDirty(true); }}
+            onLevel2ContainsChange={(v) => { setLevel2Contains(v); setIsDirty(true); }}
+            onLevel3NameChange={(v) => { setLevel3Name(v); setIsDirty(true); }}
+            onLevel3ContainsChange={(v) => { setLevel3Contains(v); setIsDirty(true); }}
+          />
 
           {/* Harga Beli & Harga Jual */}
           <div className="grid grid-cols-2 gap-3">

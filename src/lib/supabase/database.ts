@@ -1274,6 +1274,39 @@ export interface OfflineSessionUpdate {
 }
 
 // ============================================================================
+// PRODUCT UNIT LEVELS (V2 Multi Unit — Phase 1A)
+// ============================================================================
+
+export interface ProductUnitLevelRow {
+  id: string;
+  product_id: string;
+  level: number;
+  unit_name: string;
+  contains: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ProductUnitLevelInsert {
+  id?: string;
+  product_id: string;
+  level: number;
+  unit_name: string;
+  contains: number;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface ProductUnitLevelUpdate {
+  id?: string;
+  product_id?: string;
+  level?: number;
+  unit_name?: string;
+  contains?: number;
+  updated_at?: string;
+}
+
+// ============================================================================
 // DATABASE INTERFACE
 // ============================================================================
 
@@ -1290,6 +1323,7 @@ export interface Database {
       users: { Row: UserRow; Insert: UserInsert; Update: UserUpdate };
       product_categories: { Row: ProductCategoryRow; Insert: ProductCategoryInsert; Update: ProductCategoryUpdate };
       product_units: { Row: ProductUnitRow; Insert: ProductUnitInsert; Update: ProductUnitUpdate };
+      product_unit_levels: { Row: ProductUnitLevelRow; Insert: ProductUnitLevelInsert; Update: ProductUnitLevelUpdate };
       products: { Row: ProductRow; Insert: ProductInsert; Update: ProductUpdate };
       product_batches: { Row: ProductBatchRow; Insert: ProductBatchInsert; Update: ProductBatchUpdate };
       suppliers: { Row: SupplierRow; Insert: SupplierInsert; Update: SupplierUpdate };
