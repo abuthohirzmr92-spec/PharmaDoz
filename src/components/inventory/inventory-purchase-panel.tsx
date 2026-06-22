@@ -27,6 +27,7 @@ import { productRepo, supplierRepo } from "@/lib/repository-instances";
 import { useWalletStore } from "@/store/wallet-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
 import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
+import { NumericInput } from "@/components/shared/numeric-input";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
 
@@ -672,9 +673,12 @@ export function InventoryPurchasePanel() {
                             className={`w-full rounded border py-1 px-1.5 text-[11px] focus:outline-none dark:bg-neutral-800 dark:text-neutral-50 ${!item.expiredDate ? "border-red-300 bg-red-50 dark:border-red-800 dark:bg-red-950/20" : "border-neutral-200 bg-white focus:border-brand-400 dark:border-neutral-700"}`} />
                         </td>
                         <td className="px-2 py-1">
-                          <input type="number" min={1} value={item.quantity}
-                            onChange={(e) => handleItemChange(item.id, "quantity", parseInt(e.target.value) || 0)}
-                            className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                          <NumericInput
+                            value={item.quantity}
+                            min={1}
+                            onChange={(v) => handleItemChange(item.id, "quantity", v)}
+                            className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                          />
                         </td>
                         <td className="px-2 py-1">
                           <input type="number" min={0} value={item.unitPrice || ""}

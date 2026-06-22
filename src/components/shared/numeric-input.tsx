@@ -81,6 +81,8 @@ export function NumericInput({
     setFocused(false);
     if (value > 0) {
       setDisplay(String(value));
+    } else {
+      setDisplay("0");
     }
   }, [value]);
 
