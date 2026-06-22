@@ -681,20 +681,24 @@ export function InventoryPurchasePanel() {
                           />
                         </td>
                         <td className="px-2 py-1">
-                          <input type="number" min={0} value={item.unitPrice || ""}
-                            onChange={(e) => handleItemChange(item.id, "unitPrice", parseInt(e.target.value) || 0)}
-                            placeholder="0"
-                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                          <NumericInput
+                            value={item.unitPrice}
+                            min={0}
+                            onChange={(v) => handleItemChange(item.id, "unitPrice", v)}
+                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                          />
                         </td>
                         {/* HPP — read-only */}
                         <td className="px-2 py-1 text-right">
                           <span className="text-[11px] tabular-nums text-neutral-500">{hpp.toLocaleString("id-ID")}</span>
                         </td>
                         <td className="px-2 py-1">
-                          <input type="number" min={0} value={item.sellingPrice || ""}
-                            onChange={(e) => handleItemChange(item.id, "sellingPrice", parseInt(e.target.value) || 0)}
-                            placeholder="0"
-                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                          <NumericInput
+                            value={item.sellingPrice}
+                            min={0}
+                            onChange={(v) => handleItemChange(item.id, "sellingPrice", v)}
+                            className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                          />
                         </td>
                         {/* Status badge */}
                         <td className="px-2 py-1 text-center">
@@ -1032,9 +1036,13 @@ export function InventoryPurchasePanel() {
             <div>
               <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Persentase PPN Pembelian</label>
               <div className="mt-1 flex items-center gap-2">
-                <input type="number" min={0} max={100} value={purchaseTaxPercent}
-                  onChange={(e) => { const v = Math.max(0, Math.min(100, parseInt(e.target.value) || 0)); setPurchaseTaxPercent(v); if (typeof window !== "undefined") localStorage.setItem("purchaseTaxPercent", String(v)); }}
-                  className="w-20 rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                <NumericInput
+                  value={purchaseTaxPercent}
+                  min={0}
+                  max={100}
+                  onChange={(v) => { setPurchaseTaxPercent(v); if (typeof window !== "undefined") localStorage.setItem("purchaseTaxPercent", String(v)); }}
+                  className="w-20 rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                />
                 <span className="text-sm text-neutral-500">%</span>
               </div>
             </div>
