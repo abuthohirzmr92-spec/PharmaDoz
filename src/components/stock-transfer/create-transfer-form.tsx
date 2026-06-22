@@ -9,6 +9,7 @@ import { useBranchStore } from "@/store/branch-store";
 import { productRepo } from "@/lib/repository-instances";
 import type { ProductBatch } from "@/types/inventory";
 import { cn } from "@/lib/cn";
+import { NumericInput } from "@/components/shared/numeric-input";
 
 /* ------------------------------------------------------------------ */
 /*  Product Search Result                                              */
@@ -393,11 +394,10 @@ export function CreateTransferForm() {
           <label className="block text-[10px] font-medium text-neutral-500 mb-1">
             Jumlah *
           </label>
-          <input
-            type="number"
-            min={1}
+          <NumericInput
             value={quantity}
-            onChange={(e) => setQuantity(Math.max(1, parseInt(e.target.value) || 1))}
+            min={1}
+            onChange={(v) => setQuantity(v)}
             className="w-full rounded-lg border border-neutral-200 bg-white py-2 px-3 text-xs text-neutral-700 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
           />
         </div>
