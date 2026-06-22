@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { UnitLevel } from "@/types/unit";
-import { ProductMultiUnitDisplay } from "@/components/products/product-multi-unit-display";
+import { ProductMultiUnitDisplay, MultiUnitTree } from "@/components/products/product-multi-unit-display";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -323,14 +323,13 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                     </td>
                   </tr>
 
-                  {/* Expanded detail row */}
+                  {/* Expanded detail row — tree view */}
                   {isExpanded && hasMultiUnit && (
                     <tr className="bg-neutral-50 dark:bg-neutral-800/30">
-                      <td colSpan={8} className="px-6 py-2">
-                        <ProductMultiUnitDisplay
+                      <td colSpan={8} className="px-6 py-2.5">
+                        <MultiUnitTree
                           baseUnit={product.unit}
                           unitLevels={product.unitLevels ?? []}
-                          expanded={true}
                         />
                       </td>
                     </tr>

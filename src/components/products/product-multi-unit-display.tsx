@@ -52,9 +52,9 @@ export function MultiUnitBadge({ baseUnit, unitLevels }: ProductMultiUnitDisplay
  * Menampilkan semua level dengan contains.
  *
  * Contoh:
- *   Unit Dasar: Tablet
- *   Level 2: Strip = 10 Tablet
- *   Level 3: Dus = 20 Strip
+ *   Satuan Dasar: Tablet
+ *   Kemasan Menengah: Strip = 10 Tablet
+ *   Kemasan Besar: Dus = 20 Strip
  */
 export function MultiUnitDetail({ baseUnit, unitLevels }: ProductMultiUnitDisplayProps) {
   const levels = unitLevels ?? [];
@@ -63,27 +63,85 @@ export function MultiUnitDetail({ baseUnit, unitLevels }: ProductMultiUnitDispla
   const parentName = (idx: number): string =>
     idx === 0 ? baseUnit : sorted[idx - 1]?.unitName ?? "Level " + idx;
 
+  const levelLabel = (lvl: number): string => {
+    switch (lvl) {
+      case 2: return "Kemasan Menengah";
+      case 3: return "Kemasan Besar";
+      default: return `Level ${lvl}`;
+    }
+  };
+
   return (
     <div className="space-y-1 py-1">
-      {/* Unit Dasar */}
+      {/* Satuan Dasar */}
       <div className="flex items-center gap-2 text-[11px]">
-        <span className="text-neutral-400 w-16 shrink-0">Unit Dasar</span>
+        <span className="text-neutral-400 w-28 shrink-0">Satuan Dasar</span>
         <span className="font-medium text-neutral-700 dark:text-neutral-200">
           {baseUnit}
         </span>
       </div>
 
-      {/* Level 2 & 3 */}
+      {/* Kemasan Menengah & Besar */}
       {sorted.map((ul, idx) => (
         <div key={ul.level} className="flex items-center gap-2 text-[11px]">
-          <span className="text-neutral-400 w-16 shrink-0">
-            Level {ul.level}
+          <span className="text-neutral-400 w-28 shrink-0">
+            {levelLabel(ul.level)}
           </span>
           <span className="font-medium text-neutral-700 dark:text-neutral-200">
             {ul.unitName} = {ul.contains} {parentName(idx)}
           </span>
         </div>
       ))}
+    </div>
+  );
+}
+
+/**
+ * Tree display untuk Multi Unit hierarchy.
+ * Menampilkan struktur bertingkat dengan indentasi visual.
+ *
+ * Contoh dengan 2 level:
+ *   Tablet
+ *   └── Strip (10 Tablet)
+ *
+ * Contoh dengan 3 level:
+ *   Tablet
+ *   └── Strip (10 Tablet)
+ *       └── Dus (20 Strip)
+ */
+export function MultiUnitTree({ baseUnit, unitLevels }: ProductMultiUnitDisplayProps) {
+  const levels = unitLevels ?? [];
+  const sorted = [...levels].sort((a, b) => a.level - b.level);
+
+  if (levels.length === 0) {
+    return (
+      <div className="text-[11px] text-neutral-500 dark:text-neutral-400">
+        {baseUnit}
+      </div>
+    );
+  }
+
+  const parentOf = (idx: number): string =>
+    idx === 0 ? baseUnit : sorted[idx - 1]?.unitName ?? "?";
+
+  return (
+    <div className="font-mono text-[11px] leading-relaxed text-neutral-700 dark:text-neutral-300">
+      {/* Root — Satuan Dasar */}
+      <div>{baseUnit}</div>
+
+      {/* Children — dengan indentasi bertingkat */}
+      {sorted.map((ul, idx) => {
+        const indent = "    ".repeat(idx + 1);
+        return (
+          <div key={ul.level}>
+            <span>{indent}└── </span>
+            <span className="font-medium">{ul.unitName}</span>
+            <span className="text-neutral-400">
+              {" "}({ul.contains} {parentOf(idx)})
+            </span>
+          </div>
+        );
+      })}
     </div>
   );
 }
