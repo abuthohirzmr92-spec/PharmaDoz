@@ -26,6 +26,7 @@ import { usePermission } from "@/hooks/use-auth";
 import { productRepo, supplierRepo } from "@/lib/repository-instances";
 import { useWalletStore } from "@/store/wallet-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
+import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
 
@@ -49,7 +50,7 @@ export function InventoryPurchasePanel() {
   const invoices = useInventoryStore((s) => s.purchaseInvoices);
   const batches = useInventoryStore((s) => s.batches);
   const suppliers = useInventoryStore((s) => s.suppliers);
-  const [productList, setProductList] = useState<Array<{ id: string; name: string; defaultPrice?: number; defaultSellingPrice?: number; unit?: string }>>([]);
+  const [productList, setProductList] = useState<Array<{ id: string; name: string; defaultPrice?: number; defaultSellingPrice?: number; unit?: string; unitLevels?: Array<{ level: number; unitName: string; contains: number }> }>>([]);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
@@ -72,8 +73,11 @@ export function InventoryPurchasePanel() {
   const [importCreateUnit, setImportCreateUnit] = useState("Pcs");
   const [categories, setCategories] = useState<string[]>([]);
   const [units, setUnits] = useState<string[]>(["Pcs","Tablet","Kapsul","Botol","Strip","Tube","Vial","Ampul","Sachet","Box"]);
-  // Store category + unit for import items (used during auto-create on save)
-  const [importItemMeta, setImportItemMeta] = useState<Record<string, { category: string; unit: string }>>({});
+  // Store new product metadata for import items
+  const [importItemMeta, setImportItemMeta] = useState<Record<string, { category: string; unit: string; barcode?: string; minStock?: number; rackLocation?: string }>>({});
+  const [importCreateBarcode, setImportCreateBarcode] = useState("");
+  const [importCreateMinStock, setImportCreateMinStock] = useState("0");
+  const [importCreateRack, setImportCreateRack] = useState("");
 
   // ─── Import handlers — hydrate existing purchase form ───
 
@@ -644,6 +648,17 @@ export function InventoryPurchasePanel() {
                             <option disabled>──────────</option>
                             <option value="__new__" className="text-brand-600 font-medium">+ Buat Produk Baru</option>
                           </select>
+
+                          {/* V2 Multi Unit — badge jika produk terpilih memiliki unit levels */}
+                          {item.productId && (() => {
+                            const prod = productList.find(p => p.id === item.productId);
+                            if (!prod?.unitLevels?.length) return null;
+                            return (
+                              <div className="mt-1">
+                                <MultiUnitBadge baseUnit={prod.unit ?? "—"} unitLevels={prod.unitLevels} />
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className="px-2 py-1">
                           <input type="text" value={item.batchNumber}
@@ -691,6 +706,9 @@ export function InventoryPurchasePanel() {
                               setImportCreateName(item.productName);
                               setImportCreateCategory("");
                               setImportCreateUnit("Pcs");
+                              setImportCreateBarcode("");
+                              setImportCreateMinStock("0");
+                              setImportCreateRack("");
                               if (productRepo.isConnected) {
                                 productRepo.getCategories().then(cats => setCategories(cats.map(c => c.name))).catch(() => {});
                                 productRepo.getUnits().then(u => setUnits(u.map(x => x.name))).catch(() => {});
