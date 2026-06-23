@@ -169,7 +169,7 @@ export function ProductsPageContent() {
     [],
   );
 
-  const handleFormSaved = useCallback(() => {
+  const handleFormSaved = useCallback((_product?: { id: string; name: string; unit: string }) => {
     loadProducts();
   }, [loadProducts]);
 

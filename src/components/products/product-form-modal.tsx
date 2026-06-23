@@ -37,11 +37,23 @@ import { BASE_UNITS, MIDDLE_UNITS, LARGE_UNITS } from "@/constants/unit-options"
 /*  Props                                                              */
 /* ------------------------------------------------------------------ */
 
+/** V3 P0.5 — prefill data dari Purchase Panel (create mode only) */
+export interface ProductPrefillData {
+  name?: string;
+  unit?: string;
+  defaultPrice?: number;
+  defaultSellingPrice?: number;
+  barcode?: string;
+}
+
 export interface ProductFormModalProps {
   open: boolean;
   onClose: () => void;
-  onSaved: () => void;
+  /** Called after successful save. Receives created/updated product for auto-relink (V3 P0.6) */
+  onSaved: (product?: { id: string; name: string; unit: string }) => void;
   editingProduct?: ProductRow | null;
+  /** Prefill form fields in create mode (ignored in edit mode) */
+  prefillData?: ProductPrefillData;
 }
 
 /* ------------------------------------------------------------------ */
@@ -85,6 +97,7 @@ export function ProductFormModal({
   onClose,
   onSaved,
   editingProduct,
+  prefillData,
 }: ProductFormModalProps) {
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
   const [categories, setCategories] = useState<CategoryOption[]>([]);
@@ -166,6 +179,16 @@ export function ProductFormModal({
         minStock: editingProduct.minStock,
         description: editingProduct.description ?? "",
         isActive: editingProduct.isActive,
+      });
+    } else if (prefillData) {
+      // V3 P0.5 — prefill from Purchase Panel
+      setForm({
+        ...EMPTY_FORM,
+        name: prefillData.name ?? "",
+        barcode: prefillData.barcode ?? "",
+        unit: prefillData.unit ?? EMPTY_FORM.unit,
+        defaultPrice: prefillData.defaultPrice ?? 0,
+        defaultSellingPrice: prefillData.defaultSellingPrice ?? 0,
       });
     } else {
       setForm(EMPTY_FORM);
@@ -332,10 +355,12 @@ export function ProductFormModal({
       unitLevels.push({ level: 3, unitName: l3n, contains: l3c });
     }
 
+    let savedProduct: { id: string; name: string; unit: string } | undefined;
+
     try {
       if (productRepo.isConnected) {
         if (isEdit) {
-          await productRepo.updateProduct(editingProduct!.id, {
+          const updated = await productRepo.updateProduct(editingProduct!.id, {
             categoryId: form.categoryId || form.category,
             name: form.name.trim(),
             barcode: form.barcode.trim() || null,
@@ -348,8 +373,9 @@ export function ProductFormModal({
             isActive: form.isActive,
             unitLevels: unitLevels.length > 0 ? unitLevels : undefined,
           });
+          savedProduct = { id: updated.id, name: updated.name, unit: updated.unit ?? form.unit };
         } else {
-          await productRepo.createProduct({
+          const created = await productRepo.createProduct({
             categoryId: form.categoryId,
             name: form.name.trim(),
             barcode: form.barcode.trim() || null,
@@ -362,10 +388,11 @@ export function ProductFormModal({
             isActive: form.isActive,
             unitLevels: unitLevels.length > 0 ? unitLevels : undefined,
           });
+          savedProduct = { id: created.id, name: created.name, unit: created.unit ?? form.unit };
         }
       }
 
-      onSaved();
+      onSaved(savedProduct);
       onClose();
     } catch (err) {
       console.error("Failed to save product:", err);

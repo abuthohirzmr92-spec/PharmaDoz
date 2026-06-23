@@ -22,10 +22,34 @@ import { toast } from "sonner";
 import { useInventoryStore } from "@/store/inventory-store";
 import type { PurchaseStatus, PurchaseItem, PurchaseInvoice } from "@/types/inventory";
 import { cn } from "@/lib/cn";
+
+// V3 P0.4E — UI state terpisah dari save state
+// PurchaseFormItem = apa yang dilihat user di Purchase Panel
+// PurchaseItem     = apa yang dikirim ke save/addPurchase
+type PurchaseFormItem = {
+  // === Save fields (mapped to PurchaseItem) ===
+  id: string;
+  productId: string;
+  productName: string;
+  quantity: number;
+  unitPrice: number;
+  sellingPrice: number;
+  batchNumber: string;
+  expiredDate: string;
+
+  // === UI metadata (display + prefill, NOT sent to save) ===
+  rawProductName?: string;   // 🔴 P0 — nama asli import
+  unit?: string;             // 🔴 P0 — satuan pembelian (Dus/Strip/Tablet)
+  supplierName?: string;     // 🟡 P1 — supplier per item
+  barcode?: string;          // 🟢 P2 — barcode dari import
+  notes?: string;            // 🟢 P2 — catatan
+
+};
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo, supplierRepo } from "@/lib/repository-instances";
 import { useWalletStore } from "@/store/wallet-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
+import { ProductFormModal } from "@/components/products/product-form-modal";
 import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
 import { NumericInput } from "@/components/shared/numeric-input";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
@@ -53,6 +77,8 @@ export function InventoryPurchasePanel() {
   const suppliers = useInventoryStore((s) => s.suppliers);
   const [productList, setProductList] = useState<Array<{ id: string; name: string; defaultPrice?: number; defaultSellingPrice?: number; unit?: string; unitLevels?: Array<{ level: number; unitName: string; contains: number }> }>>([]);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
+  const [showProductForm, setShowProductForm] = useState(false);
+  const [productFormItemId, setProductFormItemId] = useState<string | null>(null);
   const [showNewSupplier, setShowNewSupplier] = useState(false);
   const [newSupplierName, setNewSupplierName] = useState("");
   const [creatingSupplier, setCreatingSupplier] = useState(false);
@@ -67,27 +93,14 @@ export function InventoryPurchasePanel() {
   });
   const [showTaxModal, setShowTaxModal] = useState(false);
   // Quick-create for import: category + unit selection
-  const [showImportCreate, setShowImportCreate] = useState(false);
-  const [importCreateItemId, setImportCreateItemId] = useState("");
-  const [importCreateName, setImportCreateName] = useState("");
-  const [importCreateCategory, setImportCreateCategory] = useState("");
-  const [importCreateUnit, setImportCreateUnit] = useState("Pcs");
-  const [categories, setCategories] = useState<string[]>([]);
-  const [units, setUnits] = useState<string[]>(["Pcs","Tablet","Kapsul","Botol","Strip","Tube","Vial","Ampul","Sachet","Box"]);
-  // Store new product metadata for import items
-  const [importItemMeta, setImportItemMeta] = useState<Record<string, { category: string; unit: string; barcode?: string; minStock?: number; rackLocation?: string }>>({});
-  const [importCreateBarcode, setImportCreateBarcode] = useState("");
-  const [importCreateMinStock, setImportCreateMinStock] = useState("0");
-  const [importCreateRack, setImportCreateRack] = useState("");
 
   // ─── Import handlers — hydrate existing purchase form ───
 
-  const hydrateFormFromDraft = (draft: { items: Array<{ id: string; matchedProductId: string | null; rawProductName: string; quantity: number; enteredBuyPrice: number; currentSellingPrice: number; batchNumber: string | null; expiredDate: string | null }>; supplierId?: string | null }) => {
+  const hydrateFormFromDraft = (draft: { items: Array<{ id: string; matchedProductId: string | null; rawProductName: string; quantity: number; enteredBuyPrice: number; currentSellingPrice: number; batchNumber: string | null; expiredDate: string | null; unit?: string; rawBarcode?: string | null; supplierName?: string | null; notes?: string | null }>; supplierId?: string | null }) => {
     try {
       setFormSupplier(draft.supplierId ?? "");
       setFormItems(draft.items.map((item) => ({
         id: item.id,
-        tenantId: "",
         productId: item.matchedProductId ?? "",
         productName: item.rawProductName,
         batchNumber: item.batchNumber ?? "",
@@ -95,6 +108,12 @@ export function InventoryPurchasePanel() {
         quantity: item.quantity,
         unitPrice: item.enteredBuyPrice,
         sellingPrice: item.currentSellingPrice,
+        // UI metadata
+        rawProductName: item.rawProductName,
+        unit: item.unit,
+        supplierName: item.supplierName ?? undefined,
+        barcode: item.rawBarcode ?? undefined,
+        notes: item.notes ?? undefined,
       })));
       setShowForm(true);
     } catch (e) {
@@ -219,14 +238,14 @@ export function InventoryPurchasePanel() {
   /* ---- purchase form state ---- */
   const [formSupplier, setFormSupplier] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
-  const [formItems, setFormItems] = useState<PurchaseItem[]>([
-    { id: "1", tenantId: "", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
+  const [formItems, setFormItems] = useState<PurchaseFormItem[]>([
+    { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
   ]);
 
   const handleAddItem = () => {
     setFormItems((prev) => [
       ...prev,
-      { id: String(Date.now()), tenantId: "", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
+      { id: String(Date.now()), productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
     ]);
   };
 
@@ -235,7 +254,7 @@ export function InventoryPurchasePanel() {
     setFormItems((prev) => prev.filter((it) => it.id !== id));
   };
 
-  const handleItemChange = (id: string, field: keyof PurchaseItem, value: string | number) => {
+  const handleItemChange = (id: string, field: keyof PurchaseFormItem, value: string | number) => {
     setFormItems((prev) =>
       prev.map((it) => {
         if (it.id !== id) return it;
@@ -274,48 +293,17 @@ export function InventoryPurchasePanel() {
     const supplier = suppliers.find((s) => s.id === formSupplier);
     if (!supplier) { toast.error("Pilih supplier terlebih dahulu"); return; }
 
-    // Auto-create products for unmatched NEW items
-    let autoCreatedCount = 0;
-    const resolvedItems = [...formItems];
-
-    for (let i = 0; i < resolvedItems.length; i++) {
-      const it = resolvedItems[i]!;
-      // Skip items that already have a productId or don't have a name
-      if (it.productId || !it.productName || it.quantity <= 0) continue;
-
-      // Try to find by normalized name in existing product list
-      const normalize = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, "");
-      const normName = normalize(it.productName);
-      const existing = productList.find((p) => normalize(p.name) === normName);
-
-      if (existing) {
-        resolvedItems[i] = { ...it, productId: existing.id, productName: existing.name };
-      } else if (productRepo.isConnected) {
-        try {
-          const meta = importItemMeta[it.id];
-          const created = await productRepo.createProduct({
-            categoryId: meta?.category ?? "",
-            name: it.productName.trim(),
-            unit: meta?.unit ?? "Pcs",
-            defaultPrice: it.unitPrice,
-            defaultSellingPrice: it.sellingPrice,
-            isActive: true,
-          });
-          resolvedItems[i] = { ...it, productId: created.id, productName: created.name };
-          // Add to productList so subsequent duplicate checks find it
-          setProductList((prev) => [...prev, { id: created.id, name: created.name, defaultPrice: it.unitPrice, defaultSellingPrice: it.sellingPrice }]);
-          autoCreatedCount++;
-        } catch {
-          toast.error(`Gagal membuat produk: ${it.productName}`);
-          return;
-        }
-      }
+    // V3 P0.7 — Guard: semua item harus sudah terdaftar di Master
+    const unresolved = formItems.filter((it) => it.productName && !it.productId);
+    if (unresolved.length > 0) {
+      toast.error(
+        `Masih ada ${unresolved.length} produk yang belum terdaftar ke Master Produk. ` +
+        `Gunakan "➕ Tambah ke Master" pada setiap baris ⚠ Belum terdaftar.`
+      );
+      return;
     }
 
-    // Update formItems with resolved product IDs
-    setFormItems(resolvedItems);
-
-    const validItems = resolvedItems.filter((it) => it.productId && it.productName && it.quantity > 0);
+    const validItems = formItems.filter((it) => it.productId && it.productName && it.quantity > 0);
     if (validItems.length === 0) { toast.error("Isi minimal 1 item pembelian"); return; }
     for (const it of validItems) {
       if (!it.expiredDate) { toast.error("Isi tanggal kadaluarsa untuk semua item"); return; }
@@ -329,6 +317,19 @@ export function InventoryPurchasePanel() {
 
     const totalAmount = validItems.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
 
+    // Map PurchaseFormItem[] → PurchaseItem[] (save contract)
+    const purchaseItems: PurchaseItem[] = validItems.map((it) => ({
+      id: it.id,
+      tenantId: "",
+      productId: it.productId,
+      productName: it.productName,
+      batchNumber: it.batchNumber,
+      expiredDate: it.expiredDate,
+      quantity: it.quantity,
+      unitPrice: it.unitPrice,
+      sellingPrice: it.sellingPrice,
+    }));
+
     const invoice: PurchaseInvoice = {
       id: `inv-${Date.now()}`,
       tenantId: "",
@@ -340,18 +341,15 @@ export function InventoryPurchasePanel() {
       status: "unpaid",
       totalAmount,
       paidAmount: 0,
-      items: validItems,
+      items: purchaseItems,
     };
 
-    const msg = autoCreatedCount > 0
-      ? `Pembelian ${invoice.invoiceNumber} berhasil disimpan. ${autoCreatedCount} produk baru otomatis dibuat.`
-      : `Pembelian ${invoice.invoiceNumber} berhasil disimpan`;
     useInventoryStore.getState().addPurchase(invoice);
-    toast.success(msg);
+    toast.success(`Pembelian ${invoice.invoiceNumber} berhasil disimpan`);
     setShowForm(false);
     setFormSupplier("");
     setFormDueDate("");
-    setFormItems([{ id: "1", tenantId: "", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 }]);
+    setFormItems([{ id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 }]);
   };
 
   const filtered = useMemo(() => {
@@ -604,6 +602,9 @@ export function InventoryPurchasePanel() {
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
                         Qty
                       </th>
+                      <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">
+                        Satuan
+                      </th>
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
                         Hrg Beli
                       </th>
@@ -623,12 +624,12 @@ export function InventoryPurchasePanel() {
                     {formItems.map((item) => {
                       const hpp = Math.round(item.unitPrice * (1 + purchaseTaxPercent / 100));
                       const badge = item.productId
-                        ? { label: "MATCHED", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" }
-                        : item.forceCreate
-                          ? { label: "AUTO CREATE", cls: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" }
-                          : { label: "NEW", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" };
+                        ? { label: "✓ MATCHED", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" }
+                        : { label: "⚠ Belum terdaftar", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" };
+                      // Row highlight for unmatched products
+                      const rowBg = !item.productId ? "bg-amber-50/40 dark:bg-amber-950/15" : "";
                       return (
-                      <tr key={item.id}>
+                      <tr key={item.id} className={`group hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${rowBg}`}>
                         <td className="px-2 py-1">
                           <select
                             value={item.productId || (item.productName ? "__imported__" : "")}
@@ -680,6 +681,14 @@ export function InventoryPurchasePanel() {
                             className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                           />
                         </td>
+                        {/* Satuan — single source: item.unit → product → "—" */}
+                        <td className="px-2 py-1 text-center">
+                          <span className="text-[10px] text-neutral-500 whitespace-nowrap">
+                            {item.unit
+                              || productList.find(p => p.id === item.productId)?.unit
+                              || "—"}
+                          </span>
+                        </td>
                         <td className="px-2 py-1">
                           <NumericInput
                             value={item.unitPrice}
@@ -709,27 +718,14 @@ export function InventoryPurchasePanel() {
                           <select value="" onChange={(e) => {
                             const v = e.target.value;
                             if (v === "match") setShowQuickCreate(true);
-                            else if (v === "force") {
-                              setImportCreateItemId(item.id);
-                              setImportCreateName(item.productName);
-                              setImportCreateCategory("");
-                              setImportCreateUnit("Pcs");
-                              setImportCreateBarcode("");
-                              setImportCreateMinStock("0");
-                              setImportCreateRack("");
-                              if (productRepo.isConnected) {
-                                productRepo.getCategories().then(cats => setCategories(cats.map(c => c.name))).catch(() => {});
-                                productRepo.getUnits().then(u => setUnits(u.map(x => x.name))).catch(() => {});
-                              }
-                              setShowImportCreate(true);
-                            }
+                            else if (v === "force") { setProductFormItemId(item.id); setShowProductForm(true); }
                             else if (v === "remove") handleRemoveItem(item.id);
                           }}
                           className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
                             <option value="">▼</option>
                             {!item.productId && (<>
                               <option value="match">🔗 Sesuaikan Produk</option>
-                              <option value="force">➕ Tetap Produk Baru</option>
+                              <option value="force">➕ Tambah ke Master</option>
                             </>)}
                             <option value="remove">🗑 Hapus Item</option>
                           </select>
@@ -751,9 +747,9 @@ export function InventoryPurchasePanel() {
                   <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
                     <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200">Import Summary</p>
                     <div className="mt-1 space-y-0.5 text-[10px] text-amber-700 dark:text-amber-300">
-                      <div>✓ Match otomatis : {matched}</div>
+                      <div>✓ Terdaftar di Master : {matched}</div>
                       {unmatched > 0 && (
-                        <div>🟡 Produk Baru (auto-create) : {unmatched}</div>
+                        <div>⚠ Belum terdaftar : {unmatched}</div>
                       )}
                     </div>
                   </div>
@@ -960,6 +956,40 @@ export function InventoryPurchasePanel() {
         />
       )}
 
+      {/* Full product form modal (normalization entry) */}
+      <ProductFormModal
+        open={showProductForm}
+        onClose={() => { setShowProductForm(false); setProductFormItemId(null); }}
+        prefillData={(() => {
+          const item = formItems.find(it => it.id === productFormItemId);
+          if (!item) return undefined;
+          return {
+            name: item.rawProductName || item.productName,
+            unit: item.unit,
+            defaultPrice: item.unitPrice || undefined,
+            defaultSellingPrice: item.sellingPrice || undefined,
+            barcode: item.barcode,
+          };
+        })()}
+        onSaved={(savedProduct) => {
+          setShowProductForm(false);
+          // V3 P0.6 — Auto relink: NEW → MATCHED
+          if (savedProduct && productFormItemId) {
+            handleItemChange(productFormItemId, "productId", savedProduct.id);
+            handleItemChange(productFormItemId, "productName", savedProduct.name);
+            if (savedProduct.unit) {
+              handleItemChange(productFormItemId, "unit" as any, savedProduct.unit);
+            }
+            // Refresh product list so dropdown recognizes new product
+            setProductList((prev) => [
+              ...prev,
+              { id: savedProduct.id, name: savedProduct.name, unit: savedProduct.unit },
+            ]);
+          }
+          setProductFormItemId(null);
+        }}
+      />
+
       {/* Quick-create product modal */}
       <QuickCreateProductModal
         open={showQuickCreate}
@@ -989,44 +1019,6 @@ export function InventoryPurchasePanel() {
     />
 
     {/* Import Quick-Create Modal — category + unit only */}
-    {showImportCreate && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowImportCreate(false)}>
-        <div className="w-full max-w-xs rounded-xl bg-white p-5 shadow-xl dark:bg-neutral-900" onClick={(e) => e.stopPropagation()}>
-          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Produk Baru — Import</h3>
-          <p className="mt-0.5 text-[11px] text-neutral-500 truncate">{importCreateName}</p>
-          <div className="mt-4 space-y-3">
-            <div>
-              <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Kategori</label>
-              <select value={importCreateCategory} onChange={(e) => setImportCreateCategory(e.target.value)}
-                className="mt-1 w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50">
-                <option value="">Pilih kategori...</option>
-                {categories.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">Satuan</label>
-              <select value={importCreateUnit} onChange={(e) => setImportCreateUnit(e.target.value)}
-                className="mt-1 w-full rounded border border-neutral-200 bg-white px-2 py-1.5 text-sm dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50">
-                {units.map((u) => <option key={u} value={u}>{u}</option>)}
-              </select>
-            </div>
-          </div>
-          <div className="mt-5 flex gap-2">
-            <button onClick={() => setShowImportCreate(false)}
-              className="flex-1 rounded-lg border border-neutral-200 px-3 py-2 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800">Batal</button>
-            <button onClick={() => {
-              if (!importCreateCategory) { toast.error("Pilih kategori terlebih dahulu."); return; }
-              handleItemChange(importCreateItemId, "forceCreate" as any, true as any);
-              setImportItemMeta((prev) => ({ ...prev, [importCreateItemId]: { category: importCreateCategory, unit: importCreateUnit } }));
-              setShowImportCreate(false);
-              toast.success("Produk akan dibuat otomatis saat Simpan Pembelian.");
-            }}
-              className="flex-1 rounded-lg bg-brand-600 px-3 py-2 text-xs font-medium text-white hover:bg-brand-700">Konfirmasi</button>
-          </div>
-        </div>
-      </div>
-    )}
-
     {/* Tax Settings Modal */}
     {showTaxModal && (
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={() => setShowTaxModal(false)}>
