@@ -543,7 +543,9 @@ export default function CashierPage() {
                       (c) => c.productId === product.productId,
                     );
                     const qtyInCart = inCart?.quantity ?? 0;
-                    const canAdd = qtyInCart < product.stockAvailable;
+                    // V3 C1 — Virtual Reserved Stock (UI only, no DB mutation)
+                    const availableStock = Math.max(0, product.stockAvailable - qtyInCart);
+                    const canAdd = availableStock > 0;
                     const nearExpiry = isNearExpiry(product.expiredDate);
                     const isSelected = index === selectedIndex && searchQuery.length > 0;
 
@@ -590,19 +592,19 @@ export default function CashierPage() {
                           </span>
                         </td>
 
-                        {/* Stock */}
+                        {/* Stock — V3 C1: Virtual Reserved (real stock minus cart qty) */}
                         <td className="py-1 px-1 text-center">
-                          {product.stockAvailable === 0 ? (
-                            <span className="inline-block rounded-full bg-danger/10 px-1.5 py-0.5 text-[11px] font-medium text-danger">
-                              Habis
+                          {availableStock === 0 ? (
+                            <span className="inline-block rounded-full bg-red-100 px-1.5 py-0.5 text-[11px] font-medium text-red-700 tabular-nums dark:bg-red-950/30 dark:text-red-400">
+                              {product.stockAvailable === 0 ? "Habis" : `Dipesan (${qtyInCart})`}
                             </span>
-                          ) : product.stockAvailable <= 10 ? (
-                            <span className="inline-block rounded-full bg-warning/10 px-1.5 py-0.5 text-[11px] font-medium text-warning tabular-nums">
-                              {product.stockAvailable}
+                          ) : availableStock <= 10 ? (
+                            <span className="inline-block rounded-full bg-amber-100 px-1.5 py-0.5 text-[11px] font-medium text-amber-700 tabular-nums dark:bg-amber-950/30 dark:text-amber-400">
+                              {availableStock}
                             </span>
                           ) : (
-                            <span className="inline-block rounded-full bg-success/10 px-1.5 py-0.5 text-[11px] font-medium text-success tabular-nums">
-                              {product.stockAvailable}
+                            <span className="inline-block rounded-full bg-green-100 px-1.5 py-0.5 text-[11px] font-medium text-green-700 tabular-nums dark:bg-green-950/30 dark:text-green-400">
+                              {availableStock}
                             </span>
                           )}
                         </td>
@@ -722,6 +724,10 @@ export default function CashierPage() {
                           Batch: {item.batchNumber}
                         </p>
                       )}
+                      {/* V3 C1.2 — Reserved indicator */}
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400">
+                        🛒 Ditahan: {item.quantity}
+                      </p>
                     </div>
 
                     {/* Quantity controls */}

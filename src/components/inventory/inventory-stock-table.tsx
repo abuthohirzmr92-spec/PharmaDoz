@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, memo, useCallback } from "react";
+import { useState, useMemo, useEffect, memo, useCallback, Fragment } from "react";
 import { Search, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { productRepo } from "@/lib/repository-instances";
@@ -45,133 +45,130 @@ const StockRow = memo(function StockRow({
     [fefoBatches],
   );
 
+  const COLSPAN = 6;
+
   return (
-    <tr className="group">
-      <td className="px-3 py-2.5">
-        <button
-          onClick={() => onToggleExpand(product.id)}
-          className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
-        >
-          {isExpanded ? (
-            <ChevronDown className="h-4 w-4" />
-          ) : (
-            <ChevronRight className="h-4 w-4" />
-          )}
-        </button>
-      </td>
-      <td className="px-3 py-2.5">
-        <div className="flex items-center gap-1.5">
-          <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
-            {product.name}
+    <Fragment>
+      {/* Product row */}
+      <tr className="group">
+        <td className="px-3 py-2.5">
+          <button
+            onClick={() => onToggleExpand(product.id)}
+            className="rounded p-0.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-4 w-4" />
+            ) : (
+              <ChevronRight className="h-4 w-4" />
+            )}
+          </button>
+        </td>
+        <td className="px-3 py-2.5">
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
+              {product.name}
+            </span>
+            {product.requiresPrescription && (
+              <span className="shrink-0 rounded bg-red-50 px-1 py-0.5 text-[9px] font-semibold text-red-600 dark:bg-red-950/30">
+                R
+              </span>
+            )}
+          </div>
+        </td>
+        <td className="hidden sm:table-cell px-3 py-2.5">
+          <span className="text-xs text-neutral-500">{product.category}</span>
+        </td>
+        <td className="px-3 py-2.5 text-right">
+          <span
+            className={cn(
+              "text-sm font-semibold tabular-nums",
+              product.totalStock <= product.minStock
+                ? "text-amber-600"
+                : product.totalStock === 0
+                  ? "text-red-500"
+                  : "text-neutral-900 dark:text-neutral-50",
+            )}
+          >
+            {product.totalStock}
           </span>
-          {product.requiresPrescription && (
-            <span className="shrink-0 rounded bg-red-50 px-1 py-0.5 text-[9px] font-semibold text-red-600 dark:bg-red-950/30">
-              R
-            </span>
+          {product.totalStock <= product.minStock && product.totalStock > 0 && (
+            <span className="ml-1 text-[10px] text-amber-500">MIN</span>
           )}
-        </div>
-      </td>
-      <td className="hidden sm:table-cell px-3 py-2.5">
-        <span className="text-xs text-neutral-500">{product.category}</span>
-      </td>
-      <td className="px-3 py-2.5 text-right">
-        <span
-          className={cn(
-            "text-sm font-semibold tabular-nums",
-            product.totalStock <= product.minStock
-              ? "text-amber-600"
-              : product.totalStock === 0
-                ? "text-red-500"
-                : "text-neutral-900 dark:text-neutral-50",
-          )}
-        >
-          {product.totalStock}
-        </span>
-        {product.totalStock <= product.minStock && product.totalStock > 0 && (
-          <span className="ml-1 text-[10px] text-amber-500">MIN</span>
-        )}
-      </td>
-      <td className="hidden sm:table-cell px-3 py-2.5 text-right">
-        <span className="text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
-          {product.batches.filter((b) => b.quantity > 0).length}
-        </span>
-      </td>
-      <td className="hidden md:table-cell px-3 py-2.5">
-        <div className="flex gap-1">
-          {hasExpired && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 dark:bg-red-950/30">
-              EXP
-            </span>
-          )}
-          {hasNearExpiry && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30">
-              DE
-            </span>
-          )}
-          {!hasExpired && !hasNearExpiry && (
-            <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-green-600 bg-green-50 dark:bg-green-950/30">
-              OK
-            </span>
-          )}
-        </div>
-      </td>
-    </tr>
-  );
-});
+        </td>
+        <td className="hidden sm:table-cell px-3 py-2.5 text-right">
+          <span className="text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
+            {product.batches.filter((b) => b.quantity > 0).length}
+          </span>
+        </td>
+        <td className="hidden md:table-cell px-3 py-2.5">
+          <div className="flex gap-1">
+            {hasExpired && (
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-red-600 bg-red-50 dark:bg-red-950/30">
+                EXP
+              </span>
+            )}
+            {hasNearExpiry && (
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-amber-600 bg-amber-50 dark:bg-amber-950/30">
+                DE
+              </span>
+            )}
+            {!hasExpired && !hasNearExpiry && (
+              <span className="rounded px-1.5 py-0.5 text-[10px] font-medium text-green-600 bg-green-50 dark:bg-green-950/30">
+                OK
+              </span>
+            )}
+          </div>
+        </td>
+      </tr>
 
-/* ------------------------------------------------------------------ */
-/*  Batch Row (memoized)                                               */
-/* ------------------------------------------------------------------ */
-
-const BatchRow = memo(function BatchRow({
-  batch,
-}: {
-  batch: ReturnType<typeof buildInventoryProducts>[number]["batches"][number];
-}) {
-  const days = getDaysUntilExpiry(batch.expiredDate);
-  const isExpired = days < 0;
-  const isNear = days >= 0 && days <= 90;
-
-  return (
-    <tr>
-      <td className="py-1.5 pr-2 font-mono text-neutral-700 dark:text-neutral-300">
-        {batch.batchNumber}
-      </td>
-      <td className="py-1.5 pr-2 text-right tabular-nums font-medium">
-        {batch.quantity}
-      </td>
-      <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-        {batch.unitPrice.toLocaleString("id-ID")}
-      </td>
-      <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-        {batch.sellingPrice.toLocaleString("id-ID")}
-      </td>
-      <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-        {new Date(batch.expiredDate).toLocaleDateString("id-ID", {
-          day: "numeric",
-          month: "short",
-          year: "2-digit",
-        })}
-      </td>
-      <td className="py-1.5">
-        <span
-          className={cn(
-            "rounded px-1.5 py-0.5 text-[10px] font-medium",
-            isExpired
-              ? "text-red-600 bg-red-50 dark:bg-red-950/30"
-              : isNear
-                ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30"
-                : "text-green-600 bg-green-50 dark:bg-green-950/30",
-          )}
-        >
-          {isExpired
-            ? `EXPIRED`
-            : isNear
-              ? `${days}h`
-              : `OK (${days}h)`}
-        </span>
-      </td>
-    </tr>
+      {/* Inline batch detail rows */}
+      {isExpanded && fefoBatches.length > 0 && (
+        <tr className="bg-neutral-50 dark:bg-neutral-900/50">
+          <td colSpan={COLSPAN} className="px-6 py-2">
+            <table className="w-full text-[11px]">
+              <thead>
+                <tr className="border-b border-neutral-200 dark:border-neutral-700">
+                  <th className="py-1 pr-3 text-left text-[10px] font-medium text-neutral-400">Batch</th>
+                  <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">Qty</th>
+                  <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">HPP</th>
+                  <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">Jual</th>
+                  <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">ED</th>
+                  <th className="py-1 text-left text-[10px] font-medium text-neutral-400">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+                {fefoBatches.map((b) => {
+                  const days = getDaysUntilExpiry(b.expiredDate);
+                  const isExp = days < 0;
+                  const isNear = days >= 0 && days <= 90;
+                  return (
+                    <tr key={b.id}>
+                      <td className="py-1 pr-3 font-mono text-neutral-700 dark:text-neutral-300">{b.batchNumber}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums font-medium">{b.quantity}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">{b.unitPrice.toLocaleString("id-ID")}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">{b.sellingPrice.toLocaleString("id-ID")}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">
+                        {new Date(b.expiredDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
+                      </td>
+                      <td className="py-1">
+                        <span className={cn(
+                          "rounded px-1.5 py-0.5 text-[10px] font-medium",
+                          isExp ? "text-red-600 bg-red-50 dark:bg-red-950/30" :
+                          isNear ? "text-amber-600 bg-amber-50 dark:bg-amber-950/30" :
+                          "text-green-600 bg-green-50 dark:bg-green-950/30"
+                        )}>
+                          {isExp ? "EXPIRED" : isNear ? `${days}h` : `OK (${days}h)`}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </td>
+        </tr>
+      )}
+    </Fragment>
   );
 });
 
@@ -220,10 +217,6 @@ export function InventoryStockTable() {
 
   const handleToggleExpand = useCallback((id: string) => {
     setExpandedProduct((prev) => (prev === id ? null : id));
-  }, []);
-
-  const handleCloseDetail = useCallback(() => {
-    setExpandedProduct(null);
   }, []);
 
   const filtered = useMemo(() => {
@@ -296,85 +289,6 @@ export function InventoryStockTable() {
         </table>
       </div>
 
-      {/* Expanded: batch detail for selected product */}
-      {expandedProduct && (
-        <BatchDetailPanel
-          productId={expandedProduct}
-          onClose={handleCloseDetail}
-        />
-      )}
     </div>
   );
 }
-
-/* ------------------------------------------------------------------ */
-/*  Batch Detail Panel (memoized)                                      */
-/* ------------------------------------------------------------------ */
-
-const BatchDetailPanel = memo(function BatchDetailPanel({
-  productId,
-  onClose,
-}: {
-  productId: string;
-  onClose: () => void;
-}) {
-  const batches = useInventoryStore((s) => s.batches);
-  const productBatches = useMemo(
-    () =>
-      batches
-        .filter((b) => b.productId === productId)
-        .sort(
-          (a, b) =>
-            new Date(a.expiredDate).getTime() -
-            new Date(b.expiredDate).getTime(),
-        ),
-    [batches, productId],
-  );
-
-  if (productBatches.length === 0) return null;
-
-  return (
-    <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
-      <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-          Detail Batch — {productBatches[0]?.productName}
-        </h4>
-        <button
-          onClick={onClose}
-          className="text-[10px] text-neutral-400 hover:text-neutral-600"
-        >
-          Tutup
-        </button>
-      </div>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-neutral-200 dark:border-neutral-700">
-            <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">
-              Batch
-            </th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">
-              Qty
-            </th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">
-              HPP
-            </th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">
-              Jual
-            </th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">
-              ED
-            </th>
-            <th className="py-1.5 text-left text-[10px] font-medium text-neutral-400">
-              Status
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-          {productBatches.length === 0 ? null : (
-            productBatches.map((b) => <BatchRow key={b.id} batch={b} />)
-          )}
-        </tbody>
-      </table>
-    </div>
-  );
-});
