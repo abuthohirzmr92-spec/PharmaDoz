@@ -142,6 +142,7 @@ export interface InventoryProduct {
   defaultPrice: number;           // default purchase price (cost)
   defaultSellingPrice: number;    // default retail price
   minStock: number;
+  rackLocation?: string | null;
   totalStock: number;
   batches: ProductBatch[];
   requiresPrescription: boolean;

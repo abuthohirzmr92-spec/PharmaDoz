@@ -4,6 +4,7 @@ import { useMemo, useCallback, useState, useEffect } from "react";
 import { useCashierStore, type CartItem } from "@/store/cashier-store";
 import { productRepo } from "@/lib/repository-instances";
 import { isDemoMode as checkDemoMode } from "@/config/env";
+import { toBaseUnit } from "@/lib/unit-converter";
 
 /* ------------------------------------------------------------------ */
 /*  Demo product catalogue                                             */
@@ -17,6 +18,9 @@ export interface DemoProduct {
   category: string;
   batchNumber: string;
   expiredDate: string; // ISO date string
+  /** V3 C3 — Multi Unit */
+  unit?: string;
+  unitLevels?: import("@/types/unit").UnitLevel[];
 }
 
 export const DEMO_PRODUCTS: readonly DemoProduct[] = [
@@ -28,6 +32,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Obat Bebas",
     batchNumber: "PAR-2026-001",
     expiredDate: "2027-12-31",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-002",
@@ -37,6 +45,11 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Antibiotik",
     batchNumber: "AMX-2026-001",
     expiredDate: "2027-06-30",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+      { level: 3, unitName: "Dus", contains: 10 },
+    ],
   },
   {
     productId: "demo-003",
@@ -179,6 +192,13 @@ export function useDemoCashier() {
   /** Add a demo product to the cart (quantity = 1). */
   const addDemoProductToCart = useCallback(
     (product: DemoProduct) => {
+      // V3 C3 — default to largest unit level if multi-unit exists
+      const levels = product.unitLevels ?? [];
+      const largestLevel = levels.length > 0
+        ? levels.reduce((a, b) => a.level > b.level ? a : b)
+        : null;
+      const selectedUnit = largestLevel?.unitName ?? product.unit ?? undefined;
+
       const cartItem: CartItem = {
         productId: product.productId,
         productName: product.productName,
@@ -186,6 +206,11 @@ export function useDemoCashier() {
         unitPrice: product.unitPrice,
         stockAvailable: product.stockAvailable,
         batchNumber: product.batchNumber,
+        selectedUnit,
+        displayQuantity: 1,
+        baseQuantity: selectedUnit && levels.length > 0
+          ? toBaseUnit(1, selectedUnit, levels)
+          : 1,
       };
       store.addToCart(cartItem);
     },
@@ -233,6 +258,8 @@ export function useDemoCashier() {
             category: p.category,
             batchNumber: p.batches[0]?.batchNumber ?? "",
             expiredDate: p.batches[0]?.expiredDate ?? "",
+            unit: p.unit,
+            unitLevels: p.unitLevels,
           })));
         })
         .catch(() => setDbProducts(null))

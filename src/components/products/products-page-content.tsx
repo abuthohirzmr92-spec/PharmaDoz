@@ -53,6 +53,7 @@ export function ProductsPageContent() {
           description: p.description ?? null,
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
+          rackLocation: p.rackLocation ?? null,
           totalStock: activeBranch
             ? p.batches.filter((b) => b.pharmacyId === activeBranch.id).reduce((s, b) => s + b.quantity, 0)
             : p.totalStock,
@@ -83,6 +84,7 @@ export function ProductsPageContent() {
           description: p.description ?? null,
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
+          rackLocation: p.rackLocation ?? null,
           totalStock: activeBranch
             ? p.batches.filter((b) => b.pharmacyId === activeBranch.id).reduce((s, b) => s + b.quantity, 0)
             : p.totalStock,

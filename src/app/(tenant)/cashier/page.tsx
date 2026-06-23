@@ -17,6 +17,8 @@ import { HoldCartDialog } from "@/components/cashier/hold-cart-dialog";
 import { HoldCartList } from "@/components/cashier/hold-cart-list";
 import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/shared/empty-state";
+import { toast } from "sonner";
+import { fromBaseUnit } from "@/lib/unit-converter";
 import {
   Search,
   ShoppingCart,
@@ -70,7 +72,9 @@ function isNearExpiry(dateStr: string): boolean {
 export default function CashierPage() {
   /* ---- preload inventory for checkout ---- */
   const loadInventory = useInventoryStore((s) => s.loadDemoData);
-  useEffect(() => { console.log("[VERIFY] Cashier mounted — calling loadInventory()"); loadInventory(); }, []);
+  const batches = useInventoryStore((s) => s.batches);
+  // PERF-P1.1: skip if inventory already loaded (e.g. back navigation)
+  useEffect(() => { if (batches.length === 0) loadInventory(); }, [batches.length, loadInventory]);
 
   /* ---- store ---- */
   const {
@@ -226,6 +230,14 @@ export default function CashierPage() {
 
   const handleDemoProductClick = useCallback(
     (product: DemoProduct) => {
+      // V3 C2 — oversell protection: check total reserved across all cart rows
+      const totalReserved = useCashierStore.getState().cart
+        .filter(c => c.productId === product.productId)
+        .reduce((s, c) => s + c.quantity, 0);
+      if (totalReserved >= product.stockAvailable) {
+        toast.warning(`Stok tersedia hanya ${product.stockAvailable}. Produk ini sudah ditahan seluruhnya di keranjang.`);
+        return;
+      }
       if (!currentSaleId) {
         startDemoSale();
       }
@@ -255,11 +267,13 @@ export default function CashierPage() {
           e.preventDefault();
           const product = filteredByCategory[selectedIndex];
           if (product) {
-            const inCart = cart.find((c) => c.productId === product.productId);
-            if ((inCart?.quantity ?? 0) < product.stockAvailable) {
+            const totalReserved = cart.filter(c => c.productId === product.productId).reduce((s, c) => s + c.quantity, 0);
+            if (totalReserved < product.stockAvailable) {
               handleDemoProductClick(product);
               setSearchQuery("");
               setSelectedIndex(0);
+            } else {
+              toast.warning(`Stok tersedia hanya ${product.stockAvailable}.`);
             }
           }
           break;
@@ -716,9 +730,53 @@ export default function CashierPage() {
                       <p className="truncate text-sm font-medium text-neutral-900 dark:text-neutral-50">
                         {item.productName}
                       </p>
-                      <p className="text-xs text-neutral-500">
-                        {formatCurrency(item.unitPrice)} / pcs
-                      </p>
+
+                      {/* V3 C3.2 — Multi Unit selector + price */}
+                      {(() => {
+                        const product = demoProducts.find(p => p.productId === item.productId);
+                        const levels = product?.unitLevels ?? [];
+                        const hasMultiUnit = levels.length > 0;
+                        const baseUnit = product?.unit ?? "pcs";
+
+                        return (
+                          <>
+                            <p className="text-xs text-neutral-500">
+                              {formatCurrency(item.unitPrice)} / {item.selectedUnit || baseUnit}
+                            </p>
+
+                            {/* Unit selector */}
+                            {hasMultiUnit && (
+                              <div className="mt-1 flex items-center gap-1.5">
+                                <select
+                                  value={item.selectedUnit || baseUnit}
+                                  onChange={(e) => {
+                                    const newUnit = e.target.value;
+                                    const baseQty = item.baseQuantity ?? item.quantity;
+                                    // Convert baseQty → new displayQty
+                                    const displayQty = fromBaseUnit(baseQty, newUnit, levels);
+                                    updateCartQuantity(item.productId, Math.max(1, displayQty));
+                                  }}
+                                  className="rounded border border-neutral-200 bg-white px-1.5 py-0.5 text-[10px] text-neutral-700 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                                >
+                                  {/* Sorted largest → smallest */}
+                                  {[...levels].sort((a, b) => b.level - a.level).map(ul => (
+                                    <option key={ul.unitName} value={ul.unitName}>{ul.unitName}</option>
+                                  ))}
+                                  <option value={baseUnit}>{baseUnit}</option>
+                                </select>
+                              </div>
+                            )}
+
+                            {/* Base quantity subtitle */}
+                            {hasMultiUnit && item.baseQuantity && item.baseQuantity !== item.quantity && (
+                              <p className="text-[10px] text-neutral-400 dark:text-neutral-500">
+                                ≈ {item.baseQuantity.toLocaleString("id-ID")} {baseUnit}
+                              </p>
+                            )}
+                          </>
+                        );
+                      })()}
+
                       {item.batchNumber && (
                         <p className="text-[10px] text-neutral-400">
                           Batch: {item.batchNumber}
@@ -726,7 +784,7 @@ export default function CashierPage() {
                       )}
                       {/* V3 C1.2 — Reserved indicator */}
                       <p className="text-[10px] text-amber-600 dark:text-amber-400">
-                        🛒 Ditahan: {item.quantity}
+                        🛒 Ditahan: {item.quantity} {item.selectedUnit || ""}
                       </p>
                     </div>
 
@@ -748,14 +806,22 @@ export default function CashierPage() {
                         {item.quantity}
                       </span>
                       <button
-                        onClick={() =>
-                          updateCartQuantity(
-                            item.productId,
-                            item.quantity + 1,
-                          )
-                        }
+                        onClick={() => {
+                          // V3 C2 — oversell protection: total reserved across all cart rows
+                          const realStock = demoProducts.find(p => p.productId === item.productId)?.stockAvailable ?? item.stockAvailable;
+                          const totalReserved = cart.filter(c => c.productId === item.productId).reduce((s, c) => s + c.quantity, 0);
+                          if (totalReserved >= realStock) {
+                            toast.warning(`Stok tersedia hanya ${realStock}. Produk ini sudah ditahan seluruhnya di keranjang.`);
+                            return;
+                          }
+                          updateCartQuantity(item.productId, Math.min(item.quantity + 1, realStock - (totalReserved - item.quantity)));
+                        }}
                         disabled={
-                          item.quantity >= item.stockAvailable
+                          (() => {
+                            const realStock = demoProducts.find(p => p.productId === item.productId)?.stockAvailable ?? item.stockAvailable;
+                            const totalReserved = cart.filter(c => c.productId === item.productId).reduce((s, c) => s + c.quantity, 0);
+                            return totalReserved >= realStock;
+                          })()
                         }
                         className="flex h-7 w-7 items-center justify-center rounded-md border border-neutral-200 text-neutral-500 hover:bg-neutral-100 disabled:cursor-not-allowed disabled:opacity-30 dark:border-neutral-700 dark:hover:bg-neutral-800"
                         aria-label="Tambah"

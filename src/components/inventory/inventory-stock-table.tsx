@@ -187,12 +187,12 @@ export function InventoryStockTable() {
     if (batches.length === 0) loadDemoData();
   }, [batches.length, loadDemoData]);
 
-  // Load product catalog once on mount — independent of batches (read-only)
+  // PERF-P0.1: Load catalog only if batches NOT loaded by loadDemoData (avoids duplicate getProducts())
   useEffect(() => {
-    if (productRepo.isConnected) {
-      productRepo.getProducts().then(setCatalogProducts).catch(() => {});
-    }
-  }, []);
+    if (!productRepo.isConnected) return;
+    if (batches.length > 0) return; // loadDemoData already fetched products
+    productRepo.getProducts().then(setCatalogProducts).catch(() => {});
+  }, [batches.length]);
 
   // Merge batch-derived products with catalog products (show zero-stock items)
   const products = useMemo(() => {

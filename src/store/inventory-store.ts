@@ -60,6 +60,8 @@ interface InventoryState {
   dataSource: "demo" | "database" | "loading";
   isLoading: boolean;
   isSubmitting: boolean;
+  /** PERF-P1.2: timestamp of last successful data load (ms) */
+  _lastLoadedAt: number;
 
   /* Actions — branch context */
   setBranchContext: (branchId: string | null) => void;
@@ -133,6 +135,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   dataSource: checkDemoMode() ? ("demo" as const) : ("loading" as const),
   isLoading: false,
   isSubmitting: false,
+  _lastLoadedAt: 0,
 
   /* ---- branch context ---- */
   setBranchContext: (branchId) => {
@@ -722,7 +725,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
     // Guard: wait for inventory to load if still loading
     if (state.dataSource === "loading" || state.dataSource === "demo") {
-      console.log("[DEDUCT-TRACE] Inventory not loaded (dataSource:", state.dataSource, "). Loading now...");
+      if (process.env.NODE_ENV === "development") console.log("[DEDUCT-TRACE] Inventory not loaded (dataSource:", state.dataSource, "). Loading now...");
       await get().loadDemoData();
       // Re-read state after load
       const loaded = get();
@@ -735,30 +738,34 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const newMovements: StockMovement[] = [];
     let updatedBatches = [...get().batches];
 
-    console.log("[DEDUCT-TRACE] deductForSale called. state.batches.length:", state.batches.length);
-    console.log("[DEDUCT-TRACE] state.dataSource:", state.dataSource);
-    console.log("[DEDUCT-TRACE] state.isDemoMode:", state.isDemoMode);
-    if (state.batches.length > 0) {
-      const first = state.batches[0];
-      if (first) {
-        console.log("[DEDUCT-TRACE] First batch sample:", JSON.stringify({
-          id: first.id, productId: first.productId,
-          productName: first.productName, quantity: first.quantity,
-          tenantId: (first as any).tenantId,
-        }));
+    if (process.env.NODE_ENV === "development") {
+      console.log("[DEDUCT-TRACE] deductForSale called. state.batches.length:", state.batches.length);
+      console.log("[DEDUCT-TRACE] state.dataSource:", state.dataSource);
+      console.log("[DEDUCT-TRACE] state.isDemoMode:", state.isDemoMode);
+      if (state.batches.length > 0) {
+        const first = state.batches[0];
+        if (first) {
+          console.log("[DEDUCT-TRACE] First batch sample:", JSON.stringify({
+            id: first.id, productId: first.productId,
+            productName: first.productName, quantity: first.quantity,
+            tenantId: (first as any).tenantId,
+          }));
+        }
+      } else {
+        console.warn("[DEDUCT-TRACE] ⚠️ state.batches is EMPTY! Load demo data first.");
       }
-    } else {
-      console.warn("[DEDUCT-TRACE] ⚠️ state.batches is EMPTY! Load demo data first.");
     }
 
     // Process each cart item
     for (const item of cart) {
       const { productId, quantity } = item;
       const matchingBatches = updatedBatches.filter((b) => b.productId === productId && b.quantity > 0);
-      console.log("[DEDUCT-TRACE] productId:", productId, "requestedQty:", quantity);
-      console.log("[DEDUCT-TRACE] matchingBatches:", matchingBatches.length, "| all batches:", updatedBatches.length);
-      if (matchingBatches.length === 0 && updatedBatches.length > 0) {
-        console.warn("[DEDUCT-TRACE] ⚠️ No match! Available productIds:", [...new Set(updatedBatches.map(b => b.productId))]);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[DEDUCT-TRACE] productId:", productId, "requestedQty:", quantity);
+        console.log("[DEDUCT-TRACE] matchingBatches:", matchingBatches.length, "| all batches:", updatedBatches.length);
+        if (matchingBatches.length === 0 && updatedBatches.length > 0) {
+          console.warn("[DEDUCT-TRACE] ⚠️ No match! Available productIds:", [...new Set(updatedBatches.map(b => b.productId))]);
+        }
       }
 
       // 1. FEFO allocation — which batches to draw from
@@ -895,22 +902,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     const state = get();
     // Prevent concurrent parallel loads from multiple components
     if (state.isLoading) return;
-    // Skip if already loaded from database
-    if (state.dataSource === "database" && state.batches.length > 0) return;
-    // Skip if already loaded demo data
-    if (state.dataSource === "demo" && state.batches.length > 0) return;
+    // PERF-P1.2: skip if data is fresh (within 60s TTL)
+    const TTL_MS = 60_000;
+    if (state.batches.length > 0 && Date.now() - state._lastLoadedAt < TTL_MS) return;
 
     // No tenant context — skip Supabase query (e.g. super admin with no tenant).
     // Without tenant_id the query is unfiltered and may hit RLS blocks.
-    console.log("[DASHBOARD DEBUG] loadDemoData", {
-      isConnected: productRepo.isConnected,
-      tenantId: productRepo.getTenantId(),
-      dataSource: state.dataSource,
-      batchesCount: state.batches.length,
-      isLoading: state.isLoading,
-    });
+    if (process.env.NODE_ENV === "development") {
+      console.log("[DASHBOARD DEBUG] loadDemoData", {
+        isConnected: productRepo.isConnected,
+        tenantId: productRepo.getTenantId(),
+        dataSource: state.dataSource,
+        batchesCount: state.batches.length,
+        isLoading: state.isLoading,
+      });
+    }
     if (productRepo.isConnected && !productRepo.getTenantId()) {
-      console.log("[DASHBOARD DEBUG] loadDemoData SKIPPING — no tenant context");
+      if (process.env.NODE_ENV === "development") console.log("[DASHBOARD DEBUG] loadDemoData SKIPPING — no tenant context");
       set({ dataSource: "database", isLoading: false });
       return;
     }
@@ -954,6 +962,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
           dataSource: "database",
           isDemoMode: false,
           isLoading: false,
+          _lastLoadedAt: Date.now(),
         });
       } catch (e) {
         console.error(
@@ -980,6 +989,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
         dataSource: "demo",
         isDemoMode: true,
         isLoading: false,
+        _lastLoadedAt: Date.now(),
       });
     } else {
       set({ dataSource: "database", isLoading: false });

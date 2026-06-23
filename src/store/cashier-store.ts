@@ -25,6 +25,10 @@ export interface CartItem {
   unitPrice: number;
   batchNumber?: string;
   stockAvailable: number;
+  /** V3 C3 — Multi Unit */
+  selectedUnit?: string;
+  displayQuantity?: number;
+  baseQuantity?: number;
 }
 
 export interface Payment {

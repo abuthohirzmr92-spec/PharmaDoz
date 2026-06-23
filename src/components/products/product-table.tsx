@@ -32,6 +32,7 @@ export interface ProductRow {
   description: string | null;
   requiresPrescription: boolean;
   minStock: number;
+  rackLocation?: string | null;
   totalStock: number;
   isActive: boolean;
 }
@@ -138,12 +139,15 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
             >
               Unit Dasar<SortIcon column="unit" />
             </th>
-            <th className="hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "14%" }}>
+            <th className="hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "12%" }}>
               Multi Unit
+            </th>
+            <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "6%" }}>
+              Rak
             </th>
             <th
               className={thClassRight}
-              style={{ width: "13%" }}
+              style={{ width: "12%" }}
               onClick={() => handleSort("defaultSellingPrice")}
             >
               Harga Jual<SortIcon column="defaultSellingPrice" />
@@ -171,7 +175,7 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
           {sorted.length === 0 ? (
             <tr>
               <td
-                colSpan={8}
+                colSpan={9}
                 className="px-4 py-12 text-center text-sm text-neutral-400"
               >
                 <Pill className="mx-auto mb-2 h-6 w-6 opacity-40" />
@@ -245,6 +249,13 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                         unitLevels={product.unitLevels ?? []}
                         expanded={false}
                       />
+                    </td>
+
+                    {/* Rak */}
+                    <td className="hidden md:table-cell px-3 py-2.5">
+                      <span className="text-xs text-neutral-500">
+                        {product.rackLocation || "—"}
+                      </span>
                     </td>
 
                     {/* Harga Jual */}
@@ -326,7 +337,7 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                   {/* Expanded detail row — tree view */}
                   {isExpanded && hasMultiUnit && (
                     <tr className="bg-neutral-50 dark:bg-neutral-800/30">
-                      <td colSpan={8} className="px-6 py-2.5">
+                      <td colSpan={9} className="px-6 py-2.5">
                         <MultiUnitTree
                           baseUnit={product.unit}
                           unitLevels={product.unitLevels ?? []}

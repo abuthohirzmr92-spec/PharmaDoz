@@ -389,6 +389,7 @@ export interface ProductRow {
   default_selling_price: number;
   requires_prescription: boolean;
   min_stock: number;
+  rack_location: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -408,6 +409,7 @@ export interface ProductInsert {
   default_selling_price?: number;
   requires_prescription?: boolean;
   min_stock?: number;
+  rack_location?: string | null;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -427,6 +429,7 @@ export interface ProductUpdate {
   default_selling_price?: number;
   requires_prescription?: boolean;
   min_stock?: number;
+  rack_location?: string | null;
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;

@@ -44,6 +44,7 @@ export interface ProductPrefillData {
   defaultPrice?: number;
   defaultSellingPrice?: number;
   barcode?: string;
+  rackLocation?: string;
 }
 
 export interface ProductFormModalProps {
@@ -70,6 +71,7 @@ interface FormState {
   defaultSellingPrice: number;
   requiresPrescription: boolean;
   minStock: number;
+  rackLocation: string;
   description: string;
   isActive: boolean;
 }
@@ -84,6 +86,7 @@ const EMPTY_FORM: FormState = {
   defaultSellingPrice: 0,
   requiresPrescription: false,
   minStock: 0,
+  rackLocation: "",
   description: "",
   isActive: true,
 };
@@ -177,6 +180,7 @@ export function ProductFormModal({
         defaultSellingPrice: editingProduct.defaultSellingPrice,
         requiresPrescription: editingProduct.requiresPrescription,
         minStock: editingProduct.minStock,
+        rackLocation: editingProduct.rackLocation ?? "",
         description: editingProduct.description ?? "",
         isActive: editingProduct.isActive,
       });
@@ -370,6 +374,7 @@ export function ProductFormModal({
             description: form.description.trim() || null,
             requiresPrescription: form.requiresPrescription,
             minStock: form.minStock,
+            rackLocation: form.rackLocation.trim() || null,
             isActive: form.isActive,
             unitLevels: unitLevels.length > 0 ? unitLevels : undefined,
           });
@@ -385,6 +390,7 @@ export function ProductFormModal({
             description: form.description.trim() || null,
             requiresPrescription: form.requiresPrescription,
             minStock: form.minStock,
+            rackLocation: form.rackLocation.trim() || null,
             isActive: form.isActive,
             unitLevels: unitLevels.length > 0 ? unitLevels : undefined,
           });
@@ -790,6 +796,20 @@ export function ProductFormModal({
                 updateField("minStock", Math.max(0, Number(e.target.value)))
               }
               className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+            />
+          </div>
+
+          {/* No Rak */}
+          <div>
+            <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
+              No Rak
+            </label>
+            <input
+              type="text"
+              value={form.rackLocation}
+              onChange={(e) => updateField("rackLocation", e.target.value)}
+              placeholder="Contoh: R-A-03"
+              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm placeholder-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
             />
           </div>
 

@@ -18,6 +18,7 @@ export interface Product {
   imageUrl: string | null;
   requiresPrescription: boolean;
   minStock: number;
+  rackLocation: string | null;
   pharmacyId: string | null;
   isActive: boolean;
   createdAt: string;
@@ -97,6 +98,7 @@ export class ProductRepository extends BaseRepository {
       defaultPrice: r.default_price ?? 0,
       defaultSellingPrice: r.default_selling_price ?? 0,
       minStock: r.min_stock,
+      rackLocation: r.rack_location ?? null,
       totalStock: namedBatches.reduce((sum, batch) => sum + (batch.quantity || 0), 0),
       batches: namedBatches,
       requiresPrescription: r.requires_prescription,
@@ -237,6 +239,7 @@ export class ProductRepository extends BaseRepository {
     imageUrl?: string | null;
     requiresPrescription?: boolean;
     minStock?: number;
+    rackLocation?: string | null;
     isActive?: boolean;
     /** V2 Multi Unit — optional unit levels (Level 2 & 3) */
     unitLevels?: UnitLevel[];
@@ -255,6 +258,7 @@ export class ProductRepository extends BaseRepository {
       image_url: data.imageUrl ?? null,
       requires_prescription: data.requiresPrescription ?? false,
       min_stock: data.minStock ?? 0,
+      rack_location: data.rackLocation ?? null,
       is_active: data.isActive ?? true,
     };
 
@@ -309,6 +313,7 @@ export class ProductRepository extends BaseRepository {
       imageUrl: string | null;
       requiresPrescription: boolean;
       minStock: number;
+      rackLocation: string | null;
       isActive: boolean;
       /** V2 Multi Unit — optional unit levels (Level 2 & 3).
        *  undefined = jangan sentuh. [] = hapus semua. [...]= sync diff. */
@@ -337,6 +342,7 @@ export class ProductRepository extends BaseRepository {
     if (data.requiresPrescription !== undefined)
       updateData["requires_prescription"] = data.requiresPrescription;
     if (data.minStock !== undefined) updateData["min_stock"] = data.minStock;
+    if (data.rackLocation !== undefined) updateData["rack_location"] = data.rackLocation;
     if (data.isActive !== undefined) updateData["is_active"] = data.isActive;
 
     this.requireTenant();
