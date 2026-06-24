@@ -497,6 +497,19 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             severity: "warning",
             metadata: { itemCount: opname.items.length, diffCount: opname.items.filter((i: any) => i.difference !== 0).length },
           }).catch(() => {});
+
+          // RC1 P0F.1 — Update session progress after successful opname
+          const { useOpnameSessionStore } = await import("@/store/opname-session-store");
+          const sessionStore = useOpnameSessionStore.getState();
+          if (sessionStore.activeSession && sessionStore.activeSession.status === "in_progress") {
+            sessionStore.markItemsFromOpname(
+              opname.items.map(it => ({
+                productId: it.productId,
+                batchId: it.batchId,
+                physicalQty: it.physicalQty,
+              }))
+            );
+          }
         } catch {
           set({ isSubmitting: false });
         }

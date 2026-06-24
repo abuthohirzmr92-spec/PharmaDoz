@@ -9,7 +9,9 @@
 
 import { create } from "zustand";
 import type { StockOpnameSession, StockOpnameSessionItem, SessionStatus, SessionProgress } from "@/types/opname-session";
-import { createSession, calculateProgress } from "@/types/opname-session";
+import { createSession } from "@/types/opname-session";
+import { calculateProgress, getCompletionDetail } from "@/lib/opname/session-progress";
+import { buildBatchSessionSnapshot, type BatchInput } from "@/lib/opname/session-snapshot";
 
 interface OpnameSessionState {
   /** Currently active session (null = no session) */
@@ -18,7 +20,7 @@ interface OpnameSessionState {
   items: StockOpnameSessionItem[];
 
   /* Actions */
-  startSession: (title: string, conductedBy: string, selectedLocationIds?: string[]) => string;
+  startSession: (title: string, conductedBy: string, selectedLocationIds?: string[], batches?: BatchInput[]) => string;
   pauseSession: () => void;
   resumeSession: () => void;
   completeSession: () => void;
@@ -30,17 +32,116 @@ interface OpnameSessionState {
   setSelectedLocations: (ids: string[]) => void;
   getSelectedLocations: () => string[];
   clearSelectedLocations: () => void;
+  /** RC1 P0F.1 — Mark a single batch item as counted */
+  markItemCounted: (key: string, physicalQty?: number) => void;
+  /** RC1 P0F.1 — Batch mark items from opname */
+  markItemsFromOpname: (items: Array<{ productId: string; batchId: string; physicalQty: number }>) => void;
 }
 
 export const useOpnameSessionStore = create<OpnameSessionState>()((set, get) => ({
   activeSession: null,
   items: [],
 
-  startSession: (title, conductedBy, selectedLocationIds = []) => {
+  startSession: (title, conductedBy, selectedLocationIds = [], batches?: BatchInput[]) => {
+    const { activeSession } = get();
+    // RC1 P0E.3 — Block if session already active
+    if (activeSession && activeSession.status !== "completed") {
+      console.warn("[SessionStore] Cannot start new session — existing session is", activeSession.status);
+      return "";
+    }
+    const trimmed = title.trim();
+    if (!trimmed) {
+      console.warn("[SessionStore] Cannot start session — title is empty");
+      return "";
+    }
+
+    // RC1 P0F.1 — Build batch-based snapshot at session start
+    const snapshotItems = batches
+      ? buildBatchSessionSnapshot(batches, selectedLocationIds)
+      : [];
+    const progress = calculateProgress(snapshotItems);
+
     const id = `SES-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
-    const session = createSession(id, title, conductedBy, selectedLocationIds);
-    set({ activeSession: session, items: [] });
+    const session = createSession(id, trimmed, conductedBy, selectedLocationIds);
+    session.totalItems = progress.totalItems;
+    session.completedItems = progress.completedItems;
+    session.progressPercent = progress.progressPercent;
+    session.status = snapshotItems.length > 0 ? "in_progress" : session.status;
+
+    // Map lightweight snapshot → full session items with defaults
+    const sessionItems: StockOpnameSessionItem[] = snapshotItems.map((si) => ({
+      key: si.key,
+      productId: si.productId,
+      batchId: si.batchId,
+      productName: "",
+      batchNumber: "",
+      systemQty: 0,
+      physicalQty: 0,
+      status: si.status,
+      note: "",
+    }));
+
+    set({ activeSession: session, items: sessionItems });
     return id;
+  },
+
+  /**
+   * RC1 P0F.1 — Mark a batch item as counted (idempotent).
+   * Safe to call multiple times — second call for same key is no-op.
+   */
+  markItemCounted: (key: string, physicalQty?: number) => {
+    const { activeSession, items } = get();
+    if (!activeSession) return;
+
+    const updatedItems = items.map((i) =>
+      i.key === key ? { ...i, status: "counted" as const, physicalQty: physicalQty ?? i.physicalQty } : i,
+    );
+
+    const progress = calculateProgress(updatedItems);
+    const isDone = progress.totalItems > 0 && progress.completedItems >= progress.totalItems;
+    const now = new Date().toISOString();
+    set({
+      items: updatedItems,
+      activeSession: {
+        ...activeSession,
+        status: isDone ? "completed" : activeSession.status,
+        completedItems: progress.completedItems,
+        progressPercent: progress.progressPercent,
+        updatedAt: now,
+        activeProductKey: isDone ? null : key,
+        ...(isDone ? { completedAt: now } : {}),
+      },
+    });
+  },
+
+  /**
+   * RC1 P0F.1 — Batch mark multiple items (after opname complete).
+   */
+  markItemsFromOpname: (opnameItems: Array<{ productId: string; batchId: string; physicalQty: number }>) => {
+    const { items, activeSession } = get();
+    if (!activeSession || !items || items.length === 0) return;
+
+    const keysToMark = new Set(opnameItems.map(i => `${i.productId}:${i.batchId}`));
+    const updatedItems = items.map((i) =>
+      keysToMark.has(i.key) ? { ...i, status: "counted" as const, physicalQty: opnameItems.find(o => `${o.productId}:${o.batchId}` === i.key)?.physicalQty ?? i.physicalQty } : i,
+    );
+
+    const progress = calculateProgress(updatedItems);
+
+    // RC1 P0F.3 — Auto-completion: transition to completed when all items done
+    const isDone = progress.totalItems > 0 && progress.completedItems >= progress.totalItems;
+    const now = new Date().toISOString();
+    set({
+      items: updatedItems,
+      activeSession: {
+        ...activeSession,
+        status: isDone ? "completed" : activeSession.status,
+        completedItems: progress.completedItems,
+        progressPercent: progress.progressPercent,
+        updatedAt: now,
+        ...(isDone ? { completedAt: now } : {}),
+      },
+    });
   },
 
   setSelectedLocations: (ids) => {

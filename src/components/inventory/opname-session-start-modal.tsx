@@ -9,6 +9,7 @@ import { useInventoryStore } from "@/store/inventory-store";
 import { useAuthStore } from "@/store/auth-store";
 import { extractRackLocations, type OpnameProductInfo } from "@/lib/opname/location-normalizer";
 import { countProductsByRackLocation } from "@/lib/opname/session-location-filter";
+import type { BatchInput } from "@/lib/opname/session-snapshot";
 
 interface Props {
   open: boolean;
@@ -56,7 +57,27 @@ export function OpnameSessionStartModal({ open, onClose }: Props) {
 
   const handleStart = () => {
     if (!canStart) return;
-    startSession(title.trim(), userName, selectedIds);
+    // RC1 P0F.3 — Build batch snapshot at session start
+    // RC1 P0F.3A — rackLocation is product-level, not batch-level.
+    // Build a lookup from catalog products (loaded in panel) for type-safe location.
+    const productRackMap = new Map<string, string | null>();
+    for (const p of products) {
+      productRackMap.set(p.productId, p.rackLocation);
+    }
+    const batchInputs: BatchInput[] = batches
+      .filter(b => b.quantity > 0)
+      .map(b => ({
+        productId: b.productId,
+        batchId: b.id,
+        quantity: b.quantity,
+        productName: b.productName,
+        rackLocation: productRackMap.get(b.productId) ?? null,
+      }));
+    const id = startSession(title.trim(), userName, selectedIds, batchInputs);
+    if (!id) {
+      toast.error("Gagal memulai session. Session mungkin sudah aktif atau nama kosong.");
+      return;
+    }
     toast.success(`Session "${title.trim()}" dimulai. ${filtered} produk akan dihitung.`);
     onClose();
   };

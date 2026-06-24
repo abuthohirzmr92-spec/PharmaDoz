@@ -17,6 +17,7 @@ import { cn } from "@/lib/cn";
 import { InventoryOpnameFormModal } from "./inventory-opname-form-modal";
 import { OpnameSessionStartModal } from "./opname-session-start-modal";
 import { useOpnameSessionStore } from "@/store/opname-session-store";
+import { FEATURES } from "@/config/features";
 import { buildMultiUnitSummary } from "@/lib/unit-opname";
 
 const STATUS_STYLE: Record<OpnameStatus, { icon: typeof CheckCircle; cls: string; label: string }> = {
@@ -42,9 +43,6 @@ export function InventoryOpnamePanel() {
   // RC1 P0E — Session start modal
   const [showSessionModal, setShowSessionModal] = useState(false);
   const activeSession = useOpnameSessionStore((s) => s.activeSession);
-
-  // RC1 P0E.2 — Feature flag for legacy opname path
-  const ENABLE_LEGACY_OPNAME = false;
 
   const REASON_OPTIONS = ["Kadaluarsa", "Rusak", "Hilang", "Sistem", "Lainnya"] as const;
 
@@ -106,7 +104,7 @@ export function InventoryOpnamePanel() {
         >
           <Plus className="h-4 w-4" /> Mulai Session Opname
         </button>
-        {ENABLE_LEGACY_OPNAME && (
+        {FEATURES.legacyOpname && (
           <button
             onClick={() => setShowOpnameForm(true)}
             className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
@@ -119,20 +117,36 @@ export function InventoryOpnamePanel() {
       {/* Session Banner */}
       {activeSession && activeSession.status !== "completed" && (
         <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between mb-2">
             <div>
               <h3 className="text-sm font-semibold text-brand-800 dark:text-brand-200">📋 {activeSession.title}</h3>
-              <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">
+              <p className="mt-0.5 text-xs text-brand-600 dark:text-brand-400">
                 {activeSession.selectedLocationIds.length > 0
                   ? `Lokasi: ${activeSession.selectedLocationIds.join(", ")}`
                   : "Semua Lokasi"}
-                {" · "}Progress: {activeSession.completedItems}/{activeSession.totalItems}
-                {" · "}{activeSession.progressPercent}%
               </p>
             </div>
-            <span className="rounded bg-brand-100 px-2 py-1 text-[10px] font-medium text-brand-700 dark:bg-brand-900 dark:text-brand-300">
+            <span className={cn(
+              "rounded px-2 py-1 text-[10px] font-medium",
+              activeSession.status === "in_progress" && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+              activeSession.status === "paused" && "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+            )}>
               {activeSession.status === "in_progress" ? "In Progress" : activeSession.status === "paused" ? "Paused" : activeSession.status}
             </span>
+          </div>
+
+          {/* Progress bar */}
+          <div className="mt-2">
+            <div className="flex items-center justify-between text-xs text-brand-600 dark:text-brand-400 mb-1">
+              <span>{activeSession.completedItems} / {activeSession.totalItems} batch</span>
+              <span className="font-bold">{activeSession.progressPercent}%</span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-brand-200 dark:bg-brand-900">
+              <div
+                className="h-2 rounded-full bg-brand-500 transition-all duration-300"
+                style={{ width: `${activeSession.progressPercent}%` }}
+              />
+            </div>
           </div>
         </div>
       )}

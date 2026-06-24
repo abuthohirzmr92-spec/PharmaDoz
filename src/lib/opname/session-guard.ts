@@ -35,22 +35,21 @@ export function canPerformOpname(): SessionGuardResult {
     };
   }
 
-  if (session.status === "paused") {
-    return {
-      allowed: false,
-      reason: "Session sedang dijeda. Silakan lanjutkan session terlebih dahulu.",
-      currentStatus: "paused",
-    };
+  // RC1 P0E.3 — ONLY in_progress is allowed. Everything else is blocked.
+  if (session.status === "in_progress") {
+    return { allowed: true, currentStatus: "in_progress" };
   }
 
-  if (session.status === "completed") {
-    return {
-      allowed: false,
-      reason: "Session sudah selesai. Silakan mulai session baru.",
-      currentStatus: "completed",
-    };
-  }
+  // Map remaining states to specific reasons
+  const reasonMap: Record<string, string> = {
+    draft: "Session masih draft. Silakan mulai session terlebih dahulu.",
+    paused: "Session sedang dijeda. Silakan lanjutkan session terlebih dahulu.",
+    completed: "Session sudah selesai. Silakan mulai session baru.",
+  };
 
-  // draft or in_progress → allowed
-  return { allowed: true, currentStatus: session.status };
+  return {
+    allowed: false,
+    reason: reasonMap[session.status] ?? `Session dalam status ${session.status}. Tidak dapat melakukan opname.`,
+    currentStatus: session.status,
+  };
 }
