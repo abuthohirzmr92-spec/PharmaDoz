@@ -1,13 +1,14 @@
 "use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
-import { Pill, Plus, Search } from "lucide-react";
+import { Pill, Plus, Search, Upload } from "lucide-react";
 import { toast } from "sonner";
 import { Container } from "@/components/shared/container";
 import { EmptyState } from "@/components/shared/empty-state";
 import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { ProductTable, type ProductRow } from "@/components/products/product-table";
 import { ProductFormModal } from "@/components/products/product-form-modal";
+import { ProductImportModal } from "@/components/products/product-import-modal";
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo } from "@/lib/repository-instances";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -24,8 +25,11 @@ export function ProductsPageContent() {
 
   const [showForm, setShowForm] = useState(false);
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
+  // RC1 P0 — Excel Product Import
+  const [showImport, setShowImport] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
+  const [rackFilter, setRackFilter] = useState("");
   const [showInactive, setShowInactive] = useState(false);
   const [isDemoMode, setIsDemoMode] = useState(checkDemoMode());
 
@@ -110,11 +114,20 @@ export function ProductsPageContent() {
     return Array.from(set).sort();
   }, [products]);
 
+  const racks = useMemo(() => {
+    const set = new Set(products.map((p) => p.rackLocation).filter(Boolean) as string[]);
+    return Array.from(set).sort();
+  }, [products]);
+
   const filtered = useMemo(() => {
     let result = products;
 
     if (categoryFilter) {
       result = result.filter((p) => p.category === categoryFilter);
+    }
+
+    if (rackFilter) {
+      result = result.filter((p) => p.rackLocation === rackFilter);
     }
 
     if (!showInactive) {
@@ -126,12 +139,13 @@ export function ProductsPageContent() {
       result = result.filter(
         (p) =>
           p.name.toLowerCase().includes(q) ||
-          (p.barcode && p.barcode.toLowerCase().includes(q)),
+          (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+          (p.rackLocation && p.rackLocation.toLowerCase().includes(q)),
       );
     }
 
     return result;
-  }, [products, categoryFilter, showInactive, searchQuery]);
+  }, [products, categoryFilter, rackFilter, showInactive, searchQuery]);
 
   const handleAdd = useCallback(() => {
     setEditingProduct(null);
@@ -216,13 +230,20 @@ export function ProductsPageContent() {
         />
 
         {canEdit && (
-          <div className="mt-6 flex justify-center">
+          <div className="mt-6 flex justify-center gap-3">
             <button
               onClick={handleAdd}
               className="flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors"
             >
               <Plus className="h-4 w-4" />
               Tambah Produk
+            </button>
+            <button
+              onClick={() => setShowImport(true)}
+              className="flex items-center gap-2 rounded-lg border border-brand-300 bg-white px-5 py-2.5 text-sm font-medium text-brand-700 hover:bg-brand-50 transition-colors dark:border-brand-700 dark:bg-transparent dark:text-brand-400 dark:hover:bg-brand-950"
+            >
+              <Upload className="h-4 w-4" />
+              Import Excel
             </button>
           </div>
         )}
@@ -232,6 +253,14 @@ export function ProductsPageContent() {
           onClose={handleFormClose}
           onSaved={handleFormSaved}
           editingProduct={editingProduct}
+        />
+        <ProductImportModal
+          open={showImport}
+          onClose={() => setShowImport(false)}
+          onImported={() => loadProducts()}
+          existingNames={new Set(products.map(p => p.name.toLowerCase()))}
+          existingBarcodes={new Set(products.map(p => p.barcode).filter(Boolean) as string[])}
+          categories={categories}
         />
       </Container>
     );
@@ -289,6 +318,21 @@ export function ProductsPageContent() {
             </option>
           ))}
         </select>
+
+        {racks.length > 0 && (
+          <select
+            value={rackFilter}
+            onChange={(e) => setRackFilter(e.target.value)}
+            className="rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm text-neutral-600 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-300"
+          >
+            <option value="">Semua Rak</option>
+            {racks.map((r) => (
+              <option key={r} value={r}>
+                {r}
+              </option>
+            ))}
+          </select>
+        )}
 
         <label className="flex items-center gap-2 cursor-pointer shrink-0">
           <button
@@ -349,6 +393,17 @@ export function ProductsPageContent() {
         onSaved={handleFormSaved}
         editingProduct={editingProduct}
       />
+      <ProductImportModal
+        open={showImport}
+        onClose={() => setShowImport(false)}
+        onImported={() => loadProducts()}
+        existingNames={new Set(products.map(p => p.name.toLowerCase()))}
+        existingBarcodes={new Set(products.map(p => p.barcode).filter(Boolean) as string[])}
+        categories={categories}
+      />
     </Container>
   );
 }
+
+// Second instance (non-empty state) — same props
+{/* RC1 P0 — already added in empty state section */}

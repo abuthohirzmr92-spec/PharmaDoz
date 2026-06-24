@@ -321,6 +321,7 @@ export class InventoryRepository extends BaseRepository {
         conducted_by: data.conductedBy ?? null,
         notes: data.notes ?? null,
         tenant_id: this.getTenantId(),
+        pharmacy_id: this.branchId ?? null,
       })
       .select("id")
       .single();
@@ -505,9 +506,10 @@ export class InventoryRepository extends BaseRepository {
       ] = await Promise.all([q1, q2, q3, q4, q5, q6, q7]);
 
       const batches = batchesResult.data || [];
+      // V3 P1A — Inventory value uses unit_price (cost), not selling_price (retail)
       const totalStockValue = batches.reduce(
         (sum: number, b: Record<string, unknown>) =>
-          sum + (b as any).quantity * (b as any).selling_price,
+          sum + (b as any).quantity * (b as any).unit_price,
         0,
       );
 

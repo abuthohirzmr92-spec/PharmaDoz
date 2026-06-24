@@ -188,7 +188,6 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                 product.totalStock <= product.minStock && product.totalStock > 0;
               const isOutOfStock = product.totalStock === 0;
               const isExpanded = expandedRows.has(product.id);
-              const hasMultiUnit = (product.unitLevels ?? []).length > 0;
 
               return (
                 <Fragment key={product.id}>
@@ -198,17 +197,11 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                     {/* Name */}
                     <td className="px-3 py-2.5">
                       <div className="flex items-center gap-1.5">
-                        {/* Expand toggle — only visible if multi unit exists */}
+                        {/* Expand toggle */}
                         <button
-                          onClick={() => hasMultiUnit && toggleExpand(product.id)}
-                          disabled={!hasMultiUnit}
-                          className={cn(
-                            "shrink-0 rounded p-0.5 transition-colors",
-                            hasMultiUnit
-                              ? "text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300"
-                              : "text-transparent",
-                          )}
-                          title={hasMultiUnit ? (isExpanded ? "Sembunyikan detail" : "Tampilkan detail") : undefined}
+                          onClick={() => toggleExpand(product.id)}
+                          className="shrink-0 rounded p-0.5 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300 transition-colors"
+                          title={isExpanded ? "Sembunyikan detail" : "Tampilkan detail"}
                         >
                           {isExpanded ? (
                             <ChevronDown className="h-3.5 w-3.5" />
@@ -253,9 +246,13 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
 
                     {/* Rak */}
                     <td className="hidden md:table-cell px-3 py-2.5">
-                      <span className="text-xs text-neutral-500">
-                        {product.rackLocation || "—"}
-                      </span>
+                      {product.rackLocation ? (
+                        <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
+                          {product.rackLocation}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-neutral-400">—</span>
+                      )}
                     </td>
 
                     {/* Harga Jual */}
@@ -334,14 +331,73 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                     </td>
                   </tr>
 
-                  {/* Expanded detail row — tree view */}
-                  {isExpanded && hasMultiUnit && (
+                  {/* Expanded detail row — product detail card */}
+                  {isExpanded && (
                     <tr className="bg-neutral-50 dark:bg-neutral-800/30">
-                      <td colSpan={9} className="px-6 py-2.5">
-                        <MultiUnitTree
-                          baseUnit={product.unit}
-                          unitLevels={product.unitLevels ?? []}
-                        />
+                      <td colSpan={9} className="px-6 py-3">
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 text-[11px]">
+                          {/* Category */}
+                          <div>
+                            <span className="text-neutral-400">Kategori</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.category || "—"}</p>
+                          </div>
+                          {/* Unit */}
+                          <div>
+                            <span className="text-neutral-400">Satuan Dasar</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.unit}</p>
+                          </div>
+                          {/* Rack */}
+                          <div>
+                            <span className="text-neutral-400">Rak</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.rackLocation || "—"}</p>
+                          </div>
+                          {/* Stock */}
+                          <div>
+                            <span className="text-neutral-400">Stok</span>
+                            <p className={cn("font-medium tabular-nums",
+                              product.totalStock === 0 ? "text-red-600" :
+                              product.totalStock <= product.minStock ? "text-amber-600" :
+                              "text-neutral-700 dark:text-neutral-200")}>
+                              {product.totalStock} {product.unit}
+                            </p>
+                          </div>
+                          {/* Min Stock */}
+                          <div>
+                            <span className="text-neutral-400">Stok Minimum</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.minStock}</p>
+                          </div>
+                          {/* Barcode */}
+                          <div>
+                            <span className="text-neutral-400">Barcode</span>
+                            <p className="font-medium font-mono text-neutral-700 dark:text-neutral-200">{product.barcode || "—"}</p>
+                          </div>
+                          {/* Prescription */}
+                          <div>
+                            <span className="text-neutral-400">Resep Dokter</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">
+                              {product.requiresPrescription ? (
+                                <span className="text-red-600">Ya</span>
+                              ) : "Tidak"}
+                            </p>
+                          </div>
+                          {/* Multi Unit */}
+                          {(product.unitLevels ?? []).length > 0 && (
+                            <div className="col-span-2 sm:col-span-3 md:col-span-4">
+                              <span className="text-neutral-400">Struktur Kemasan</span>
+                              <MultiUnitTree
+                                baseUnit={product.unit}
+                                unitLevels={product.unitLevels ?? []}
+                              />
+                            </div>
+                          )}
+                          {/* Description */}
+                          {product.description && (
+                            <div className="col-span-2 sm:col-span-3 md:col-span-4">
+                              <span className="text-neutral-400">Deskripsi</span>
+                              <p className="text-neutral-600 dark:text-neutral-400">{product.description}</p>
+                            </div>
+                          )}
+                        </div>
                       </td>
                     </tr>
                   )}

@@ -7,6 +7,7 @@ import { generateProductCode } from "@/lib/barcode-utils";
 import { productRepo } from "@/lib/repository-instances";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { NumericInput } from "@/components/shared/numeric-input";
+import { BASE_UNITS } from "@/constants/unit-options";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -37,8 +38,6 @@ const DEMO_CATEGORIES = [
   "Suplemen",
 ];
 
-const DEMO_UNITS = ["Tablet", "Botol", "Strip", "Sachet", "Tube", "Pcs"];
-
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -66,7 +65,7 @@ export function QuickCreateProductModal({
     checkDemoMode() ? DEMO_CATEGORIES : [],
   );
   const [units, setUnits] = useState<string[]>(
-    checkDemoMode() ? DEMO_UNITS : [],
+    checkDemoMode() ? BASE_UNITS : [],
   );
   const categoryIdMapRef = useRef<Map<string, string>>(new Map());
   const nameRef = useRef<HTMLInputElement>(null);

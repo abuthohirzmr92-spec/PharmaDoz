@@ -399,6 +399,13 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   performOpname: async (opname) => {
     const state = get();
 
+    // RC1 P0E.2 — Session enforcement guard
+    const { canPerformOpname } = await import("@/lib/opname/session-guard");
+    const guard = canPerformOpname();
+    if (!guard.allowed) {
+      throw new Error(guard.reason ?? "Opname tidak diizinkan.");
+    }
+
     if (state.dataSource === 'database') {
       set({ isSubmitting: true });
 
@@ -429,9 +436,18 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             })),
         });
 
+        // P4C: Reload current batch quantities before adjusting (prevent concurrent corruption)
+        const currentBatches = await inventoryRepo.getBatches();
+        const batchQtyMap = new Map(currentBatches.map(b => [b.id, b.quantity]));
+
         // For each item with difference: update batch + create movement
         for (const item of opname.items) {
           if (item.difference === 0) continue;
+
+          // Use LIVE quantity, not snapshotted systemQty
+          const currentQty = batchQtyMap.get(item.batchId) ?? item.systemQty;
+          const actualDiff = item.physicalQty - currentQty;
+          if (actualDiff === 0) continue; // concurrent change resolved the difference
 
           await inventoryRepo.updateBatchQuantity(item.batchId, item.physicalQty);
           await inventoryRepo.createStockMovement({
@@ -440,8 +456,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
             productName: item.productName,
             batchId: item.batchId,
             batchNumber: item.batchNumber,
-            qtyBefore: item.systemQty,
-            qtyChange: item.difference,
+            qtyBefore: currentQty,
+            qtyChange: actualDiff,
             qtyAfter: item.physicalQty,
             referenceNumber: `OPN-${opname.id.slice(0, 8)}`,
             note: item.note || `Penyesuaian dari opname ${opname.date}`,
@@ -578,6 +594,24 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
         await get().loadDemoData();
         set({ isSubmitting: false });
+        // V3 P2A — audit trail: expired writeoff
+        const writtenOffQty = batchIds.reduce((sum, id) => {
+          const b = state.batches.find(x => x.id === id);
+          return sum + (b?.quantity ?? 0);
+        }, 0);
+        logActivity({
+          action: "inventory.writeoff",
+          resourceType: "product_batch",
+          resourceId: batchIds[0] ?? "",
+          reference: `WO-${new Date().toISOString().slice(0, 10)}`,
+          severity: "warning",
+          metadata: {
+            batchCount: batchIds.length,
+            totalQuantity: writtenOffQty,
+            reason: "expired",
+            note: note ?? null,
+          },
+        }).catch(() => {});
         return;
       } catch (e) {
         console.error('DB write-off failed, falling back to demo:', e);
@@ -677,6 +711,21 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
               batches: allBatches,
               dataSource: "database",
             });
+            // V3 P2A — audit trail: purchase payment
+            logActivity({
+              action: "purchase.payment",
+              resourceType: "purchase_invoice",
+              resourceId: invoiceId,
+              reference: invoice.invoiceNumber,
+              severity: "info",
+              metadata: {
+                supplierId: invoice.supplierId,
+                supplierName: invoice.supplierName,
+                amount,
+                paymentMethod: paymentMethod ?? "unknown",
+                walletId: walletId ?? null,
+              },
+            }).catch(() => {});
           } catch { /* best-effort reload */ }
           return;
         } catch (e) {

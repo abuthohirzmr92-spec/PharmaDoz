@@ -52,6 +52,7 @@ import { QuickCreateProductModal } from "@/components/products/quick-create-prod
 import { ProductFormModal } from "@/components/products/product-form-modal";
 import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
 import { NumericInput } from "@/components/shared/numeric-input";
+import { toBaseUnit } from "@/lib/unit-converter";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
 
@@ -318,17 +319,34 @@ export function InventoryPurchasePanel() {
     const totalAmount = validItems.reduce((s, it) => s + it.quantity * it.unitPrice, 0);
 
     // Map PurchaseFormItem[] → PurchaseItem[] (save contract)
-    const purchaseItems: PurchaseItem[] = validItems.map((it) => ({
-      id: it.id,
-      tenantId: "",
-      productId: it.productId,
-      productName: it.productName,
-      batchNumber: it.batchNumber,
-      expiredDate: it.expiredDate,
-      quantity: it.quantity,
-      unitPrice: it.unitPrice,
-      sellingPrice: it.sellingPrice,
-    }));
+    // V3 P0A — convert display unit → base unit for batch storage
+    const purchaseItems: PurchaseItem[] = validItems.map((it) => {
+      let baseQty = it.quantity;
+      let baseUnitPrice = it.unitPrice;
+      if (it.unit) {
+        const prod = productList.find(p => p.id === it.productId);
+        const levels = prod?.unitLevels ?? [];
+        if (levels.length > 0) {
+          const multiplier = toBaseUnit(1, it.unit, levels) / 1; // get multiplier
+          baseQty = toBaseUnit(it.quantity, it.unit, levels);
+          // Adjust unit price to per-base-unit (e.g., Dus Rp 200.000 → Tablet Rp 1.000)
+          if (baseQty > 0 && baseQty !== it.quantity) {
+            baseUnitPrice = Math.round(it.unitPrice * it.quantity / baseQty);
+          }
+        }
+      }
+      return {
+        id: it.id,
+        tenantId: "",
+        productId: it.productId,
+        productName: it.productName,
+        batchNumber: it.batchNumber,
+        expiredDate: it.expiredDate,
+        quantity: baseQty,
+        unitPrice: baseUnitPrice,
+        sellingPrice: it.sellingPrice,
+      };
+    });
 
     const invoice: PurchaseInvoice = {
       id: `inv-${Date.now()}`,
@@ -609,10 +627,13 @@ export function InventoryPurchasePanel() {
                         Hrg Beli
                       </th>
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
+                        Hrg Dasar
+                      </th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
                         HPP
                       </th>
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        Hrg Jual
+                        Jual Dasar
                       </th>
                       <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">
                         Status
@@ -622,7 +643,17 @@ export function InventoryPurchasePanel() {
                   </thead>
                   <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
                     {formItems.map((item) => {
-                      const hpp = Math.round(item.unitPrice * (1 + purchaseTaxPercent / 100));
+                      // V3 P1 — compute base unit price for display
+                      const prodMeta = productList.find(p => p.id === item.productId);
+                      const levels = prodMeta?.unitLevels ?? [];
+                      const hasMultiUnit = levels.length > 0;
+                      const multiplier = hasMultiUnit && item.unit
+                        ? (() => { try { return toBaseUnit(1, item.unit, levels); } catch { return 1; } })()
+                        : 1;
+                      const baseUnitPrice = multiplier > 1 ? Math.round(item.unitPrice / multiplier) : item.unitPrice;
+                      const baseSellingPrice = multiplier > 1 ? Math.round(item.sellingPrice / multiplier) : item.sellingPrice;
+                      // V3 P1A — HPP must use base unit price, not display unit price
+                      const hpp = Math.round(baseUnitPrice * (1 + purchaseTaxPercent / 100));
                       const badge = item.productId
                         ? { label: "✓ MATCHED", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" }
                         : { label: "⚠ Belum terdaftar", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" };
@@ -697,10 +728,17 @@ export function InventoryPurchasePanel() {
                             className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                           />
                         </td>
+                        {/* V3 P1 — Harga Dasar (per base unit, readonly) */}
+                        <td className="px-2 py-1 text-right">
+                          <span className="text-[10px] tabular-nums text-neutral-400">
+                            {hasMultiUnit && multiplier > 1 ? baseUnitPrice.toLocaleString("id-ID") : "—"}
+                          </span>
+                        </td>
                         {/* HPP — read-only */}
                         <td className="px-2 py-1 text-right">
                           <span className="text-[11px] tabular-nums text-neutral-500">{hpp.toLocaleString("id-ID")}</span>
                         </td>
+                        {/* V3 P1 — Jual Dasar (per base unit) */}
                         <td className="px-2 py-1">
                           <NumericInput
                             value={item.sellingPrice}
@@ -708,6 +746,9 @@ export function InventoryPurchasePanel() {
                             onChange={(v) => handleItemChange(item.id, "sellingPrice", v)}
                             className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                           />
+                          {hasMultiUnit && multiplier > 1 && (
+                            <div className="text-[9px] text-neutral-400 text-right">{baseSellingPrice.toLocaleString("id-ID")} / {prodMeta?.unit ?? "base"}</div>
+                          )}
                         </td>
                         {/* Status badge */}
                         <td className="px-2 py-1 text-center">

@@ -390,6 +390,9 @@ export interface ProductRow {
   requires_prescription: boolean;
   min_stock: number;
   rack_location: string | null;
+  manufacturer: string | null;
+  strength: string | null;
+  dosage_form: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;

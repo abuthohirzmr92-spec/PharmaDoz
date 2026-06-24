@@ -113,6 +113,12 @@ export interface StockOpnameItem {
   physicalQty: number;
   difference: number;
   note: string;
+  /** V3 P3A — Multi Unit Opname counts (optional, backward compatible) */
+  multiUnitCounts?: import("@/lib/unit-opname").MultiUnitCount[];
+  /** V3 P3A — Total physical in base unit (computed from multiUnitCounts) */
+  physicalBaseQty?: number;
+  /** V3 P3B.1A — Product base unit for smart fallback display */
+  baseUnit?: string;
 }
 
 export interface StockOpname {
@@ -156,7 +162,7 @@ export interface InventoryProduct {
 export interface DashboardSummary {
   tenantId?: string;
   totalProducts: number;
-  totalStockValue: number; // sum(qty * sellingPrice)
+  totalStockValue: number; // sum(qty * unitPrice) — cost-based valuation
   lowStockCount: number; // totalStock <= minStock
   nearExpiryCount: number; // expired within 90 days
   expiredCount: number; // already expired

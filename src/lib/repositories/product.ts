@@ -19,6 +19,9 @@ export interface Product {
   requiresPrescription: boolean;
   minStock: number;
   rackLocation: string | null;
+  manufacturer: string | null;
+  strength: string | null;
+  dosageForm: string | null;
   pharmacyId: string | null;
   isActive: boolean;
   createdAt: string;
@@ -240,6 +243,9 @@ export class ProductRepository extends BaseRepository {
     requiresPrescription?: boolean;
     minStock?: number;
     rackLocation?: string | null;
+    manufacturer?: string | null;
+    strength?: string | null;
+    dosageForm?: string | null;
     isActive?: boolean;
     /** V2 Multi Unit — optional unit levels (Level 2 & 3) */
     unitLevels?: UnitLevel[];
@@ -259,6 +265,9 @@ export class ProductRepository extends BaseRepository {
       requires_prescription: data.requiresPrescription ?? false,
       min_stock: data.minStock ?? 0,
       rack_location: data.rackLocation ?? null,
+      manufacturer: data.manufacturer ?? null,
+      strength: data.strength ?? null,
+      dosage_form: data.dosageForm ?? null,
       is_active: data.isActive ?? true,
     };
 
@@ -278,6 +287,25 @@ export class ProductRepository extends BaseRepository {
     if (error) return this.handleError(error, "createProduct");
 
     const product = mapRow<Product>(row as Record<string, unknown>);
+
+    // RC1.5 P0C — Emit product created event with sourceType (non-blocking MPKB listener)
+    const tenantId = this.getTenantId();
+    if (tenantId) {
+      const { emitProductCreated, buildProductCreatedEvent } = await import("@/lib/mpkb/events");
+      emitProductCreated(buildProductCreatedEvent({
+        tenantId,
+        productId: product.id,
+        name: product.name,
+        barcode: product.barcode,
+        manufacturer: data.manufacturer ?? product.manufacturer ?? null,
+        strength: data.strength ?? product.strength ?? null,
+        dosageForm: data.dosageForm ?? product.dosageForm ?? null,
+        categoryId: data.categoryId, // UUID from createProduct param
+        baseUnit: data.unit ?? "pcs",
+        unitLevels: data.unitLevels,
+        sourceType: (data as any)._mpkbSourceType ?? "manual",
+      }));
+    }
 
     // V2 Multi Unit — insert unit levels if provided
     if (data.unitLevels && data.unitLevels.length > 0) {
@@ -314,6 +342,9 @@ export class ProductRepository extends BaseRepository {
       requiresPrescription: boolean;
       minStock: number;
       rackLocation: string | null;
+      manufacturer: string | null;
+      strength: string | null;
+      dosageForm: string | null;
       isActive: boolean;
       /** V2 Multi Unit — optional unit levels (Level 2 & 3).
        *  undefined = jangan sentuh. [] = hapus semua. [...]= sync diff. */
@@ -343,6 +374,9 @@ export class ProductRepository extends BaseRepository {
       updateData["requires_prescription"] = data.requiresPrescription;
     if (data.minStock !== undefined) updateData["min_stock"] = data.minStock;
     if (data.rackLocation !== undefined) updateData["rack_location"] = data.rackLocation;
+    if (data.manufacturer !== undefined) updateData["manufacturer"] = data.manufacturer;
+    if (data.strength !== undefined) updateData["strength"] = data.strength;
+    if (data.dosageForm !== undefined) updateData["dosage_form"] = data.dosageForm;
     if (data.isActive !== undefined) updateData["is_active"] = data.isActive;
 
     this.requireTenant();

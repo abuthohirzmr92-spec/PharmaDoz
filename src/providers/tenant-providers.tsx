@@ -10,6 +10,10 @@ import { NetworkProvider } from "./network-provider";
 import { QueryProvider } from "./query-provider";
 import { ThemeProvider } from "./theme-provider";
 import { ToastProvider } from "./toast-provider";
+import { bootstrapMpkb } from "@/lib/bootstrap/mpkb-bootstrap";
+
+// RC1.5 P0C — Initialize MPKB listener once at app startup
+bootstrapMpkb();
 
 /**
  * Tenant-only provider tree.

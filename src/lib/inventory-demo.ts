@@ -945,8 +945,9 @@ export function buildDashboardSummary(
   movements: StockMovement[],
 ): DashboardSummary {
   const products = buildInventoryProducts(batches);
+  // V3 P1A — Inventory value uses unitPrice (cost), not sellingPrice (retail)
   const totalStockValue = batches.reduce(
-    (sum, b) => sum + b.quantity * b.sellingPrice,
+    (sum, b) => sum + b.quantity * b.unitPrice,
     0,
   );
   const lowStockCount = products.filter(

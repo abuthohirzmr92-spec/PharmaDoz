@@ -15,6 +15,9 @@ import { useInventoryStore } from "@/store/inventory-store";
 import type { OpnameStatus } from "@/types/inventory";
 import { cn } from "@/lib/cn";
 import { InventoryOpnameFormModal } from "./inventory-opname-form-modal";
+import { OpnameSessionStartModal } from "./opname-session-start-modal";
+import { useOpnameSessionStore } from "@/store/opname-session-store";
+import { buildMultiUnitSummary } from "@/lib/unit-opname";
 
 const STATUS_STYLE: Record<OpnameStatus, { icon: typeof CheckCircle; cls: string; label: string }> = {
   draft: { icon: Clock, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Draft" },
@@ -36,6 +39,12 @@ export function InventoryOpnamePanel() {
   const [expandedId, setExpandedId] = useState<string | null>(null);
   const [reasonFilter, setReasonFilter] = useState<string>("");
   const [showOpnameForm, setShowOpnameForm] = useState(false);
+  // RC1 P0E — Session start modal
+  const [showSessionModal, setShowSessionModal] = useState(false);
+  const activeSession = useOpnameSessionStore((s) => s.activeSession);
+
+  // RC1 P0E.2 — Feature flag for legacy opname path
+  const ENABLE_LEGACY_OPNAME = false;
 
   const REASON_OPTIONS = ["Kadaluarsa", "Rusak", "Hilang", "Sistem", "Lainnya"] as const;
 
@@ -92,12 +101,44 @@ export function InventoryOpnamePanel() {
           ))}
         </select>
         <button
-          onClick={() => setShowOpnameForm(true)}
-          className="ml-auto flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
+          onClick={() => setShowSessionModal(true)}
+          className="flex items-center gap-1.5 rounded-lg bg-brand-600 px-3 py-2 text-sm font-medium text-white hover:bg-brand-700 transition-colors"
         >
-          <Plus className="h-4 w-4" /> Buat Stock Opname
+          <Plus className="h-4 w-4" /> Mulai Session Opname
         </button>
+        {ENABLE_LEGACY_OPNAME && (
+          <button
+            onClick={() => setShowOpnameForm(true)}
+            className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors"
+          >
+            Buat Manual
+          </button>
+        )}
       </div>
+
+      {/* Session Banner */}
+      {activeSession && activeSession.status !== "completed" && (
+        <div className="mb-4 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-brand-800 dark:text-brand-200">📋 {activeSession.title}</h3>
+              <p className="mt-1 text-xs text-brand-600 dark:text-brand-400">
+                {activeSession.selectedLocationIds.length > 0
+                  ? `Lokasi: ${activeSession.selectedLocationIds.join(", ")}`
+                  : "Semua Lokasi"}
+                {" · "}Progress: {activeSession.completedItems}/{activeSession.totalItems}
+                {" · "}{activeSession.progressPercent}%
+              </p>
+            </div>
+            <span className="rounded bg-brand-100 px-2 py-1 text-[10px] font-medium text-brand-700 dark:bg-brand-900 dark:text-brand-300">
+              {activeSession.status === "in_progress" ? "In Progress" : activeSession.status === "paused" ? "Paused" : activeSession.status}
+            </span>
+          </div>
+        </div>
+      )}
+
+      {/* Session Start Modal */}
+      <OpnameSessionStartModal open={showSessionModal} onClose={() => setShowSessionModal(false)} />
 
       {/* Opname Form Modal */}
       <InventoryOpnameFormModal open={showOpnameForm} onClose={() => setShowOpnameForm(false)} />
@@ -250,70 +291,80 @@ function OpnameDetailPanel({
 
   if (!opname) return null;
 
+  const baseLabel = (item: any): string => item?.baseUnit || "pcs";
+
   return (
     <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
       <div className="flex items-center justify-between mb-3">
         <h4 className="text-xs font-semibold text-neutral-700 dark:text-neutral-300">
-          Detail Opname — {new Date(opname.date).toLocaleDateString("id-ID", {
-            day: "numeric",
-            month: "long",
-            year: "numeric",
-          })}
+          Detail Opname � {new Date(opname.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
         </h4>
-        <button onClick={onClose} className="text-[10px] text-neutral-400 hover:text-neutral-600">
-          Tutup
-        </button>
+        <button onClick={onClose} className="text-[10px] text-neutral-400 hover:text-neutral-600">Tutup</button>
       </div>
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-neutral-200 dark:border-neutral-700">
-            <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">Produk</th>
-            <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">Batch</th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Sistem</th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Fisik</th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Selisih</th>
-            <th className="py-1.5 text-left text-[10px] font-medium text-neutral-400">Alasan</th>
-            <th className="py-1.5 text-left text-[10px] font-medium text-neutral-400">Catatan</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-          {opname.items.map((item, idx) => {
-            const reason = getReasonFromNote(item.note);
-            return (
-              <tr key={`${item.productId}-${item.batchId || idx}`}>
-                <td className="py-1.5 pr-2 text-neutral-700 dark:text-neutral-300">{item.productName}</td>
-                <td className="py-1.5 pr-2 font-mono text-neutral-500">{item.batchNumber || "—"}</td>
-                <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">{item.systemQty}</td>
-                <td className="py-1.5 pr-2 text-right tabular-nums font-medium text-neutral-700 dark:text-neutral-300">{item.physicalQty}</td>
-                <td className="py-1.5 pr-2 text-right tabular-nums">
-                  <span
-                    className={cn(
-                      "font-semibold",
-                      item.difference > 0
-                        ? "text-green-600"
-                        : item.difference < 0
-                          ? "text-red-600"
-                          : "text-neutral-400",
-                    )}
-                  >
-                    {item.difference > 0 ? `+${item.difference}` : item.difference === 0 ? "0" : item.difference}
+
+      <div className="space-y-3">
+        {opname.items.map((item, idx) => {
+          const unit = baseLabel(item);
+          const detail = buildMultiUnitSummary((item as any).multiUnitCounts, unit);
+          const hasVariance = item.difference !== 0;
+
+          return (
+            <div key={`${item.productId}-${item.batchId || idx}`} className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
+              {/* Header: product + batch + variance badge */}
+              <div className="flex items-baseline justify-between mb-2">
+                <div>
+                  <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">{item.productName}</p>
+                  <p className="text-[10px] font-mono text-neutral-400">{item.batchNumber || "�"}</p>
+                </div>
+                {hasVariance && (
+                  <span className={cn("rounded px-2 py-0.5 text-[10px] font-bold tabular-nums",
+                    item.difference > 0 ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400"
+                    : "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400")}>
+                    {item.difference > 0 ? "+" : ""}{item.difference} {unit}
                   </span>
-                </td>
-                <td className="py-1.5 pr-2">
-                  {reason ? (
-                    <span className={cn("inline-block rounded px-1 py-0.5 text-[9px] font-medium", REASON_COLORS[reason])}>
-                      {reason}
-                    </span>
-                  ) : (
-                    <span className="text-neutral-300">—</span>
-                  )}
-                </td>
-                <td className="py-1.5 text-neutral-500">{item.note || "—"}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+                )}
+              </div>
+
+              {/* Detail grid: 2 columns */}
+              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                <div>
+                  <span className="text-neutral-400">Detail Hitung</span>
+                  <p className="font-medium text-neutral-700 dark:text-neutral-300">{detail}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-neutral-400">Qty Fisik</span>
+                  <p className="font-medium tabular-nums text-neutral-700 dark:text-neutral-300">{item.physicalQty} {unit}</p>
+                </div>
+                <div>
+                  <span className="text-neutral-400">Qty Sistem</span>
+                  <p className="tabular-nums text-neutral-500">{item.systemQty} {unit}</p>
+                </div>
+                <div className="text-right">
+                  <span className="text-neutral-400">Selisih</span>
+                  <p className={cn("font-medium tabular-nums",
+                    item.difference > 0 ? "text-green-600" : item.difference < 0 ? "text-red-600" : "text-neutral-400")}>
+                    {item.difference > 0 ? "+" : ""}{item.difference} {unit}
+                  </p>
+                </div>
+                {item.note && (
+                  <div className="col-span-2">
+                    <span className="text-neutral-400">Catatan</span>
+                    <p className="text-neutral-600 dark:text-neutral-400">{item.note}</p>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Footer: conducted by + date */}
+      <div className="mt-3 flex items-center gap-3 text-[10px] text-neutral-400">
+        <span>Dilakukan Oleh: {opname.conductedBy || "�"}</span>
+        <span>�</span>
+        <span>{new Date(opname.date).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}</span>
+      </div>
     </div>
   );
 }
+

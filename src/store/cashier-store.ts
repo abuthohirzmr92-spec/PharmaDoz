@@ -142,9 +142,12 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       return;
     }
     set({
-      cart: get().cart.map((i) =>
-        i.productId === productId ? { ...i, quantity } : i,
-      ),
+      cart: get().cart.map((i) => {
+        if (i.productId !== productId) return i;
+        // V3 P0C — keep baseQuantity in sync with display quantity
+        const ratio = i.quantity > 0 ? (i.baseQuantity ?? i.quantity) / i.quantity : 1;
+        return { ...i, quantity, baseQuantity: Math.round(quantity * ratio) };
+      }),
     });
   },
 
@@ -230,12 +233,13 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       id: transactionId,
       tenantId: auth.user?.tenantId ?? auth.user?.pharmacyId ?? "",
       invoiceNumber: get().invoiceNumber ?? `INV-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`,
+      // V3 P0B — send BASE quantity to FEFO (display qty retained for receipt)
       items: cart.map((item) => ({
         productId: item.productId,
         productName: item.productName,
-        quantity: item.quantity,
+        quantity: item.baseQuantity ?? item.quantity,
         unitPrice: item.unitPrice,
-        subtotal: item.quantity * item.unitPrice,
+        subtotal: (item.baseQuantity ?? item.quantity) * item.unitPrice,
       })),
       payments: payments.map((p) => ({
         amount: p.amount,
@@ -280,6 +284,10 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       }
 
       // FEFO allocation + inventory deduction + sale_batch_allocations
+      // V3 P1E — explicit allocation status tracking
+      let allocationStatus: "created" | "failed" | "skipped_offline" | "skipped_demo" | "unknown" = "unknown";
+      const isDb = isSupabaseConnected();
+      const isDemo = useInventoryStore.getState().isDemoMode;
       try {
         const realTxnId = dbTransaction?.id ?? transactionId;
         const realItems = (dbTransaction?.items ?? transaction.items).map((item) => ({
@@ -288,11 +296,18 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
           productName: item.productName,
           quantity: item.quantity,
         }));
-        console.log("[TXN-TRACE] STEP 7: deductForSale called, realTxnId:", realTxnId, "items:", realItems.length);
         await invStore.deductForSale(realItems, realTxnId);
-        console.log("[TXN-TRACE] STEP 8: deductForSale completed");
+        // deductForSale succeeded — allocation status depends on environment
+        if (isDb) {
+          allocationStatus = "created";
+        } else if (isDemo) {
+          allocationStatus = "skipped_demo";
+        } else {
+          allocationStatus = "skipped_offline";
+        }
       } catch (err) {
         console.error("[TXN-TRACE] STEP 8 FAILED:", err);
+        allocationStatus = "failed";
         set({ isSubmitting: false, submitError: err instanceof Error ? err.message : "Gagal memproses inventori." });
         return { success: false, error: "Gagal memproses inventori. Silakan coba lagi." };
       }
@@ -314,7 +329,14 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       logActivity({
         action: "sale.created", resourceType: "transaction", resourceId: transactionId,
         reference: transaction.invoiceNumber,
-        metadata: { total: transaction.subtotal, itemCount: cart.length, paymentMethod: payments[0]?.method, cashierName: transaction.cashierName },
+        metadata: {
+          total: transaction.subtotal,
+          itemCount: cart.length,
+          paymentMethod: payments[0]?.method,
+          cashierName: transaction.cashierName,
+          // V3 P1E — explicit allocation status
+          allocationStatus,
+        },
       }).catch(() => {});
       return { success: true, transactionId };
     } catch (err) {
