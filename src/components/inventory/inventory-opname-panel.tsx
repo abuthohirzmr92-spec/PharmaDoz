@@ -10,12 +10,14 @@ import {
   Clock,
   Settings,
   Plus,
+  Play,
 } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import type { OpnameStatus } from "@/types/inventory";
 import { cn } from "@/lib/cn";
 import { InventoryOpnameFormModal } from "./inventory-opname-form-modal";
 import { OpnameSessionStartModal } from "./opname-session-start-modal";
+import { OpnameSessionDetailModal } from "./opname-session-detail-modal";
 import { useOpnameSessionStore } from "@/store/opname-session-store";
 import { FEATURES } from "@/config/features";
 import { buildMultiUnitSummary } from "@/lib/unit-opname";
@@ -42,6 +44,7 @@ export function InventoryOpnamePanel() {
   const [showOpnameForm, setShowOpnameForm] = useState(false);
   // RC1 P0E — Session start modal
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const [showSessionDetail, setShowSessionDetail] = useState(false);
   const activeSession = useOpnameSessionStore((s) => s.activeSession);
 
   const REASON_OPTIONS = ["Kadaluarsa", "Rusak", "Hilang", "Sistem", "Lainnya"] as const;
@@ -126,13 +129,19 @@ export function InventoryOpnamePanel() {
                   : "Semua Lokasi"}
               </p>
             </div>
-            <span className={cn(
-              "rounded px-2 py-1 text-[10px] font-medium",
-              activeSession.status === "in_progress" && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
-              activeSession.status === "paused" && "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
-            )}>
-              {activeSession.status === "in_progress" ? "In Progress" : activeSession.status === "paused" ? "Paused" : activeSession.status}
-            </span>
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowSessionDetail(true)}
+                className="flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors">
+                <Play className="h-3 w-3" /> Lanjutkan
+              </button>
+              <span className={cn(
+                "rounded px-2 py-1 text-[10px] font-medium",
+                activeSession.status === "in_progress" && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
+                activeSession.status === "paused" && "bg-amber-100 text-amber-700 dark:bg-amber-950/30 dark:text-amber-400",
+              )}>
+                {activeSession.status === "in_progress" ? "In Progress" : activeSession.status === "paused" ? "Paused" : activeSession.status}
+              </span>
+            </div>
           </div>
 
           {/* Progress bar */}
@@ -151,8 +160,27 @@ export function InventoryOpnamePanel() {
         </div>
       )}
 
+      {/* Completed session banner */}
+      {activeSession && activeSession.status === "completed" && (
+        <div className="mb-4 rounded-xl border border-green-200 bg-green-50/50 p-4 dark:border-green-800 dark:bg-green-950/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-green-800 dark:text-green-200">✅ {activeSession.title}</h3>
+              <p className="text-xs text-green-600 dark:text-green-400">{activeSession.completedItems} / {activeSession.totalItems} batch · 100%</p>
+            </div>
+            <button onClick={() => setShowSessionDetail(true)}
+              className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400">
+              Lihat Hasil
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Session Start Modal */}
       <OpnameSessionStartModal open={showSessionModal} onClose={() => setShowSessionModal(false)} />
+
+      {/* Session Detail Modal */}
+      <OpnameSessionDetailModal open={showSessionDetail} onClose={() => setShowSessionDetail(false)} />
 
       {/* Opname Form Modal */}
       <InventoryOpnameFormModal open={showOpnameForm} onClose={() => setShowOpnameForm(false)} />
