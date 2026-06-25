@@ -15,10 +15,15 @@ import {
 import { useInventoryStore } from "@/store/inventory-store";
 import type { OpnameStatus } from "@/types/inventory";
 import { cn } from "@/lib/cn";
+import { toast } from "sonner";
 import { InventoryOpnameFormModal } from "./inventory-opname-form-modal";
 import { OpnameSessionStartModal } from "./opname-session-start-modal";
 import { OpnameSessionDetailModal } from "./opname-session-detail-modal";
 import { useOpnameSessionStore } from "@/store/opname-session-store";
+import { createSessionFacade } from "@/lib/opname/session-application";
+import { buildSessionExecutionContext } from "@/lib/opname/session-context";
+import { useAuthStore } from "@/store/auth-store";
+import { useBranchStore } from "@/store/branch-store";
 import { FEATURES } from "@/config/features";
 import { buildMultiUnitSummary } from "@/lib/unit-opname";
 
@@ -46,6 +51,15 @@ export function InventoryOpnamePanel() {
   const [showSessionModal, setShowSessionModal] = useState(false);
   const [showSessionDetail, setShowSessionDetail] = useState(false);
   const activeSession = useOpnameSessionStore((s) => s.activeSession);
+  const pauseSession = useOpnameSessionStore((s) => s.pauseSession);
+  const resumeSession = useOpnameSessionStore((s) => s.resumeSession);
+  const clearSession = useOpnameSessionStore((s) => s.clearSession);
+
+  // RC1 P0H.3E — Single application facade for all session operations
+  const authUser = useAuthStore((s) => s.user);
+  const activeBranch = useBranchStore((s) => s.activeBranch);
+  const sessionContext = buildSessionExecutionContext(authUser, activeBranch);
+  const sessionApp = createSessionFacade(sessionContext);
 
   const REASON_OPTIONS = ["Kadaluarsa", "Rusak", "Hilang", "Sistem", "Lainnya"] as const;
 
@@ -130,10 +144,30 @@ export function InventoryOpnamePanel() {
               </p>
             </div>
             <div className="flex items-center gap-2">
-              <button onClick={() => setShowSessionDetail(true)}
-                className="flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors">
-                <Play className="h-3 w-3" /> Lanjutkan
-              </button>
+              {activeSession.status === "in_progress" && (
+                <>
+                  <button onClick={() => setShowSessionDetail(true)}
+                    className="flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors">
+                    <Play className="h-3 w-3" /> Lanjutkan
+                  </button>
+                  <button onClick={pauseSession}
+                    className="rounded-lg border border-amber-300 px-2.5 py-1.5 text-xs font-medium text-amber-700 hover:bg-amber-50 dark:border-amber-700 dark:text-amber-400">
+                    ⏸ Jeda
+                  </button>
+                </>
+              )}
+              {activeSession.status === "paused" && (
+                <>
+                  <button onClick={resumeSession}
+                    className="flex items-center gap-1 rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-brand-700">
+                    <Play className="h-3 w-3" /> Lanjutkan
+                  </button>
+                  <button onClick={() => { if (confirm("Batalkan session?")) clearSession(); }}
+                    className="rounded-lg border border-red-300 px-2.5 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 dark:border-red-700 dark:text-red-400">
+                    ✕ Batalkan
+                  </button>
+                </>
+              )}
               <span className={cn(
                 "rounded px-2 py-1 text-[10px] font-medium",
                 activeSession.status === "in_progress" && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
@@ -168,9 +202,30 @@ export function InventoryOpnamePanel() {
               <h3 className="text-sm font-semibold text-green-800 dark:text-green-200">✅ {activeSession.title}</h3>
               <p className="text-xs text-green-600 dark:text-green-400">{activeSession.completedItems} / {activeSession.totalItems} batch · 100%</p>
             </div>
-            <button onClick={() => setShowSessionDetail(true)}
-              className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400">
-              Lihat Hasil
+            <div className="flex items-center gap-2">
+              <button onClick={() => setShowSessionDetail(true)}
+                className="rounded-lg bg-green-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-green-700">
+                Review
+              </button>
+              <button onClick={async () => { const result = await sessionApp.post(); if (result.success) { toast.success(result.message); } else { toast.error(result.message); } }}
+                className="rounded-lg border border-green-300 px-3 py-1.5 text-xs font-medium text-green-700 hover:bg-green-50 dark:border-green-700 dark:text-green-400">
+                Posting Adjustment
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeSession && activeSession.status === "posted" && (
+        <div className="mb-4 rounded-xl border border-blue-200 bg-blue-50/50 p-4 dark:border-blue-800 dark:bg-blue-950/20">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-sm font-semibold text-blue-800 dark:text-blue-200">📦 {activeSession.title}</h3>
+              <p className="text-xs text-blue-600 dark:text-blue-400">{activeSession.completedItems} / {activeSession.totalItems} batch · Posted</p>
+            </div>
+            <button onClick={async () => { const result = await sessionApp.archive(); if (result.success) { toast.success(result.message); } else { toast.error(result.message); } }}
+              className="rounded-lg border border-blue-300 px-3 py-1.5 text-xs font-medium text-blue-700 hover:bg-blue-50 dark:border-blue-700 dark:text-blue-400">
+              Arsipkan
             </button>
           </div>
         </div>

@@ -33,6 +33,7 @@ const DEMO_CATEGORIES: CategoryOption[] = [
 
 import { BASE_UNITS, MIDDLE_UNITS, LARGE_UNITS } from "@/constants/unit-options";
 import { DOSAGE_FORM_OPTIONS } from "@/constants/dosage-forms";
+import { useLocationMasterStore } from "@/store/location-master-store";
 
 /* ------------------------------------------------------------------ */
 /*  Props                                                              */
@@ -117,6 +118,10 @@ export function ProductFormModal({
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [sellingPriceWarning, setSellingPriceWarning] = useState(false);
+  // RC1 P0G.1 — location suggestions from master
+  const locationMaster = useLocationMasterStore((s) => s.locations);
+  const loadLocations = useLocationMasterStore((s) => s.loadLocations);
+  useEffect(() => { if (open) loadLocations(); }, [open, loadLocations]);
 
   /* ---- V2 Multi Unit — Kemasan Menengah & Besar state ---- */
   const [level2Name, setLevel2Name] = useState("");
@@ -817,16 +822,11 @@ export function ProductFormModal({
 
           {/* No Rak */}
           <div>
-            <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">
-              No Rak
-            </label>
-            <input
-              type="text"
-              value={form.rackLocation}
+            <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">No Rak</label>
+            <input type="text" value={form.rackLocation}
               onChange={(e) => updateField("rackLocation", e.target.value)}
-              placeholder="Contoh: R-A-03"
-              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm placeholder-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
-            />
+              placeholder="Contoh: R-A-03" list="location-suggestions"
+              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm placeholder-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
           </div>
 
           {/* Manufacturer */}
@@ -913,6 +913,15 @@ export function ProductFormModal({
               </button>
             </label>
           </div>
+
+          {/* Location suggestions datalist */}
+          {locationMaster.length > 0 && (
+            <datalist id="location-suggestions">
+              {locationMaster.filter(l => l.isActive).map(l => (
+                <option key={l.id} value={l.name} />
+              ))}
+            </datalist>
+          )}
 
           {/* Deskripsi */}
           <div>

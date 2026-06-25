@@ -24,6 +24,8 @@ interface OpnameSessionState {
   pauseSession: () => void;
   resumeSession: () => void;
   completeSession: () => void;
+  postSession: () => void;
+  archiveSession: () => void;
   clearSession: () => void;
   setItems: (items: StockOpnameSessionItem[]) => void;
   updateItem: (key: string, updates: Partial<StockOpnameSessionItem>) => void;
@@ -112,6 +114,7 @@ export const useOpnameSessionStore = create<OpnameSessionState>()((set, get) => 
         ...(isDone ? { completedAt: now } : {}),
       },
     });
+    // Events emitted by SessionLifecycleService (P0H.3A)
   },
 
   /**
@@ -142,6 +145,10 @@ export const useOpnameSessionStore = create<OpnameSessionState>()((set, get) => 
         ...(isDone ? { completedAt: now } : {}),
       },
     });
+    if (opnameItems.length > 0) {
+      // Events emitted by SessionLifecycleService (P0H.3A)
+    }
+    if (isDone) { /* auto-completion — events emitted by SessionLifecycleService (P0H.3A) */ }
   },
 
   setSelectedLocations: (ids) => {
@@ -198,6 +205,37 @@ export const useOpnameSessionStore = create<OpnameSessionState>()((set, get) => 
         progressPercent: progress.progressPercent,
       },
     });
+    // Events emitted by SessionLifecycleService (P0H.3A)
+  },
+
+  postSession: () => {
+    const { activeSession } = get();
+    if (!activeSession || activeSession.status !== "completed") return;
+    const now = new Date().toISOString();
+    set({
+      activeSession: {
+        ...activeSession,
+        status: "posted",
+        postedAt: now,
+        updatedAt: now,
+      },
+    });
+    // Events emitted by SessionLifecycleService (P0H.3A)
+  },
+
+  archiveSession: () => {
+    const { activeSession } = get();
+    if (!activeSession || (activeSession.status !== "completed" && activeSession.status !== "posted")) return;
+    const now = new Date().toISOString();
+    set({
+      activeSession: {
+        ...activeSession,
+        status: "archived",
+        archivedAt: now,
+        updatedAt: now,
+      },
+    });
+    // Events emitted by SessionLifecycleService (P0H.3A)
   },
 
   clearSession: () => set({ activeSession: null, items: [] }),

@@ -20,6 +20,8 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editQty, setEditQty] = useState("");
+  const [statusFilter, setStatusFilter] = useState<"all" | "pending" | "counted" | "skipped">("all");
+  const [searchTerm, setSearchTerm] = useState("");
 
   const handleStartEdit = useCallback((key: string, currentQty: number) => {
     setEditingKey(key);
@@ -37,21 +39,32 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
     markItemCounted(key, 0);
   }, [markItemCounted]);
 
+  // RC1 P0H.2 — Only in_progress allows editing. Paused/Completed = read-only.
   const isEditable = activeSession?.status === "in_progress";
+  const isPaused = activeSession?.status === "paused";
   const isComplete = activeSession?.status === "completed";
 
   if (!open || !activeSession) return null;
 
-  // Enrich items with batch data for display
-  const enrichedItems = items.map((item) => {
-    const batch = batches.find((b) => b.id === item.batchId);
-    return {
-      ...item,
-      productName: batch?.productName || item.productName || "—",
-      batchNumber: batch?.batchNumber || item.batchNumber || "—",
-      systemQty: batch?.quantity ?? item.systemQty,
-    };
-  });
+  // Enrich + filter items
+  const enrichedItems = items
+    .map((item) => {
+      const batch = batches.find((b) => b.id === item.batchId);
+      return {
+        ...item,
+        productName: batch?.productName || item.productName || "—",
+        batchNumber: batch?.batchNumber || item.batchNumber || "—",
+        systemQty: batch?.quantity ?? item.systemQty,
+      };
+    })
+    .filter((item) => {
+      if (statusFilter !== "all" && item.status !== statusFilter) return false;
+      if (searchTerm) {
+        const q = searchTerm.toLowerCase();
+        if (!item.productName.toLowerCase().includes(q) && !item.batchNumber.toLowerCase().includes(q)) return false;
+      }
+      return true;
+    });
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40" onClick={onClose}>
@@ -77,9 +90,14 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
                 <Check className="mr-1 inline h-3 w-3" /> Selesai
               </button>
             )}
+            {isPaused && (
+              <div className="mb-2 rounded bg-amber-100 px-3 py-1.5 text-center text-xs font-medium text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">
+                ⏸ Session dijeda — input tidak aktif. Klik "Lanjutkan" di banner untuk melanjutkan.
+              </div>
+            )}
             <span className={cn("rounded px-2 py-1 text-[10px] font-medium",
               isComplete && "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400",
-              activeSession.status === "paused" && "bg-amber-100 text-amber-700",
+              isPaused && "bg-amber-100 text-amber-700",
               activeSession.status === "in_progress" && "bg-brand-100 text-brand-700")}>
               {isComplete ? "Completed" : activeSession.status === "paused" ? "Paused" : "In Progress"}
             </span>
@@ -89,10 +107,28 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
 
         {/* Progress bar */}
         <div className="px-5 py-3 border-b dark:border-neutral-800 shrink-0">
+          <div className="flex items-center justify-between text-xs text-neutral-500 mb-1">
+            <span>{activeSession.completedItems} / {activeSession.totalItems} batch</span>
+            <span className="font-bold">{activeSession.progressPercent}%</span>
+          </div>
           <div className="h-2 w-full rounded-full bg-neutral-200 dark:bg-neutral-800">
             <div className="h-2 rounded-full bg-brand-500 transition-all duration-300"
               style={{ width: `${activeSession.progressPercent}%` }} />
           </div>
+        </div>
+
+        {/* Filter tabs + search */}
+        <div className="flex items-center gap-2 border-b px-5 py-2 dark:border-neutral-800 shrink-0">
+          {(["all", "pending", "counted", "skipped"] as const).map((f) => (
+            <button key={f} onClick={() => setStatusFilter(f)}
+              className={cn("rounded px-2.5 py-1 text-[10px] font-medium transition-colors",
+                statusFilter === f ? "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-400" : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-800")}>
+              {f === "all" ? "Semua" : f === "pending" ? "Pending" : f === "counted" ? "Counted" : "Skipped"}
+            </button>
+          ))}
+          <div className="flex-1" />
+          <input value={searchTerm} onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Cari..." className="w-32 rounded border border-neutral-200 px-2 py-1 text-[10px] dark:border-neutral-700 dark:bg-neutral-800" />
         </div>
 
         {/* Item list */}

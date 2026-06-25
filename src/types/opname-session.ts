@@ -11,7 +11,7 @@ import type { MultiUnitCount } from "@/lib/unit-opname";
 // Session Status
 // ============================================================================
 
-export type SessionStatus = "draft" | "in_progress" | "paused" | "completed";
+export type SessionStatus = "draft" | "in_progress" | "paused" | "completed" | "posted" | "archived";
 
 // ============================================================================
 // Session Progress
@@ -49,6 +49,10 @@ export interface StockOpnameSession {
   updatedAt: string;
   /** ISO timestamp — when completed */
   completedAt: string | null;
+  /** ISO timestamp — when posted (adjustments applied) */
+  postedAt: string | null;
+  /** ISO timestamp — when archived */
+  archivedAt: string | null;
   /** Who initiated this session */
   conductedBy: string;
 
@@ -197,6 +201,8 @@ export function createSession(
     startedAt: now,
     updatedAt: now,
     completedAt: null,
+    postedAt: null,
+    archivedAt: null,
     conductedBy,
     totalItems: 0,
     completedItems: 0,

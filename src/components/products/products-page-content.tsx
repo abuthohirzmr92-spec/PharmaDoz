@@ -10,6 +10,7 @@ import { TableSkeleton } from "@/components/shared/table-skeleton";
 import { ProductTable, type ProductRow } from "@/components/products/product-table";
 import { ProductFormModal } from "@/components/products/product-form-modal";
 import { ProductImportModal } from "@/components/products/product-import-modal";
+import { ProductLocationModal } from "@/components/products/product-location-modal";
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo } from "@/lib/repository-instances";
 import { useInventoryStore } from "@/store/inventory-store";
@@ -28,6 +29,7 @@ export function ProductsPageContent() {
   const [editingProduct, setEditingProduct] = useState<ProductRow | null>(null);
   // RC1 P0 — Excel Product Import
   const [showImport, setShowImport] = useState(false);
+  const [showLocationMaster, setShowLocationMaster] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [rackFilter, setRackFilter] = useState("");
@@ -275,6 +277,7 @@ export function ProductsPageContent() {
           existingBarcodes={new Set(products.map(p => p.barcode).filter(Boolean) as string[])}
           categories={categories}
         />
+        <ProductLocationModal open={showLocationMaster} onClose={() => setShowLocationMaster(false)} />
       </Container>
     );
   }
@@ -301,6 +304,10 @@ export function ProductsPageContent() {
             <button onClick={handleDownloadTemplate}
               className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
               <Download className="h-3.5 w-3.5" /> Template
+            </button>
+            <button onClick={() => setShowLocationMaster(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
+              ⚙ Lokasi Rak
             </button>
             <button onClick={() => setShowImport(true)}
               className="flex items-center gap-1.5 rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:bg-transparent dark:text-brand-400 dark:hover:bg-brand-950 transition-colors">
@@ -421,6 +428,7 @@ export function ProductsPageContent() {
         existingBarcodes={new Set(products.map(p => p.barcode).filter(Boolean) as string[])}
         categories={categories}
       />
+      <ProductLocationModal open={showLocationMaster} onClose={() => setShowLocationMaster(false)} />
     </Container>
   );
 }
