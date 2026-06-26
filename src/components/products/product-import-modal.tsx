@@ -28,19 +28,6 @@ interface ResolvedRow {
 }
 
 export function ProductImportModal({ open, onClose, onImported, existingNames, existingBarcodes, categories }: Props) {
-  const [featureEnabled, setFeatureEnabled] = useState(false);
-  // RC1 P0C — feature flag from app_settings
-  useEffect(() => {
-    if (open) {
-      import("@/lib/supabase/client").then(({ supabase }) => {
-        if (supabase) {
-          (supabase as any).from("app_settings").select("value").eq("key", "excel_product_import").maybeSingle()
-            .then(({ data }: any) => { setFeatureEnabled(data?.value === "true"); })
-            .catch(() => { setFeatureEnabled(false); }); // RC1 P0D: fail CLOSED
-        } else { setFeatureEnabled(false); } // RC1 P0D: fail CLOSED
-      }).catch(() => { setFeatureEnabled(true); });
-    }
-  }, [open]);
   const [file, setFile] = useState<File | null>(null);
   const [parsedRows, setParsedRows] = useState<ImportedProductRow[] | null>(null);
   const [resolved, setResolved] = useState<ResolvedRow[] | null>(null);
@@ -242,7 +229,6 @@ export function ProductImportModal({ open, onClose, onImported, existingNames, e
   }, []);
 
   if (!open) return null;
-  if (!featureEnabled) return null;
 
   // RC1 P0B — Dry run summary
   const showConfirm = step === "confirm";

@@ -16,6 +16,7 @@ import { productRepo } from "@/lib/repository-instances";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useBranchStore } from "@/store/branch-store";
 import { isDemoMode as checkDemoMode } from "@/config/env";
+import { useFeature } from "@/lib/features/use-feature";
 import { cn } from "@/lib/cn";
 
 export function ProductsPageContent() {
@@ -30,6 +31,8 @@ export function ProductsPageContent() {
   // RC1 P0 — Excel Product Import
   const [showImport, setShowImport] = useState(false);
   const [showLocationMaster, setShowLocationMaster] = useState(false);
+  // ADR-015: Feature visibility via centralized resolver — not app_settings
+  const canImportExcel = useFeature("product_import_excel");
   const [searchQuery, setSearchQuery] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("");
   const [rackFilter, setRackFilter] = useState("");
@@ -255,14 +258,18 @@ export function ProductsPageContent() {
         {canEdit && (
           <div className="mt-6 flex flex-col items-center gap-3">
             <div className="flex items-center gap-3">
-              <button onClick={() => setShowImport(true)}
-                className="flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
-                <Upload className="h-4 w-4" /> Import Excel
-              </button>
-              <button onClick={handleDownloadTemplate}
-                className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
-                <Download className="h-4 w-4" /> Download Template
-              </button>
+              {canImportExcel && (
+                <>
+                  <button onClick={() => setShowImport(true)}
+                    className="flex items-center gap-2 rounded-lg bg-brand-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-brand-600 transition-colors">
+                    <Upload className="h-4 w-4" /> Import Excel
+                  </button>
+                  <button onClick={handleDownloadTemplate}
+                    className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-5 py-2.5 text-sm font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
+                    <Download className="h-4 w-4" /> Download Template
+                  </button>
+                </>
+              )}
             </div>
             <button onClick={handleAdd}
               className="flex items-center gap-2 rounded-lg border border-dashed border-neutral-300 px-5 py-2 text-xs font-medium text-neutral-500 hover:border-brand-400 hover:text-brand-600 transition-colors dark:border-neutral-600 dark:text-neutral-400 dark:hover:border-brand-500">
@@ -309,18 +316,22 @@ export function ProductsPageContent() {
 
         {canEdit && (
           <div className="flex items-center gap-2 shrink-0">
-            <button onClick={handleDownloadTemplate}
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
-              <Download className="h-3.5 w-3.5" /> Template
-            </button>
+            {canImportExcel && (
+              <button onClick={handleDownloadTemplate}
+                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
+                <Download className="h-3.5 w-3.5" /> Template
+              </button>
+            )}
             <button onClick={() => setShowLocationMaster(true)}
               className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-xs font-medium text-neutral-700 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-transparent dark:text-neutral-300 dark:hover:bg-neutral-800 transition-colors">
               ⚙ Lokasi Rak
             </button>
-            <button onClick={() => setShowImport(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:bg-transparent dark:text-brand-400 dark:hover:bg-brand-950 transition-colors">
-              <Upload className="h-3.5 w-3.5" /> Import Excel
-            </button>
+            {canImportExcel && (
+              <button onClick={() => setShowImport(true)}
+                className="flex items-center gap-1.5 rounded-lg border border-brand-300 bg-white px-3 py-2 text-xs font-medium text-brand-700 hover:bg-brand-50 dark:border-brand-700 dark:bg-transparent dark:text-brand-400 dark:hover:bg-brand-950 transition-colors">
+                <Upload className="h-3.5 w-3.5" /> Import Excel
+              </button>
+            )}
             <button onClick={handleAdd}
               className="flex items-center gap-2 rounded-lg bg-brand-500 px-4 py-2 text-xs font-medium text-white hover:bg-brand-600 transition-colors">
               <Plus className="h-3.5 w-3.5" /> Tambah Produk

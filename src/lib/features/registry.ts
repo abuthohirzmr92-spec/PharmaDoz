@@ -31,6 +31,8 @@ export const FEATURE_FLAGS = {
   FINANCIAL_INSIGHT: "financial_insight",
   /** Profit allocation — tutup buku, cadangan, pemilik, operasional */
   PROFIT_ALLOCATION: "profit_allocation",
+  /** Excel-based product master import (bulk create/update) */
+  PRODUCT_IMPORT_EXCEL: "product_import_excel",
 } as const;
 
 export type FeatureFlagKey = (typeof FEATURE_FLAGS)[keyof typeof FEATURE_FLAGS];
@@ -49,6 +51,7 @@ export const FEATURE_LABELS: Record<FeatureFlagKey, string> = {
   priority_support: "Support Prioritas",
   financial_insight: "Insight Bisnis",
   profit_allocation: "Alokasi Profit",
+  product_import_excel: "Import Produk Excel",
 };
 
 /** Feature descriptions for tooltips */
@@ -65,6 +68,7 @@ export const FEATURE_DESCRIPTIONS: Record<FeatureFlagKey, string> = {
   priority_support: "Saluran support prioritas dengan waktu respon lebih cepat.",
   financial_insight: "Dashboard modal usaha, profit kotor, ROI, dan performa cabang — tanpa akuntansi penuh.",
   profit_allocation: "Alokasi profit bersih ke cadangan, pemilik, dan operasional dengan tutup buku bulanan.",
+  product_import_excel: "Import data produk massal dari file Excel (buat baru dan update stok/harga).",
 };
 
 /** All feature keys as an array for iteration */
