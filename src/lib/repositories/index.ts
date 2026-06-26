@@ -5,4 +5,6 @@ export type { TransactionFilters } from "./transaction";
 export { SupplierRepository } from "./supplier";
 export { ProductRepository } from "./product";
 export type { Product, ProductCategory } from "./product";
+export { StorageAreaRepository } from "./storage-area";
+export type { StorageArea, StorageAreaInput } from "./storage-area";
 export { AuthRepository } from "./auth";

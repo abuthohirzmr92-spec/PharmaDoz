@@ -37,6 +37,10 @@ type PurchaseFormItem = {
   batchNumber: string;
   expiredDate: string;
 
+  // === RC1 M2 — Storage Location (Purchase = Assignment) ===
+  storageAreaId: string;      // FK → storage_areas (default from product)
+  storageSlot: string;        // free-text slot (default from product)
+
   // === UI metadata (display + prefill, NOT sent to save) ===
   rawProductName?: string;   // 🔴 P0 — nama asli import
   unit?: string;             // 🔴 P0 — satuan pembelian (Dus/Strip/Tablet)
@@ -76,7 +80,17 @@ export function InventoryPurchasePanel() {
   const invoices = useInventoryStore((s) => s.purchaseInvoices);
   const batches = useInventoryStore((s) => s.batches);
   const suppliers = useInventoryStore((s) => s.suppliers);
-  const [productList, setProductList] = useState<Array<{ id: string; name: string; defaultPrice?: number; defaultSellingPrice?: number; unit?: string; unitLevels?: Array<{ level: number; unitName: string; contains: number }> }>>([]);
+  interface ProductListItem {
+    id: string;
+    name: string;
+    defaultPrice?: number;
+    defaultSellingPrice?: number;
+    unit?: string;
+    unitLevels?: Array<{ level: number; unitName: string; contains: number }>;
+    defaultStorageAreaId: string | null;   // RC1 M2
+    defaultStorageSlot: string | null;     // RC1 M2
+  }
+  const [productList, setProductList] = useState<ProductListItem[]>([]);
   const [showQuickCreate, setShowQuickCreate] = useState(false);
   const [showProductForm, setShowProductForm] = useState(false);
   const [productFormItemId, setProductFormItemId] = useState<string | null>(null);
@@ -109,6 +123,8 @@ export function InventoryPurchasePanel() {
         quantity: item.quantity,
         unitPrice: item.enteredBuyPrice,
         sellingPrice: item.currentSellingPrice,
+        storageAreaId: "",
+        storageSlot: "",
         // UI metadata
         rawProductName: item.rawProductName,
         unit: item.unit,
@@ -204,7 +220,7 @@ export function InventoryPurchasePanel() {
   useEffect(() => {
     if (productRepo.isConnected) {
       productRepo.getRawProducts({ isActive: true }).then(prods => {
-        setProductList(prods.map(p => ({ id: p.id, name: p.name, defaultPrice: p.defaultPrice ?? 0, defaultSellingPrice: p.defaultSellingPrice ?? 0, unit: p.unit ?? '' })));
+        setProductList(prods.map(p => ({ id: p.id, name: p.name, defaultPrice: p.defaultPrice ?? 0, defaultSellingPrice: p.defaultSellingPrice ?? 0, unit: p.unit ?? '', defaultStorageAreaId: p.defaultStorageAreaId ?? null, defaultStorageSlot: p.defaultStorageSlot ?? null })));
       }).catch(() => {
         // Fallback to batch-derived products
         const grouped = new Map<string, any>();
@@ -240,13 +256,13 @@ export function InventoryPurchasePanel() {
   const [formSupplier, setFormSupplier] = useState("");
   const [formDueDate, setFormDueDate] = useState("");
   const [formItems, setFormItems] = useState<PurchaseFormItem[]>([
-    { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
+    { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" },
   ]);
 
   const handleAddItem = () => {
     setFormItems((prev) => [
       ...prev,
-      { id: String(Date.now()), productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 },
+      { id: String(Date.now()), productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" },
     ]);
   };
 
@@ -266,6 +282,9 @@ export function InventoryPurchasePanel() {
             updated.productName = prod.name;
             updated.unitPrice = prod.defaultPrice ?? 0;
             updated.sellingPrice = prod.defaultSellingPrice ?? 0;
+            // RC1 M2 — auto-fill storage location from product default (Purchase = Assignment)
+            updated.storageAreaId = prod.defaultStorageAreaId ?? "";
+            updated.storageSlot = prod.defaultStorageSlot ?? "";
           }
         }
         return updated;
@@ -367,7 +386,7 @@ export function InventoryPurchasePanel() {
     setShowForm(false);
     setFormSupplier("");
     setFormDueDate("");
-    setFormItems([{ id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0 }]);
+    setFormItems([{ id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" }]);
   };
 
   const filtered = useMemo(() => {
@@ -1024,7 +1043,7 @@ export function InventoryPurchasePanel() {
             // Refresh product list so dropdown recognizes new product
             setProductList((prev) => [
               ...prev,
-              { id: savedProduct.id, name: savedProduct.name, unit: savedProduct.unit },
+              { id: savedProduct.id, name: savedProduct.name, unit: savedProduct.unit, defaultStorageAreaId: null, defaultStorageSlot: null },
             ]);
           }
           setProductFormItemId(null);
@@ -1036,7 +1055,7 @@ export function InventoryPurchasePanel() {
         open={showQuickCreate}
         onClose={() => setShowQuickCreate(false)}
         onCreated={(newProduct) => {
-          setProductList((prev) => [...prev, newProduct]);
+          setProductList((prev) => [...prev, { ...newProduct, defaultStorageAreaId: null, defaultStorageSlot: null }]);
           const emptyItem = formItems.find((it) => !it.productId);
           if (emptyItem) {
             handleItemChange(emptyItem.id, "productId", newProduct.id);

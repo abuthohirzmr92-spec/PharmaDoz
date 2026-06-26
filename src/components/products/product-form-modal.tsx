@@ -73,7 +73,9 @@ interface FormState {
   defaultSellingPrice: number;
   requiresPrescription: boolean;
   minStock: number;
-  rackLocation: string;
+  rackLocation: string;          // LEGACY (ADR-001)
+  defaultStorageAreaId: string;    // RC1 M2 — FK → storage_areas
+  defaultStorageSlot: string;      // RC1 M2 — free-text slot
   manufacturer: string;
   strength: string;
   dosageForm: string;
@@ -92,6 +94,8 @@ const EMPTY_FORM: FormState = {
   requiresPrescription: false,
   minStock: 0,
   rackLocation: "",
+  defaultStorageAreaId: "",
+  defaultStorageSlot: "",
   manufacturer: "",
   strength: "",
   dosageForm: "",
@@ -193,6 +197,8 @@ export function ProductFormModal({
         requiresPrescription: editingProduct.requiresPrescription,
         minStock: editingProduct.minStock,
         rackLocation: editingProduct.rackLocation ?? "",
+        defaultStorageAreaId: (editingProduct as any).defaultStorageAreaId ?? "",
+        defaultStorageSlot: (editingProduct as any).defaultStorageSlot ?? "",
         manufacturer: (editingProduct as any).manufacturer ?? "",
         strength: (editingProduct as any).strength ?? "",
         dosageForm: (editingProduct as any).dosageForm ?? "",
@@ -390,6 +396,8 @@ export function ProductFormModal({
             requiresPrescription: form.requiresPrescription,
             minStock: form.minStock,
             rackLocation: form.rackLocation.trim() || null,
+            defaultStorageAreaId: form.defaultStorageAreaId || null,
+            defaultStorageSlot: form.defaultStorageSlot.trim() || null,
             manufacturer: form.manufacturer.trim() || null,
             strength: form.strength.trim() || null,
             dosageForm: form.dosageForm.trim() || null,
@@ -409,6 +417,8 @@ export function ProductFormModal({
             requiresPrescription: form.requiresPrescription,
             minStock: form.minStock,
             rackLocation: form.rackLocation.trim() || null,
+            defaultStorageAreaId: form.defaultStorageAreaId || null,
+            defaultStorageSlot: form.defaultStorageSlot.trim() || null,
             manufacturer: form.manufacturer.trim() || null,
             strength: form.strength.trim() || null,
             dosageForm: form.dosageForm.trim() || null,
@@ -820,14 +830,52 @@ export function ProductFormModal({
             />
           </div>
 
-          {/* No Rak */}
-          <div>
-            <label className="mb-1 block text-[11px] font-medium text-neutral-600 dark:text-neutral-400">No Rak</label>
-            <input type="text" value={form.rackLocation}
-              onChange={(e) => updateField("rackLocation", e.target.value)}
-              placeholder="Contoh: R-A-03" list="location-suggestions"
-              className="w-full rounded-lg border border-neutral-200 bg-white px-3 py-2 text-sm placeholder-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+          {/* RC1 M2 — Lokasi Default Produk */}
+          <div className="rounded-lg border border-brand-100 bg-brand-50/30 p-3 dark:border-brand-800 dark:bg-brand-950/10">
+            <label className="mb-1 block text-[11px] font-semibold text-brand-700 dark:text-brand-300">Lokasi Default Produk</label>
+            <p className="mb-2 text-[10px] text-neutral-400">Lokasi awal untuk batch baru produk ini.</p>
+            <div className="grid grid-cols-2 gap-2">
+              {/* Area Penyimpanan */}
+              <div>
+                <label className="mb-0.5 block text-[10px] font-medium text-neutral-500">Area Penyimpanan</label>
+                <select
+                  value={form.defaultStorageAreaId}
+                  onChange={(e) => {
+                    updateField("defaultStorageAreaId", e.target.value);
+                    if (!e.target.value) updateField("defaultStorageSlot", "");
+                  }}
+                  className="w-full rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                >
+                  <option value="">— Pilih Area —</option>
+                  {locationMaster.filter(l => l.isActive).map(l => (
+                    <option key={l.id} value={l.id}>{l.code} — {l.name}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Nomor Slot */}
+              <div>
+                <label className="mb-0.5 block text-[10px] font-medium text-neutral-500">Nomor Slot</label>
+                <input
+                  type="text"
+                  value={form.defaultStorageSlot}
+                  onChange={(e) => updateField("defaultStorageSlot", e.target.value)}
+                  placeholder={form.defaultStorageAreaId ? "Contoh: A-12" : "Pilih Area dulu"}
+                  disabled={!form.defaultStorageAreaId}
+                  className="w-full rounded-lg border border-neutral-200 bg-white px-2.5 py-1.5 text-xs placeholder-neutral-400 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 disabled:bg-neutral-100 disabled:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:disabled:bg-neutral-800/50"
+                />
+              </div>
+            </div>
           </div>
+
+          {/* No Rak (Legacy) */}
+          {form.rackLocation && (
+            <div>
+              <label className="mb-1 block text-[11px] font-medium text-neutral-400">No Rak <span className="text-[9px] text-amber-500">(Legacy)</span></label>
+              <input type="text" value={form.rackLocation}
+                onChange={(e) => updateField("rackLocation", e.target.value)}
+                className="w-full rounded-lg border border-neutral-200 bg-neutral-50 px-3 py-2 text-sm text-neutral-500 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+            </div>
+          )}
 
           {/* Manufacturer */}
           <div>
@@ -913,15 +961,6 @@ export function ProductFormModal({
               </button>
             </label>
           </div>
-
-          {/* Location suggestions datalist */}
-          {locationMaster.length > 0 && (
-            <datalist id="location-suggestions">
-              {locationMaster.filter(l => l.isActive).map(l => (
-                <option key={l.id} value={l.name} />
-              ))}
-            </datalist>
-          )}
 
           {/* Deskripsi */}
           <div>

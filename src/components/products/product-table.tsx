@@ -32,7 +32,11 @@ export interface ProductRow {
   description: string | null;
   requiresPrescription: boolean;
   minStock: number;
-  rackLocation?: string | null;
+  rackLocation?: string | null;         // LEGACY
+  defaultStorageAreaId?: string | null;  // RC1 M2
+  defaultStorageSlot?: string | null;    // RC1 M2
+  storageAreaCode?: string;              // JOIN result
+  storageAreaName?: string;              // JOIN result
   totalStock: number;
   isActive: boolean;
 }
@@ -142,8 +146,8 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
             <th className="hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "12%" }}>
               Multi Unit
             </th>
-            <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "6%" }}>
-              Rak
+            <th className="hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500" style={{ width: "10%" }}>
+              Area
             </th>
             <th
               className={thClassRight}
@@ -244,12 +248,20 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                       />
                     </td>
 
-                    {/* Rak */}
+                    {/* Area Penyimpanan */}
                     <td className="hidden md:table-cell px-3 py-2.5">
-                      {product.rackLocation ? (
-                        <span className="inline-block rounded bg-blue-50 px-1.5 py-0.5 text-[10px] font-medium text-blue-700 dark:bg-blue-950/30 dark:text-blue-400">
-                          {product.rackLocation}
-                        </span>
+                      {product.storageAreaName ? (
+                        <div>
+                          <p className="text-xs font-medium text-neutral-700 dark:text-neutral-300">{product.storageAreaName}</p>
+                          {product.defaultStorageSlot && (
+                            <p className="text-[10px] text-neutral-400">{product.defaultStorageSlot}</p>
+                          )}
+                        </div>
+                      ) : product.rackLocation ? (
+                        <div>
+                          <p className="text-xs text-neutral-500">{product.rackLocation}</p>
+                          <p className="text-[9px] text-amber-500">Legacy</p>
+                        </div>
                       ) : (
                         <span className="text-xs text-neutral-400">—</span>
                       )}
@@ -346,11 +358,23 @@ export function ProductTable({ products, onEdit, onToggleActive }: ProductTableP
                             <span className="text-neutral-400">Satuan Dasar</span>
                             <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.unit}</p>
                           </div>
-                          {/* Rack */}
+                          {/* Default Storage Area */}
                           <div>
-                            <span className="text-neutral-400">Rak</span>
-                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.rackLocation || "—"}</p>
+                            <span className="text-neutral-400">Area Penyimpanan</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.storageAreaName || "—"}</p>
                           </div>
+                          {/* Default Storage Slot */}
+                          <div>
+                            <span className="text-neutral-400">Nomor Slot</span>
+                            <p className="font-medium text-neutral-700 dark:text-neutral-200">{product.defaultStorageSlot || "—"}</p>
+                          </div>
+                          {/* Legacy Rack */}
+                          {product.rackLocation && (
+                            <div>
+                              <span className="text-neutral-400">Rak <span className="text-[9px] text-amber-500">Legacy</span></span>
+                              <p className="text-neutral-500">{product.rackLocation}</p>
+                            </div>
+                          )}
                           {/* Stock */}
                           <div>
                             <span className="text-neutral-400">Stok</span>

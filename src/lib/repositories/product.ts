@@ -18,7 +18,9 @@ export interface Product {
   imageUrl: string | null;
   requiresPrescription: boolean;
   minStock: number;
-  rackLocation: string | null;
+  rackLocation: string | null;            // LEGACY (ADR-001)
+  defaultStorageAreaId: string | null;     // RC1 M2 — FK → storage_areas
+  defaultStorageSlot: string | null;       // RC1 M2 — free-text slot
   manufacturer: string | null;
   strength: string | null;
   dosageForm: string | null;
@@ -243,6 +245,8 @@ export class ProductRepository extends BaseRepository {
     requiresPrescription?: boolean;
     minStock?: number;
     rackLocation?: string | null;
+    defaultStorageAreaId?: string | null;    // RC1 M2
+    defaultStorageSlot?: string | null;      // RC1 M2
     manufacturer?: string | null;
     strength?: string | null;
     dosageForm?: string | null;
@@ -265,6 +269,8 @@ export class ProductRepository extends BaseRepository {
       requires_prescription: data.requiresPrescription ?? false,
       min_stock: data.minStock ?? 0,
       rack_location: data.rackLocation ?? null,
+      default_storage_area_id: data.defaultStorageAreaId ?? null,   // RC1 M2
+      default_storage_slot: data.defaultStorageSlot ?? null,        // RC1 M2
       manufacturer: data.manufacturer ?? null,
       strength: data.strength ?? null,
       dosage_form: data.dosageForm ?? null,
@@ -342,6 +348,8 @@ export class ProductRepository extends BaseRepository {
       requiresPrescription: boolean;
       minStock: number;
       rackLocation: string | null;
+      defaultStorageAreaId: string | null;    // RC1 M2
+      defaultStorageSlot: string | null;      // RC1 M2
       manufacturer: string | null;
       strength: string | null;
       dosageForm: string | null;
@@ -374,6 +382,8 @@ export class ProductRepository extends BaseRepository {
       updateData["requires_prescription"] = data.requiresPrescription;
     if (data.minStock !== undefined) updateData["min_stock"] = data.minStock;
     if (data.rackLocation !== undefined) updateData["rack_location"] = data.rackLocation;
+    if (data.defaultStorageAreaId !== undefined) updateData["default_storage_area_id"] = data.defaultStorageAreaId;   // RC1 M2
+    if (data.defaultStorageSlot !== undefined) updateData["default_storage_slot"] = data.defaultStorageSlot;         // RC1 M2
     if (data.manufacturer !== undefined) updateData["manufacturer"] = data.manufacturer;
     if (data.strength !== undefined) updateData["strength"] = data.strength;
     if (data.dosageForm !== undefined) updateData["dosage_form"] = data.dosageForm;

@@ -61,6 +61,10 @@ export function ProductsPageContent() {
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
           rackLocation: p.rackLocation ?? null,
+          defaultStorageAreaId: (p as any).defaultStorageAreaId ?? null,
+          defaultStorageSlot: (p as any).defaultStorageSlot ?? null,
+          storageAreaCode: (p as any).storageAreaCode ?? undefined,
+          storageAreaName: (p as any).storageAreaName ?? undefined,
           totalStock: activeBranch
             ? p.batches.filter((b) => b.pharmacyId === activeBranch.id).reduce((s, b) => s + b.quantity, 0)
             : p.totalStock,
@@ -92,6 +96,10 @@ export function ProductsPageContent() {
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
           rackLocation: p.rackLocation ?? null,
+          defaultStorageAreaId: (p as any).defaultStorageAreaId ?? null,
+          defaultStorageSlot: (p as any).defaultStorageSlot ?? null,
+          storageAreaCode: (p as any).storageAreaCode ?? undefined,
+          storageAreaName: (p as any).storageAreaName ?? undefined,
           totalStock: activeBranch
             ? p.batches.filter((b) => b.pharmacyId === activeBranch.id).reduce((s, b) => s + b.quantity, 0)
             : p.totalStock,

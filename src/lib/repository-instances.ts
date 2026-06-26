@@ -9,7 +9,9 @@ import { PackageRepository } from "./repositories/package";
 import { CapitalRepository } from "./repositories/capital";
 import { SalesReturnRepository } from "./repositories/sales-return";
 import { ActivityLogRepository } from "./repositories/activity-log";
+import { StorageAreaRepository } from "./repositories/storage-area";
 
+export const storageAreaRepo = new StorageAreaRepository();
 export const productRepo = new ProductRepository();
 export const supplierRepo = new SupplierRepository();
 export const inventoryRepo = new InventoryRepository();

@@ -375,6 +375,44 @@ export interface ProductUnitUpdate {
   name?: string;
 }
 
+// --- storage_areas (RC1 M2) ---
+export interface StorageAreaRow {
+  id: string;
+  tenant_id: string;
+  pharmacy_id: string | null;
+  code: string;
+  name: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  deleted_at: string | null;
+}
+
+export interface StorageAreaInsert {
+  id?: string;
+  tenant_id?: string;
+  pharmacy_id?: string | null;
+  code: string;
+  name: string;
+  description?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+}
+
+export interface StorageAreaUpdate {
+  id?: string;
+  tenant_id?: string;
+  pharmacy_id?: string | null;
+  code?: string;
+  name?: string;
+  description?: string | null;
+  sort_order?: number;
+  is_active?: boolean;
+  deleted_at?: string | null;
+}
+
 // --- products (now with tenant_id + unit/pricing columns) ---
 export interface ProductRow {
   id: string;
@@ -389,7 +427,9 @@ export interface ProductRow {
   default_selling_price: number;
   requires_prescription: boolean;
   min_stock: number;
-  rack_location: string | null;
+  rack_location: string | null;           // LEGACY (ADR-001)
+  default_storage_area_id: string | null;  // RC1 M2 — FK → storage_areas
+  default_storage_slot: string | null;     // RC1 M2 — free-text slot
   manufacturer: string | null;
   strength: string | null;
   dosage_form: string | null;
@@ -413,6 +453,8 @@ export interface ProductInsert {
   requires_prescription?: boolean;
   min_stock?: number;
   rack_location?: string | null;
+  default_storage_area_id?: string | null;  // RC1 M2
+  default_storage_slot?: string | null;     // RC1 M2
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -433,6 +475,8 @@ export interface ProductUpdate {
   requires_prescription?: boolean;
   min_stock?: number;
   rack_location?: string | null;
+  default_storage_area_id?: string | null;  // RC1 M2
+  default_storage_slot?: string | null;     // RC1 M2
   is_active?: boolean;
   created_at?: string;
   updated_at?: string;
@@ -454,6 +498,9 @@ export interface ProductBatchRow {
   unit_price: number;
   selling_price: number;
   received_at: string;
+  storage_area_id: string | null;   // RC1 M2 — FK → storage_areas
+  storage_slot: string | null;      // RC1 M2 — free-text slot
+  is_relocated: boolean;            // RC1 M2 — true when moved from default
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -469,6 +516,9 @@ export interface ProductBatchInsert {
   unit_price?: number;
   selling_price?: number;
   received_at?: string;
+  storage_area_id?: string | null;   // RC1 M2
+  storage_slot?: string | null;      // RC1 M2
+  is_relocated?: boolean;            // RC1 M2 — default false
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -484,6 +534,9 @@ export interface ProductBatchUpdate {
   unit_price?: number;
   selling_price?: number;
   received_at?: string;
+  storage_area_id?: string | null;   // RC1 M2
+  storage_slot?: string | null;      // RC1 M2
+  is_relocated?: boolean;            // RC1 M2
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -1327,6 +1380,7 @@ export interface Database {
       role_permissions: { Row: RolePermissionRow; Insert: RolePermissionInsert; Update: RolePermissionUpdate };
       pharmacies: { Row: PharmacyRow; Insert: PharmacyInsert; Update: PharmacyUpdate };
       users: { Row: UserRow; Insert: UserInsert; Update: UserUpdate };
+      storage_areas: { Row: StorageAreaRow; Insert: StorageAreaInsert; Update: StorageAreaUpdate };
       product_categories: { Row: ProductCategoryRow; Insert: ProductCategoryInsert; Update: ProductCategoryUpdate };
       product_units: { Row: ProductUnitRow; Insert: ProductUnitInsert; Update: ProductUnitUpdate };
       product_unit_levels: { Row: ProductUnitLevelRow; Insert: ProductUnitLevelInsert; Update: ProductUnitLevelUpdate };

@@ -105,6 +105,9 @@ export class InventoryRepository extends BaseRepository {
     quantity: number;
     unitPrice: number;
     sellingPrice: number;
+    storageAreaId?: string | null;   // RC1 M2
+    storageSlot?: string | null;     // RC1 M2
+    isRelocated?: boolean;           // RC1 M2
   }): Promise<ProductBatch> {
     if (!this.isConnected) throw new Error("Not connected");
 
@@ -117,6 +120,9 @@ export class InventoryRepository extends BaseRepository {
         quantity: data.quantity,
         unit_price: data.unitPrice,
         selling_price: data.sellingPrice,
+        storage_area_id: data.storageAreaId ?? null,   // RC1 M2
+        storage_slot: data.storageSlot ?? null,         // RC1 M2
+        is_relocated: data.isRelocated ?? false,        // RC1 M2
         tenant_id: this.getTenantId(),
         ...(this.branchId ? { pharmacy_id: this.branchId } : {}),
       })
