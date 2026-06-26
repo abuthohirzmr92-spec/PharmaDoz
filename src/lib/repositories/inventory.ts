@@ -137,6 +137,35 @@ export class InventoryRepository extends BaseRepository {
     };
   }
 
+  /** RC1 M2 — Update batch storage location (relocation). */
+  async updateBatchLocation(
+    id: string,
+    data: { storageAreaId: string | null; storageSlot: string | null; isRelocated: boolean },
+  ): Promise<ProductBatch> {
+    if (!this.isConnected) throw new Error("Not connected");
+
+    let query = this.client
+      .from("product_batches")
+      .update({
+        storage_area_id: data.storageAreaId,
+        storage_slot: data.storageSlot,
+        is_relocated: data.isRelocated,
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", id)
+      .select(`*, product:product_id(name)`);
+    query = this.withTenantScope(query);
+    query = this.withBranchScope(query);
+
+    const { data: row, error } = await query.single();
+    if (error) return this.handleError(error, "updateBatchLocation");
+
+    return {
+      ...mapRow<ProductBatch>(row as Record<string, unknown>),
+      productName: ((row as any).product?.name as string) ?? "",
+    };
+  }
+
   async updateBatchQuantity(id: string, quantity: number): Promise<ProductBatch> {
     if (!this.isConnected) throw new Error("Not connected");
 

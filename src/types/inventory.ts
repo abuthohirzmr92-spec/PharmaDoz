@@ -15,6 +15,9 @@ export interface ProductBatch {
   unitPrice: number; // purchase / cost price
   sellingPrice: number; // retail price
   createdAt: string; // ISO — when batch was received
+  storageAreaId?: string | null;   // RC1 M2 — FK → storage_areas
+  storageSlot?: string | null;     // RC1 M2 — free-text slot
+  isRelocated?: boolean;           // RC1 M2 — true when moved from default
 }
 
 /* ------------------------------------------------------------------ */
@@ -50,6 +53,9 @@ export interface PurchaseItem {
   sellingPrice: number;
   /** Auto-create product on save (import flow) */
   forceCreate?: boolean;
+  /** RC1 M2 — Storage location from Purchase Assignment */
+  storageAreaId?: string | null;
+  storageSlot?: string | null;
 }
 
 export interface PurchaseInvoice {
@@ -148,7 +154,9 @@ export interface InventoryProduct {
   defaultPrice: number;           // default purchase price (cost)
   defaultSellingPrice: number;    // default retail price
   minStock: number;
-  rackLocation?: string | null;
+  rackLocation?: string | null;        // LEGACY (ADR-001)
+  defaultStorageAreaId?: string | null; // RC1 M2 — FK → storage_areas
+  defaultStorageSlot?: string | null;   // RC1 M2 — free-text slot
   totalStock: number;
   batches: ProductBatch[];
   requiresPrescription: boolean;

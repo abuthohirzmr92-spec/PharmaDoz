@@ -3,10 +3,12 @@
 import { useState, useMemo, useEffect, memo, useCallback, Fragment } from "react";
 import { Search, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
+import { useLocationMasterStore } from "@/store/location-master-store";
 import { productRepo } from "@/lib/repository-instances";
 import { cn } from "@/lib/cn";
 import { getDaysUntilExpiry, buildInventoryProducts } from "@/lib/inventory-demo";
-import type { InventoryProduct } from "@/types/inventory";
+import type { InventoryProduct, ProductBatch } from "@/types/inventory";
+import { BatchRelocateModal } from "./batch-relocate-modal";
 
 /* ------------------------------------------------------------------ */
 /*  Stock Row (memoized)                                               */
@@ -16,11 +18,23 @@ const StockRow = memo(function StockRow({
   product,
   isExpanded,
   onToggleExpand,
+  onRelocateBatch,
 }: {
   product: ReturnType<typeof buildInventoryProducts>[number];
   isExpanded: boolean;
   onToggleExpand: (id: string) => void;
+  onRelocateBatch: (batch: ProductBatch, productName: string) => void;
 }) {
+  // RC1 M2 — Location lookup map from storage area master
+  const locationMaster = useLocationMasterStore((s) => s.locations);
+  const locationMap = useMemo(() => {
+    const map = new Map<string, { code: string; name: string }>();
+    for (const loc of locationMaster) {
+      map.set(loc.id, { code: loc.code, name: loc.name });
+    }
+    return map;
+  }, [locationMaster]);
+
   const fefoBatches = useMemo(
     () =>
       [...product.batches].sort(
@@ -133,6 +147,7 @@ const StockRow = memo(function StockRow({
                   <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">HPP</th>
                   <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">Jual</th>
                   <th className="py-1 pr-3 text-right text-[10px] font-medium text-neutral-400">ED</th>
+                  <th className="py-1 pr-3 text-left text-[10px] font-medium text-neutral-400">Lokasi</th>
                   <th className="py-1 text-left text-[10px] font-medium text-neutral-400">Status</th>
                 </tr>
               </thead>
@@ -150,6 +165,54 @@ const StockRow = memo(function StockRow({
                       <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">
                         {new Date(b.expiredDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
                       </td>
+                      <td className="py-1 pr-3">
+                        {(() => {
+                          // --- RESOLUTION CHAIN ---
+                          // Priority 1: Batch Location (REALITY)
+                          const batchArea = b.storageAreaId ? locationMap.get(b.storageAreaId) : null;
+                          if (batchArea) {
+                            return (
+                              <div>
+                                <p className="text-[10px] font-medium text-neutral-700 dark:text-neutral-300">{batchArea.name}</p>
+                                {b.storageSlot && <p className="text-[9px] text-neutral-400">{b.storageSlot}</p>}
+                                {b.isRelocated ? (
+                                  <span className="inline-block mt-0.5 rounded bg-amber-50 px-1 text-[8px] font-medium text-amber-700 dark:bg-amber-950/30 dark:text-amber-400">Lokasi Dipindahkan</span>
+                                ) : (
+                                  <span className="inline-block mt-0.5 text-[8px] text-neutral-400">Mengikuti Lokasi Utama Produk</span>
+                                )}
+                              </div>
+                            );
+                          }
+
+                          // Priority 2: Product Default Location (SUGGESTION)
+                          const defaultAreaId = product.defaultStorageAreaId ?? null;
+                          const defaultArea = defaultAreaId ? locationMap.get(defaultAreaId) : null;
+                          if (defaultArea) {
+                            return (
+                              <div>
+                                <p className="text-[10px] text-neutral-500">{defaultArea.name}</p>
+                                {product.defaultStorageSlot && (
+                                  <p className="text-[9px] text-neutral-400">{product.defaultStorageSlot}</p>
+                                )}
+                                <span className="inline-block mt-0.5 text-[8px] text-neutral-400">Mengikuti Lokasi Utama Produk</span>
+                              </div>
+                            );
+                          }
+
+                          // Priority 3: Legacy Rack Location (FALLBACK)
+                          if (product.rackLocation) {
+                            return (
+                              <div>
+                                <p className="text-[10px] text-neutral-500">{product.rackLocation}</p>
+                                <span className="inline-block mt-0.5 rounded bg-neutral-100 px-1 text-[8px] font-medium text-amber-600 dark:bg-amber-950/30 dark:text-amber-400">Legacy</span>
+                              </div>
+                            );
+                          }
+
+                          // Priority 4: No Location
+                          return <span className="text-[10px] text-neutral-400">—</span>;
+                        })()}
+                      </td>
                       <td className="py-1">
                         <span className={cn(
                           "rounded px-1.5 py-0.5 text-[10px] font-medium",
@@ -159,6 +222,14 @@ const StockRow = memo(function StockRow({
                         )}>
                           {isExp ? "EXPIRED" : isNear ? `${days}h` : `OK (${days}h)`}
                         </span>
+                      </td>
+                      <td className="py-1 text-center">
+                        <button
+                          onClick={() => onRelocateBatch(b, product.name)}
+                          className="rounded border border-neutral-300 px-1.5 py-0.5 text-[9px] text-neutral-500 hover:bg-brand-50 hover:text-brand-700 hover:border-brand-300 dark:border-neutral-700 dark:hover:bg-brand-950/20"
+                        >
+                          Pindahkan
+                        </button>
                       </td>
                     </tr>
                   );
@@ -182,6 +253,16 @@ export function InventoryStockTable() {
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
   const [catalogProducts, setCatalogProducts] = useState<InventoryProduct[]>([]);
+  // RC1 M2 — Batch relocation modal state
+  const [relocateBatch, setRelocateBatch] = useState<ProductBatch | null>(null);
+  const [relocateProductName, setRelocateProductName] = useState("");
+  // RC1 M2 — Load storage area master for batch location display
+  const loadLocations = useLocationMasterStore((s) => s.loadLocations);
+  const locationCount = useLocationMasterStore((s) => s.locations.length);
+
+  useEffect(() => {
+    if (locationCount === 0) loadLocations();
+  }, [locationCount, loadLocations]);
 
   useEffect(() => {
     if (batches.length === 0) loadDemoData();
@@ -280,6 +361,7 @@ export function InventoryStockTable() {
                 <StockRow
                   key={product.id}
                   product={product}
+                  onRelocateBatch={(batch, name) => { setRelocateBatch(batch); setRelocateProductName(name); }}
                   isExpanded={expandedProduct === product.id}
                   onToggleExpand={handleToggleExpand}
                 />
@@ -289,6 +371,14 @@ export function InventoryStockTable() {
         </table>
       </div>
 
+      {/* RC1 M2 — Batch Relocation Modal */}
+      <BatchRelocateModal
+        open={!!relocateBatch}
+        batch={relocateBatch}
+        productName={relocateProductName}
+        onClose={() => { setRelocateBatch(null); setRelocateProductName(""); }}
+        onRelocated={(updated) => { useInventoryStore.getState().updateBatch(updated); setRelocateBatch(null); setRelocateProductName(""); }}
+      />
     </div>
   );
 }

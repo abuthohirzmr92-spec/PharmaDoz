@@ -364,6 +364,8 @@ export function InventoryPurchasePanel() {
         quantity: baseQty,
         unitPrice: baseUnitPrice,
         sellingPrice: it.sellingPrice,
+        storageAreaId: it.storageAreaId || null,   // RC1 M2 — Purchase Assignment
+        storageSlot: it.storageSlot || null,        // RC1 M2 — Purchase Assignment
       };
     });
 

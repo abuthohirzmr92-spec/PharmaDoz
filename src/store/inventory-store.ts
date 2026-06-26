@@ -77,6 +77,8 @@ interface InventoryState {
   addPurchase: (invoice: PurchaseInvoice) => Promise<void>;
 
   /* Actions — batch queries */
+  /** RC1 M2 — Replace a single batch in local state (store sync after relocation). */
+  updateBatch: (batch: ProductBatch) => void;
   getFefoBatches: (productId?: string) => ProductBatch[];
   getNearExpiryBatches: (daysThreshold?: number) => ProductBatch[];
   getExpiredBatches: () => ProductBatch[];
@@ -151,6 +153,12 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
   /* ---- UI ---- */
   setActiveTab: (tab) => set({ activeTab: tab, searchQuery: "" }),
   setSearchQuery: (query) => set({ searchQuery: query }),
+
+  /* ---- batch sync ---- */
+  /** RC1 M2 — Replace a single batch in local state by ID (store sync after relocation). */
+  updateBatch: (batch) => {
+    set((s) => ({ batches: s.batches.map((b) => (b.id === batch.id ? batch : b)) }));
+  },
 
   /* ---- supplier ---- */
   addSupplier: (supplier) => {
@@ -238,6 +246,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
               quantity: item.quantity,
               unitPrice: item.unitPrice,
               sellingPrice: item.sellingPrice,
+              storageAreaId: item.storageAreaId || null,     // RC1 M2 — from Purchase Assignment
+              storageSlot: item.storageSlot || null,         // RC1 M2 — from Purchase Assignment
             });
             await inventoryRepo.createStockMovement({
               type: 'purchase',
