@@ -429,49 +429,32 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       }
 
       try {
-        // Create stock opname in DB
-        await inventoryRepo.createStockOpname({
-          opnameDate: opname.date,
+        // RC1 P0H.3G-BUGFIX — Use shared Opname Posting Engine
+        const { postOpnameResults } = await import("@/lib/opname/opname-posting-engine");
+        const items = opname.items
+          .filter(i => i.difference !== 0)
+          .map(i => ({
+            productId: i.productId,
+            productName: i.productName,
+            batchId: i.batchId,
+            batchNumber: i.batchNumber,
+            systemQty: i.systemQty,
+            physicalQty: i.physicalQty,
+            difference: i.difference,
+            note: i.note || undefined,
+          }));
+
+        const result = await postOpnameResults({
+          date: opname.date,
           status: opname.status,
           conductedBy: opname.conductedBy || undefined,
           notes: opname.notes || undefined,
-          items: opname.items
-            .filter(item => item.difference !== 0)
-            .map(item => ({
-              productId: item.productId,
-              batchId: item.batchId,
-              systemQty: item.systemQty,
-              physicalQty: item.physicalQty,
-              note: item.note || undefined,
-            })),
+          referencePrefix: "OPN",
+          items,
         });
 
-        // P4C: Reload current batch quantities before adjusting (prevent concurrent corruption)
-        const currentBatches = await inventoryRepo.getBatches();
-        const batchQtyMap = new Map(currentBatches.map(b => [b.id, b.quantity]));
-
-        // For each item with difference: update batch + create movement
-        for (const item of opname.items) {
-          if (item.difference === 0) continue;
-
-          // Use LIVE quantity, not snapshotted systemQty
-          const currentQty = batchQtyMap.get(item.batchId) ?? item.systemQty;
-          const actualDiff = item.physicalQty - currentQty;
-          if (actualDiff === 0) continue; // concurrent change resolved the difference
-
-          await inventoryRepo.updateBatchQuantity(item.batchId, item.physicalQty);
-          await inventoryRepo.createStockMovement({
-            type: 'adjustment',
-            productId: item.productId,
-            productName: item.productName,
-            batchId: item.batchId,
-            batchNumber: item.batchNumber,
-            qtyBefore: currentQty,
-            qtyChange: actualDiff,
-            qtyAfter: item.physicalQty,
-            referenceNumber: `OPN-${opname.id.slice(0, 8)}`,
-            note: item.note || `Penyesuaian dari opname ${opname.date}`,
-          });
+        if (!result.success) {
+          throw new Error(result.error ?? "Gagal memposting opname.");
         }
 
         // Reload state directly (bypass loadDemoData guard — same pattern as addPurchase)

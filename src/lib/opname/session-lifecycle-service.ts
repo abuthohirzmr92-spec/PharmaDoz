@@ -87,12 +87,58 @@ export function completeSessionOpname(ctx: SessionExecutionContext): SessionOper
   return { success: true, message: "Session selesai." };
 }
 
-export function postSessionOpname(ctx: SessionExecutionContext): SessionOperationResult {
+export async function postSessionOpname(ctx: SessionExecutionContext): Promise<SessionOperationResult> {
   const store = useOpnameSessionStore.getState();
+  console.log("[BUG-TRACE-1] ENTER postSessionOpname. activeSession:", !!store.activeSession, "status:", store.activeSession?.status);
   if (!store.activeSession || store.activeSession.status !== "completed") return { success: false, message: "Session belum selesai. Posting hanya bisa dilakukan setelah session completed." };
-  store.postSession();
-  emit(ctx, "SESSION_POSTED", store.activeSession.id);
-  return { success: true, message: "Session diposting." };
+
+  // RC1 P0H.3G-BUGFIX — Persist opname results via shared engine
+  const session = store.activeSession;
+  const sessionItems = store.items.filter(i => i.status === "counted" || i.status === "skipped");
+  console.log("[BUG-TRACE-2] sessionItems count:", sessionItems.length, "total items in store:", store.items.length);
+
+  if (sessionItems.length === 0) {
+    console.log("[BUG-TRACE-3] EARLY RETURN — no counted/skipped items. Calling postSession + emit.");
+    store.postSession();
+    emit(ctx, "SESSION_POSTED", session.id);
+    return { success: true, message: "Session diposting (tidak ada item dengan selisih)." };
+  }
+
+  try {
+    console.log("[BUG-TRACE-4] ENTER engine call. Loading opname-posting-engine...");
+    const { postOpnameResults } = await import("@/lib/opname/opname-posting-engine");
+    console.log("[BUG-TRACE-5] Engine loaded. Calling postOpnameResults with", sessionItems.length, "items...");
+    const result = await postOpnameResults({
+      date: session.startedAt.slice(0, 10),
+      status: "confirmed",
+      conductedBy: ctx.userId,   // ADR-014: UUID from execution context, NOT from session
+      notes: session.notes || undefined,
+      referencePrefix: "SES",
+      items: sessionItems.map(i => ({
+        productId: i.productId,
+        productName: i.productName,
+        batchId: i.batchId,
+        batchNumber: i.batchNumber,
+        systemQty: i.systemQty,
+        physicalQty: i.physicalQty,
+        difference: i.physicalQty - i.systemQty,
+        note: i.note || undefined,
+      })),
+    });
+
+    console.log("[BUG-TRACE-6] Engine result:", JSON.stringify({ success: result.success, opnameId: result.opnameId, error: result.error }));
+    if (!result.success) {
+      return { success: false, message: result.error ?? "Gagal memposting opname." };
+    }
+
+    store.postSession();
+    emit(ctx, "SESSION_POSTED", session.id);
+    console.log("[BUG-TRACE-7] SUCCESS — postSession called, emit called.");
+    return { success: true, message: "Session diposting." };
+  } catch (err: any) {
+    console.error("[BUG-TRACE-ERR] CAUGHT in lifecycle:", err?.message, err);
+    return { success: false, message: err?.message ?? "Gagal memposting opname." };
+  }
 }
 
 export function archiveSessionOpname(ctx: SessionExecutionContext): SessionOperationResult {

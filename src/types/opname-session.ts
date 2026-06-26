@@ -53,7 +53,7 @@ export interface StockOpnameSession {
   postedAt: string | null;
   /** ISO timestamp — when archived */
   archivedAt: string | null;
-  /** Who initiated this session */
+  /** Display name for UI (e.g. "SAFINA") — NOT a DB FK */
   conductedBy: string;
 
   /** Progress tracking */

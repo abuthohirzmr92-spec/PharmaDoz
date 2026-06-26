@@ -346,43 +346,56 @@ export class InventoryRepository extends BaseRepository {
       note?: string;
     }[];
   }): Promise<{ id: string }> {
-    if (!this.isConnected) throw new Error("Not connected");
+    console.log("[TRACE-REPO-1] ENTER createStockOpname. isConnected:", this.isConnected, "items:", data.items.length, "tenantId:", this.getTenantId(), "branchId:", this.branchId);
+    if (!this.isConnected) { console.log("[TRACE-REPO-2] NOT CONNECTED — throwing"); throw new Error("Not connected"); }
+
+    const payload = {
+      opname_date: data.opnameDate ?? new Date().toISOString().slice(0, 10),
+      status: data.status ?? "confirmed",
+      conducted_by: data.conductedBy ?? null,
+      notes: data.notes ?? null,
+      tenant_id: this.getTenantId(),
+      pharmacy_id: this.branchId ?? null,
+    };
+    console.log("[TRACE-REPO-3] INSERT stock_opname payload:", JSON.stringify(payload));
 
     const { data: opname, error } = await this.client
       .from("stock_opname")
-      .insert({
-        opname_date: data.opnameDate ?? new Date().toISOString().slice(0, 10),
-        status: data.status ?? "confirmed",
-        conducted_by: data.conductedBy ?? null,
-        notes: data.notes ?? null,
-        tenant_id: this.getTenantId(),
-        pharmacy_id: this.branchId ?? null,
-      })
+      .insert(payload)
       .select("id")
       .single();
+
+    console.log("[TRACE-REPO-4] INSERT stock_opname response:", JSON.stringify({ id: (opname as any)?.id, error: error ? { code: error.code, message: error.message, details: error.details } : null }));
 
     if (error) return this.handleError(error, "createStockOpname");
 
     const opnameId = (opname as any).id;
+    console.log("[TRACE-REPO-5] Header created. opnameId:", opnameId);
 
     if (data.items.length > 0) {
+      console.log("[TRACE-REPO-6] INSERT stock_opname_items. count:", data.items.length);
+      const itemPayload = data.items.map((item) => ({
+        opname_id: opnameId,
+        product_id: item.productId,
+        batch_id: item.batchId ?? null,
+        system_qty: item.systemQty ?? 0,
+        physical_qty: item.physicalQty ?? 0,
+        note: item.note ?? null,
+      }));
+      console.log("[TRACE-REPO-7] Items payload:", JSON.stringify(itemPayload.slice(0, 3))); // first 3 only
       const { error: itemError } = await this.client
         .from("stock_opname_items")
-        .insert(
-          data.items.map((item) => ({
-            opname_id: opnameId,
-            product_id: item.productId,
-            batch_id: item.batchId ?? null,
-            system_qty: item.systemQty ?? 0,
-            physical_qty: item.physicalQty ?? 0,
-            note: item.note ?? null,
-          })),
-        );
+        .insert(itemPayload);
+
+      console.log("[TRACE-REPO-8] INSERT items response:", JSON.stringify({ error: itemError ? { code: itemError.code, message: itemError.message } : null }));
 
       if (itemError)
         return this.handleError(itemError, "createStockOpname items");
+    } else {
+      console.log("[TRACE-REPO-6-SKIP] No items to insert (items.length === 0)");
     }
 
+    console.log("[TRACE-REPO-9] createStockOpname DONE. Returning id:", opnameId);
     return { id: opnameId };
   }
 
