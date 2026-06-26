@@ -381,6 +381,7 @@ export class InventoryRepository extends BaseRepository {
         system_qty: item.systemQty ?? 0,
         physical_qty: item.physicalQty ?? 0,
         note: item.note ?? null,
+        tenant_id: this.getTenantId(),
       }));
       console.log("[TRACE-REPO-7] Items payload:", JSON.stringify(itemPayload.slice(0, 3))); // first 3 only
       const { error: itemError } = await this.client
