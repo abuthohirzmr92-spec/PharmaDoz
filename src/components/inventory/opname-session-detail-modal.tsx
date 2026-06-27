@@ -19,6 +19,7 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
   const markItemCounted = useOpnameSessionStore((s) => s.markItemCounted);
   const completeSession = useOpnameSessionStore((s) => s.completeSession);
   const batches = useInventoryStore((s) => s.batches);
+  const locationMaster = useLocationMasterStore((s) => s.locations);
 
   const [editingKey, setEditingKey] = useState<string | null>(null);
   const [editQty, setEditQty] = useState("");
@@ -41,7 +42,6 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
   if (!open || !activeSession) return null;
 
   // ADR-016: Location source of truth = Master Lokasi Produk (storage_areas)
-  const locationMaster = useLocationMasterStore((s) => s.locations);
   const locationMap = new Map(locationMaster.map(l => [l.id, l]));
   // Build productId → storage area name lookup from inventory batches
   const productLocationMap = new Map<string, string>();

@@ -102,16 +102,23 @@ export class StorageAreaRepository extends BaseRepository {
 
     const tenantId = this.getTenantId();
 
+    const payload = {
+      tenant_id: tenantId,
+      code: input.code.trim(),
+      name: input.name.trim(),
+      description: input.description?.trim() || null,
+      sort_order: input.sortOrder ?? 0,
+      is_active: true,
+    };
+    console.log("[CREATE-STORAGE-AREA]", JSON.stringify({
+      tenantContext: this.tenantContext,
+      tenantId,
+      payload,
+    }));
+
     const { data, error } = await this.client
       .from("storage_areas")
-      .insert({
-        tenant_id: tenantId,
-        code: input.code.trim(),
-        name: input.name.trim(),
-        description: input.description?.trim() || null,
-        sort_order: input.sortOrder ?? 0,
-        is_active: true,
-      })
+      .insert(payload)
       .select("*")
       .single();
 

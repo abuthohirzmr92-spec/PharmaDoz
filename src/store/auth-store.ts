@@ -18,6 +18,7 @@ import {
   inventoryRepo,
   transactionRepo,
   activityLogRepo,
+  storageAreaRepo,
 } from "@/lib/repository-instances";
 import { useCashierStore } from "@/store/cashier-store";
 import { useTransactionStore } from "@/store/transaction-store";
@@ -72,14 +73,17 @@ let hydrationPromise: Promise<boolean> | null = null;
 /* ------------------------------------------------------------------ */
 
 export function syncRepositoryContext(user: UserProfile | null) {
+  console.log("[AUTH-CTX] syncRepositoryContext called. user:", user ? { tenantId: user.tenantId, role: user.role, id: user.id } : null);
   if (user && user.tenantId && user.role) {
     const ctx = { tenantId: user.tenantId, role: user.role, userId: user.id };
+    console.log("[AUTH-CTX] Setting tenant context:", ctx);
     productRepo.setTenantContext(ctx);
     supplierRepo.setTenantContext(ctx);
     inventoryRepo.setTenantContext(ctx);
     transactionRepo.setTenantContext(ctx);
     authRepo.setTenantContext(ctx);
     activityLogRepo.setTenantContext(ctx);
+    storageAreaRepo.setTenantContext(ctx);
   } else if (user && user.pharmacyId) {
     const ctx = { tenantId: user.pharmacyId, role: user.role, userId: user.id };
     productRepo.setTenantContext(ctx);
@@ -88,6 +92,7 @@ export function syncRepositoryContext(user: UserProfile | null) {
     transactionRepo.setTenantContext(ctx);
     authRepo.setTenantContext(ctx);
     activityLogRepo.setTenantContext(ctx);
+    storageAreaRepo.setTenantContext(ctx);
   } else {
     productRepo.setTenantContext(undefined);
     supplierRepo.setTenantContext(undefined);
@@ -95,6 +100,7 @@ export function syncRepositoryContext(user: UserProfile | null) {
     transactionRepo.setTenantContext(undefined);
     authRepo.setTenantContext(undefined);
     activityLogRepo.setTenantContext(undefined);
+    storageAreaRepo.setTenantContext(undefined);
   }
 }
 

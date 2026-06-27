@@ -48,6 +48,7 @@ export const useLocationMasterStore = create<LocationMasterState>()((set, get) =
       return null;
     }
     try {
+      console.log("[STORE-CREATE]", JSON.stringify({ input, tenantId: _tenantId }));
       const loc = await storageAreaRepo.create(input);
       set({ locations: [...get().locations, loc] });
       return loc;
