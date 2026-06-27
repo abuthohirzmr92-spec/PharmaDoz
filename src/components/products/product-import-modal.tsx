@@ -215,7 +215,7 @@ export function ProductImportModal({ open, onClose, onImported, existingNames, e
     logActivity({
       action: "product.import_excel",
       resourceType: "product",
-      resourceId: "bulk",
+      resourceId: null,  // Bulk import — no single product UUID
       reference: file?.name ?? "unknown",
       metadata: { filename: file?.name, totalRows: resolved.length, createdRows: created, updatedRows: updated, skippedRows: skipped, failedRows: failed, durationMs, updateMode },
     }).catch(() => {});

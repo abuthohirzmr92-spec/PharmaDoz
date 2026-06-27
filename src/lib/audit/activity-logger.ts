@@ -8,7 +8,7 @@
 interface LogPayload {
   action: string;
   resourceType: string;
-  resourceId: string;
+  resourceId: string | null;
   reference: string;
   severity?: "info" | "warning" | "critical";
   metadata?: Record<string, unknown>;
