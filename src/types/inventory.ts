@@ -115,6 +115,7 @@ export interface StockOpnameItem {
   productName: string;
   batchId: string;
   batchNumber: string;
+  expiredDate?: string | null;       // from product_batches JOIN
   systemQty: number;
   physicalQty: number;
   difference: number;

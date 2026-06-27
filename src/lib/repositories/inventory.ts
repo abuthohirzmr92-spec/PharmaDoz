@@ -436,7 +436,11 @@ export class InventoryRepository extends BaseRepository {
       .from("stock_opname")
       .select(
         `*,
-        items:stock_opname_items(*),
+        items:stock_opname_items(
+          *,
+          product:product_id(id, name),
+          batch:batch_id(id, batch_number, expired_date)
+        ),
         user:conducted_by(display_name)`,
       )
       .order("opname_date", { ascending: false });
@@ -457,9 +461,10 @@ export class InventoryRepository extends BaseRepository {
         notes: r.notes ?? "",
         items: (r.items || []).map((item: any) => ({
           productId: item.product_id,
-          productName: "",
+          productName: item.product?.name ?? "",
           batchId: item.batch_id ?? "",
-          batchNumber: "",
+          batchNumber: item.batch?.batch_number ?? "",
+          expiredDate: item.batch?.expired_date ?? null,
           systemQty: item.system_qty,
           physicalQty: item.physical_qty,
           difference: item.difference ?? (item.physical_qty - item.system_qty),
