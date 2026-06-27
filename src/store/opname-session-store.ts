@@ -77,7 +77,7 @@ export const useOpnameSessionStore = create<OpnameSessionState>()((set, get) => 
       batchId: si.batchId,
       productName: "",
       batchNumber: "",
-      systemQty: 0,
+      systemQty: si.systemQty,    // Snapshot — immutable from session start
       physicalQty: 0,
       status: si.status,
       note: "",

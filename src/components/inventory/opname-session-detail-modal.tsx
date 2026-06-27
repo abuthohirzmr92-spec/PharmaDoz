@@ -53,14 +53,14 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
     }
   }
 
-  // Enrich items with batch data + area name from master
+  // Enrich items with batch metadata — systemQty stays as snapshot (not live qty)
   const enrichedItems: BatchItem[] = items.map((item) => {
     const batch = batches.find((b) => b.id === item.batchId);
     return {
       ...item,
       productName: batch?.productName || item.productName || "—",
       batchNumber: batch?.batchNumber || item.batchNumber || "—",
-      systemQty: batch?.quantity ?? item.systemQty,
+      // systemQty is immutable snapshot — DO NOT override with live batch.quantity
       expiredDate: batch?.expiredDate,
       rackLocation: productLocationMap.get(item.productId) ?? null,
     } as BatchItem;

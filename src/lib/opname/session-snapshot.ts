@@ -12,6 +12,8 @@ export interface SessionSnapshotItem {
   key: string;
   productId: string;
   batchId: string;
+  /** System quantity at snapshot time — immutable audit trail */
+  systemQty: number;
   status: SessionItemStatus;
 }
 
@@ -47,6 +49,7 @@ export function buildBatchSessionSnapshot(
     key: `${b.productId}:${b.batchId}`,
     productId: b.productId,
     batchId: b.batchId,
+    systemQty: b.quantity,    // Snapshot — immutable at session start
     status: "pending",
   }));
 }
