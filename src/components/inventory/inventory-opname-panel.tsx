@@ -25,7 +25,7 @@ import { buildSessionExecutionContext } from "@/lib/opname/session-context";
 import { useAuthStore } from "@/store/auth-store";
 import { useBranchStore } from "@/store/branch-store";
 import { FEATURES } from "@/config/features";
-import { buildMultiUnitSummary } from "@/lib/unit-opname";
+import { ProductBatchGroup, groupBatchesByProduct, type BatchItem } from "./product-batch-group";
 
 const STATUS_STYLE: Record<OpnameStatus, { icon: typeof CheckCircle; cls: string; label: string }> = {
   draft: { icon: Clock, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Draft" },
@@ -388,7 +388,15 @@ function OpnameDetailPanel({
 
   if (!opname) return null;
 
-  const baseLabel = (item: any): string => item?.baseUnit || "pcs";
+  // Transform flat items → FEFO product groups (presentation only)
+  const productGroups = groupBatchesByProduct(
+    opname.items.map((item) => ({
+      ...item,
+      key: `${item.productId}-${item.batchId}`,
+      status: "counted" as const,
+      expiredDate: undefined,
+    } as BatchItem))
+  );
 
   return (
     <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
@@ -399,63 +407,9 @@ function OpnameDetailPanel({
         <button onClick={onClose} className="text-[10px] text-neutral-400 hover:text-neutral-600">Tutup</button>
       </div>
 
-      <div className="space-y-3">
-        {opname.items.map((item, idx) => {
-          const unit = baseLabel(item);
-          const detail = buildMultiUnitSummary((item as any).multiUnitCounts, unit);
-          const hasVariance = item.difference !== 0;
+      <ProductBatchGroup groups={productGroups} mode="readonly" />
 
-          return (
-            <div key={`${item.productId}-${item.batchId || idx}`} className="rounded-lg border border-neutral-200 bg-white p-3 dark:border-neutral-700 dark:bg-neutral-900">
-              {/* Header: product + batch + variance badge */}
-              <div className="flex items-baseline justify-between mb-2">
-                <div>
-                  <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">{item.productName}</p>
-                  <p className="text-[10px] font-mono text-neutral-400">{item.batchNumber || "�"}</p>
-                </div>
-                {hasVariance && (
-                  <span className={cn("rounded px-2 py-0.5 text-[10px] font-bold tabular-nums",
-                    item.difference > 0 ? "bg-green-100 text-green-700 dark:bg-green-950/30 dark:text-green-400"
-                    : "bg-red-100 text-red-700 dark:bg-red-950/30 dark:text-red-400")}>
-                    {item.difference > 0 ? "+" : ""}{item.difference} {unit}
-                  </span>
-                )}
-              </div>
-
-              {/* Detail grid: 2 columns */}
-              <div className="grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
-                <div>
-                  <span className="text-neutral-400">Detail Hitung</span>
-                  <p className="font-medium text-neutral-700 dark:text-neutral-300">{detail}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-neutral-400">Qty Fisik</span>
-                  <p className="font-medium tabular-nums text-neutral-700 dark:text-neutral-300">{item.physicalQty} {unit}</p>
-                </div>
-                <div>
-                  <span className="text-neutral-400">Qty Sistem</span>
-                  <p className="tabular-nums text-neutral-500">{item.systemQty} {unit}</p>
-                </div>
-                <div className="text-right">
-                  <span className="text-neutral-400">Selisih</span>
-                  <p className={cn("font-medium tabular-nums",
-                    item.difference > 0 ? "text-green-600" : item.difference < 0 ? "text-red-600" : "text-neutral-400")}>
-                    {item.difference > 0 ? "+" : ""}{item.difference} {unit}
-                  </p>
-                </div>
-                {item.note && (
-                  <div className="col-span-2">
-                    <span className="text-neutral-400">Catatan</span>
-                    <p className="text-neutral-600 dark:text-neutral-400">{item.note}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* Footer: conducted by + date */}
+      {/* Footer */}
       <div className="mt-3 flex items-center gap-3 text-[10px] text-neutral-400">
         <span>Dilakukan Oleh: {opname.conductedBy || "�"}</span>
         <span>�</span>
