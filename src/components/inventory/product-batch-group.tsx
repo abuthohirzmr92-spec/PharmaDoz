@@ -58,6 +58,19 @@ export function groupBatchesByProduct(
 ): ProductGroup[] {
   const grouped = new Map<string, ProductGroup>();
 
+  // Runtime validation — check first item
+  if (items.length > 0) {
+    const i0 = items[0]!;
+    console.log("[RUNTIME-4] groupBatchesByProduct items[0]:", JSON.stringify({
+      systemQty: i0.systemQty,
+      typeof_systemQty: typeof i0.systemQty,
+      physicalQty: i0.physicalQty,
+      productName: i0.productName,
+      batchNumber: i0.batchNumber,
+      isNaN_systemQty: Number.isNaN(i0.systemQty),
+    }));
+  }
+
   for (const item of items) {
     // ── Search filter ──
     if (filters?.searchTerm) {
@@ -110,6 +123,18 @@ export function groupBatchesByProduct(
       if (expA !== expB) return expA - expB;
       return a.batchNumber.localeCompare(b.batchNumber);
     });
+  }
+
+  // Runtime group output validation
+  if (result.length > 0) {
+    const g0 = result[0]!;
+    console.log("[RUNTIME-5] groupBatchesByProduct result[0]:", JSON.stringify({
+      productName: g0.productName,
+      totalSystemQty: g0.totalSystemQty,
+      isNaN_totalSystemQty: Number.isNaN(g0.totalSystemQty),
+      totalBatch: g0.totalBatch,
+      batchesCount: g0.batches.length,
+    }));
   }
 
   return result.sort((a, b) => a.productName.localeCompare(b.productName));

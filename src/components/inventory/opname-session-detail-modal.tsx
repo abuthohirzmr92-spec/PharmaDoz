@@ -69,6 +69,20 @@ export function OpnameSessionDetailModal({ open, onClose }: Props) {
   // Extract locations — only those with products in this session (Option A)
   const locations = [...new Set(enrichedItems.map(i => i.rackLocation).filter(Boolean) as string[])].sort();
 
+  // Runtime trace before grouping
+  if (enrichedItems.length > 0) {
+    const e0 = enrichedItems[0]!;
+    console.log("[RUNTIME-3] enrichedItems[0]:", JSON.stringify({
+      key: e0.key,
+      productName: e0.productName,
+      batchNumber: e0.batchNumber,
+      systemQty: e0.systemQty,
+      typeof_systemQty: typeof e0.systemQty,
+      physicalQty: e0.physicalQty,
+      status: e0.status,
+    }));
+  }
+
   // FEFO groups with filters
   const productGroups = groupBatchesByProduct(enrichedItems, {
     searchTerm,

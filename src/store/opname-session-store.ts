@@ -61,6 +61,18 @@ export const useOpnameSessionStore = create<OpnameSessionState>()((set, get) => 
     const snapshotItems = batches
       ? buildBatchSessionSnapshot(batches, selectedLocationIds)
       : [];
+    console.log("[RUNTIME-1] snapshotItems count:", snapshotItems.length);
+    if (snapshotItems.length > 0) {
+      const s0 = snapshotItems[0]!;
+      console.log("[RUNTIME-2] snapshotItems[0]:", JSON.stringify({
+        key: s0.key,
+        productId: s0.productId,
+        batchId: s0.batchId,
+        systemQty: s0.systemQty,
+        typeof_systemQty: typeof s0.systemQty,
+        status: s0.status,
+      }));
+    }
     const progress = calculateProgress(snapshotItems);
 
     const id = `SES-${Date.now()}-${Math.random().toString(36).slice(2, 6).toUpperCase()}`;
