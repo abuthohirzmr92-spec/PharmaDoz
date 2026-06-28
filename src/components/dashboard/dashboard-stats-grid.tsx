@@ -92,11 +92,10 @@ export function DashboardStatsGrid() {
   }, [isTxnsLoaded, loadTxns]);
 
   useEffect(() => {
-    if (batches.length === 0 && !isLoading) {
-      console.log("[DASHBOARD DEBUG] calling loadInv(), batches:", batches.length, "isLoading:", isLoading);
+    if (batches.length === 0) {
       loadInv();
     }
-  }, [batches.length, loadInv, isLoading]);
+  }, [batches.length, loadInv]); // isLoading removed — causes infinite loop (loadInv sets isLoading → re-render → effect fires again)
 
   const lowStockCount = useMemo(() => getLowStock().length, [getLowStock, batches]);
   const nearExpiryCount = useMemo(() => getNearExpiry(30).length, [getNearExpiry, batches]);
