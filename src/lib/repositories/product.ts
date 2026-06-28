@@ -1,6 +1,7 @@
 import { BaseRepository, mapRow, mapRows } from "./base";
 import type { InventoryProduct, ProductBatch } from "@/types/inventory";
 import type { UnitLevel } from "@/types/unit";
+import { chunk, mapWithLimit, DEFAULT_CHUNK_SIZE, DEFAULT_MAX_CONCURRENCY } from "@/lib/utils/query-batching";
 
 /**
  * CamelCase representation of the `products` DB row.
@@ -49,35 +50,42 @@ export class ProductRepository extends BaseRepository {
   private async getScopedBatchesForProducts(productIds: string[]): Promise<Record<string, ProductBatch[]>> {
     if (productIds.length === 0) return {};
 
-    let query = this.client
-      .from("product_batches")
-      .select("*")
-      .is("deleted_at", null)
-      .in("product_id", productIds);
+    const chunks = chunk(productIds, DEFAULT_CHUNK_SIZE);
 
-    query = this.withTenantScope(query);
-    query = this.withBranchScope(query);
+    const allResults = await mapWithLimit(chunks, DEFAULT_MAX_CONCURRENCY, async (chunk) => {
+      let query = this.client
+        .from("product_batches")
+        .select("*")
+        .is("deleted_at", null)
+        .in("product_id", chunk);
 
-    const { data, error } = await query;
-    if (error) return this.handleError(error, "getScopedBatchesForProducts");
+      query = this.withTenantScope(query);
+      query = this.withBranchScope(query);
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data || []) as Record<string, unknown>[];
+    });
 
     const grouped: Record<string, ProductBatch[]> = {};
-    for (const batch of (data || []) as Record<string, unknown>[]) {
-      const productId = batch.product_id as string;
-      if (!grouped[productId]) grouped[productId] = [];
-      grouped[productId].push({
-        id: batch.id as string,
-        tenantId: (batch.tenant_id as string) ?? this.pharmacyId ?? "",
-        productId,
-        productName: "",
-        pharmacyId: (batch.pharmacy_id as string | null) ?? null,
-        batchNumber: batch.batch_number as string,
-        expiredDate: batch.expired_date as string,
-        quantity: (batch.quantity as number) ?? 0,
-        unitPrice: (batch.unit_price as number) ?? 0,
-        sellingPrice: (batch.selling_price as number) ?? 0,
-        createdAt: batch.created_at as string,
-      });
+    for (const data of allResults) {
+      for (const batch of data) {
+        const productId = batch.product_id as string;
+        if (!grouped[productId]) grouped[productId] = [];
+        grouped[productId].push({
+          id: batch.id as string,
+          tenantId: (batch.tenant_id as string) ?? this.pharmacyId ?? "",
+          productId,
+          productName: "",
+          pharmacyId: (batch.pharmacy_id as string | null) ?? null,
+          batchNumber: batch.batch_number as string,
+          expiredDate: batch.expired_date as string,
+          quantity: (batch.quantity as number) ?? 0,
+          unitPrice: (batch.unit_price as number) ?? 0,
+          sellingPrice: (batch.selling_price as number) ?? 0,
+          createdAt: batch.created_at as string,
+        });
+      }
     }
 
     return grouped;
@@ -563,25 +571,28 @@ export class ProductRepository extends BaseRepository {
     // Init empty arrays for all requested IDs
     for (const pid of productIds) result[pid] = [];
 
-    const { data, error } = await this.client
-      .from("product_unit_levels")
-      .select("id, product_id, level, unit_name, contains")
-      .in("product_id", productIds)
-      .order("level", { ascending: true });
+    const chunks = chunk(productIds, DEFAULT_CHUNK_SIZE);
+    await mapWithLimit(chunks, DEFAULT_MAX_CONCURRENCY, async (chunk) => {
+      const { data, error } = await this.client
+        .from("product_unit_levels")
+        .select("id, product_id, level, unit_name, contains")
+        .in("product_id", chunk)
+        .order("level", { ascending: true });
 
-    if (error) return this.handleError(error, "getUnitLevelsByProducts");
+      if (error) throw error;
 
-    for (const row of data || []) {
-      const r = row as Record<string, unknown>;
-      const pid = r.product_id as string;
-      if (!result[pid]) result[pid] = [];
-      result[pid].push({
-        id: r.id as string,
-        level: r.level as number,
-        unitName: r.unit_name as string,
-        contains: r.contains as number,
-      });
-    }
+      for (const row of data || []) {
+        const r = row as Record<string, unknown>;
+        const pid = r.product_id as string;
+        if (!result[pid]) result[pid] = [];
+        result[pid].push({
+          id: r.id as string,
+          level: r.level as number,
+          unitName: r.unit_name as string,
+          contains: r.contains as number,
+        });
+      }
+    });
 
     return result;
   }
