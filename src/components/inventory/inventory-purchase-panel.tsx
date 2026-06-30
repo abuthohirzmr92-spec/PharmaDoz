@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useMemo, useEffect } from "react";
 import {
@@ -48,6 +48,13 @@ type PurchaseFormItem = {
   barcode?: string;          // 🟢 P2 — barcode dari import
   notes?: string;            // 🟢 P2 — catatan
 
+  // === Review Priority Engine metadata (UI-only, NOT sent to save) ===
+  matchConfidence?: number;   // 0–100 from match-engine
+  matchMethod?: string;       // barcode | exact_name | token | fuzzy | manual | unmatched
+  draftStatus?: string;       // matched | fuzzy_match | unmatched | warning | error
+  warnings?: Array<{ code: string; message: string; level: string }>;
+  originalRowIndex?: number;  // original Excel/CSV row (0-based)
+
 };
 import { usePermission } from "@/hooks/use-auth";
 import { productRepo, supplierRepo } from "@/lib/repository-instances";
@@ -57,6 +64,8 @@ import { ProductFormModal } from "@/components/products/product-form-modal";
 import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
 import { NumericInput } from "@/components/shared/numeric-input";
 import { toBaseUnit } from "@/lib/unit-converter";
+import { computeReview, filterByPriorityGroup, searchItems, classifyReviewStatus } from "@/lib/purchasing/review-priority-engine";
+import type { ReviewStatus, ReviewSubStatus } from "@/lib/purchasing/review-priority-engine";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { Loader2 } from "lucide-react";
 
@@ -71,6 +80,39 @@ const STATUS_STYLE: Record<PurchaseStatus, { icon: typeof CheckCircle; cls: stri
   paid: { icon: CheckCircle, cls: "text-green-600 bg-green-50 dark:bg-green-950/30", label: "Lunas" },
   partial: { icon: Clock, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Sebagian" },
   unpaid: { icon: AlertCircle, cls: "text-red-600 bg-red-50 dark:bg-red-950/30", label: "Belum" },
+};
+
+// RC1 — Review Priority Engine: module-level badge maps (not recreated per row)
+const REVIEW_BADGE_MAP: Record<ReviewStatus, { label: string; cls: string }> = {
+  unmatched: { label: "🔴 Belum Match", cls: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400" },
+  need_review: { label: "🟡 Perlu Review", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
+  warning: { label: "🟡 Warning", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
+  matched: { label: "🟢 Match", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" },
+  empty: { label: "—", cls: "bg-neutral-50 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500" },
+};
+
+const REVIEW_ROW_BG: Record<ReviewStatus, string> = {
+  unmatched: "bg-red-50/30 dark:bg-red-950/10",
+  need_review: "bg-amber-50/40 dark:bg-amber-950/15",
+  warning: "bg-amber-50/20 dark:bg-amber-950/8",
+  matched: "",
+  empty: "",
+};
+
+const REVIEW_SUBSTATUS_LABEL: Record<ReviewSubStatus, string> = {
+  unmatched: "Belum ditemukan di master",
+  barcode_not_found: "Barcode tidak ditemukan",
+  multiple_candidates: "Ditemukan beberapa kandidat",
+  ambiguous_match: "Hasil pencocokan ambigu",
+  missing_product: "Produk belum terdaftar di master",
+  need_review: "Perlu ditinjau",
+  fuzzy_match: "Hasil fuzzy matching",
+  manual_match: "Dipasangkan manual",
+  low_confidence: "Tingkat kepercayaan rendah",
+  has_warnings: "Memiliki peringatan",
+  auto_match: "Otomatis cocok",
+  valid: "Valid",
+  ready: "Siap posting",
 };
 
 export function InventoryPurchasePanel() {
@@ -114,7 +156,7 @@ export function InventoryPurchasePanel() {
   const hydrateFormFromDraft = (draft: { items: Array<{ id: string; matchedProductId: string | null; rawProductName: string; quantity: number; enteredBuyPrice: number; currentSellingPrice: number; batchNumber: string | null; expiredDate: string | null; unit?: string; rawBarcode?: string | null; supplierName?: string | null; notes?: string | null }>; supplierId?: string | null }) => {
     try {
       setFormSupplier(draft.supplierId ?? "");
-      setFormItems(draft.items.map((item) => ({
+      setFormItems(draft.items.map((item, idx) => ({
         id: item.id,
         productId: item.matchedProductId ?? "",
         productName: item.rawProductName,
@@ -131,6 +173,12 @@ export function InventoryPurchasePanel() {
         supplierName: item.supplierName ?? undefined,
         barcode: item.rawBarcode ?? undefined,
         notes: item.notes ?? undefined,
+        // Review engine metadata
+        matchConfidence: (item as any).matchConfidence,
+        matchMethod: (item as any).matchMethod,
+        draftStatus: (item as any).status,
+        warnings: (item as any).warnings,
+        originalRowIndex: idx,
       })));
       setShowForm(true);
     } catch (e) {
@@ -258,6 +306,42 @@ export function InventoryPurchasePanel() {
   const [formItems, setFormItems] = useState<PurchaseFormItem[]>([
     { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" },
   ]);
+  // RC1 — Review priority filter (default: "belum_match" per BUSINESS RULE)
+  const [reviewFilter, setReviewFilter] = useState<"all"|"belum_match"|"perlu_review"|"sudah_match">("belum_match");
+  const [formItemSearch, setFormItemSearch] = useState("");
+
+  // Review Priority Engine — compute once, sort by priority
+  const reviewResult = useMemo(() => {
+    return computeReview(formItems, formSupplier.trim().length > 0);
+  }, [formItems, formSupplier]);
+
+  // Items to display (search overrides group filter per spec TASK 5)
+  const displayItems = useMemo(() => {
+    // When searching, span ALL items regardless of current group filter
+    if (formItemSearch.trim()) {
+      const allItems = reviewResult.items.map((r) => r.item);
+      return searchItems(allItems, formItemSearch);
+    }
+    // Normal mode: apply group filter
+    return filterByPriorityGroup(reviewResult, reviewFilter).map((r) => r.item);
+  }, [reviewResult, reviewFilter, formItemSearch]);
+
+  // Auto-collapse: if current filter group is empty, switch to next available
+  useEffect(() => {
+    const filtered = filterByPriorityGroup(reviewResult, reviewFilter);
+    if (filtered.length === 0 && reviewResult.stats.total > 0) {
+      // Find next non-empty group
+      const order: Array<"belum_match"|"perlu_review"|"sudah_match"|"all"> = ["belum_match", "perlu_review", "sudah_match", "all"];
+      for (const next of order) {
+        if (next === reviewFilter) continue;
+        const nextFiltered = next === "all" ? reviewResult.items : filterByPriorityGroup(reviewResult, next);
+        if (nextFiltered.length > 0) {
+          setReviewFilter(next);
+          break;
+        }
+      }
+    }
+  }, [reviewResult, reviewFilter]);
 
   const handleAddItem = () => {
     setFormItems((prev) => [
@@ -624,46 +708,114 @@ export function InventoryPurchasePanel() {
                 </div>
               </div>
 
+              {/* Sticky Review Header — search + summary stay visible on scroll */}
+              <div className="sticky top-0 z-20 -mx-1 px-1 pt-1 pb-2 mb-3 bg-white/95 backdrop-blur-sm dark:bg-neutral-950/95 rounded-b-lg">
+                {/* Search across all form items */}
+                <div className="mb-2">
+                  <div className="relative">
+                    <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-400" />
+                    <input
+                      type="text"
+                      value={formItemSearch}
+                      onChange={(e) => setFormItemSearch(e.target.value)}
+                      placeholder="Cari produk di seluruh data..."
+                      className="w-full rounded-lg border border-neutral-200 bg-white py-2 pl-8 pr-3 text-xs text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none focus:ring-2 focus:ring-brand-100 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                    />
+                    {formItemSearch && (
+                      <button onClick={() => setFormItemSearch("")} className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-600">
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Review Summary */}
+                <div className="rounded-lg border border-brand-200 bg-neutral-50/80 p-2.5 dark:border-brand-800 dark:bg-neutral-800/80">
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-[10px] font-medium text-neutral-500">Review:</span>
+                  <span className="text-[11px] tabular-nums">
+                    <strong className="text-neutral-700 dark:text-neutral-300">{reviewResult.stats.total}</strong>
+                    <span className="text-neutral-400"> Item</span>
+                  </span>
+                  <span className="text-[11px] tabular-nums">
+                    <strong className="text-green-600">{reviewResult.stats.matched}</strong>
+                    <span className="text-neutral-400"> Match</span>
+                  </span>
+                  {reviewResult.stats.needReview > 0 && (
+                    <span className="text-[11px] tabular-nums">
+                      <strong className="text-amber-600">{reviewResult.stats.needReview}</strong>
+                      <span className="text-neutral-400"> Perlu Review</span>
+                    </span>
+                  )}
+                  {reviewResult.stats.unmatched > 0 && (
+                    <span className="text-[11px] tabular-nums">
+                      <strong className="text-red-600">{reviewResult.stats.unmatched}</strong>
+                      <span className="text-neutral-400"> Belum Match</span>
+                    </span>
+                  )}
+                  <span className="text-[11px] tabular-nums">
+                    <strong className="text-neutral-600 dark:text-neutral-300">{reviewResult.stats.progress}/{reviewResult.stats.total}</strong>
+                    <span className="text-neutral-400"> selesai</span>
+                  </span>
+                  {/* Progress bar + percentage */}
+                  <span className="flex items-center gap-1.5">
+                    <span className="block h-1.5 w-16 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
+                      <span
+                        className="block h-full rounded-full bg-brand-500 transition-all duration-300"
+                        style={{ width: `${reviewResult.stats.progressPercent}%` }}
+                      />
+                    </span>
+                    <span className="text-[10px] tabular-nums font-medium text-neutral-500">
+                      {reviewResult.stats.progressPercent}%
+                    </span>
+                  </span>
+                  <span className="flex-1" />
+                  {/* Quick filter tabs */}
+                  <div className="flex gap-1">
+                    {([
+                      { key: "all", label: "Semua" },
+                      { key: "belum_match", label: reviewResult.stats.unmatched > 0 ? `Belum Match (${reviewResult.stats.unmatched})` : "Belum Match" },
+                      { key: "perlu_review", label: reviewResult.stats.needReview > 0 ? `Perlu Review (${reviewResult.stats.needReview})` : "Perlu Review" },
+                      { key: "sudah_match", label: "Sudah Match" },
+                    ] as const).map((f) => (
+                      <button
+                        key={f.key}
+                        onClick={() => setReviewFilter(f.key)}
+                        className={cn(
+                          "rounded px-2 py-0.5 text-[10px] font-medium transition-colors",
+                          reviewFilter === f.key
+                            ? "bg-brand-100 text-brand-700 dark:bg-brand-950 dark:text-brand-400"
+                            : "text-neutral-500 hover:bg-neutral-100 dark:hover:bg-neutral-700",
+                        )}
+                      >
+                        {f.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              </div>
+
               {/* Items table */}
               <div className="overflow-x-auto rounded-lg border border-neutral-200 dark:border-neutral-700 mb-3">
                 <table className="w-full text-xs">
                   <thead>
                     <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800/50">
-                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">
-                        Produk
-                      </th>
-                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">
-                        Batch (Opsional)
-                      </th>
-                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">
-                        ED
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        Qty
-                      </th>
-                      <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">
-                        Satuan
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        Hrg Beli
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        Hrg Dasar
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        HPP
-                      </th>
-                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">
-                        Jual Dasar
-                      </th>
-                      <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">
-                        Status
-                      </th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">Produk</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">Batch</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">ED</th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">Qty</th>
+                      <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">Satuan</th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">Hrg Beli</th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">Hrg Dasar</th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">HPP</th>
+                      <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">Jual Dasar</th>
+                      <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">Status</th>
                       <th className="px-2 py-1.5 w-[80px]" />
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-                    {formItems.map((item) => {
+                    {displayItems.map((item) => {
                       // V3 P1 — compute base unit price for display
                       const prodMeta = productList.find(p => p.id === item.productId);
                       const levels = prodMeta?.unitLevels ?? [];
@@ -675,11 +827,10 @@ export function InventoryPurchasePanel() {
                       const baseSellingPrice = multiplier > 1 ? Math.round(item.sellingPrice / multiplier) : item.sellingPrice;
                       // V3 P1A — HPP must use base unit price, not display unit price
                       const hpp = Math.round(baseUnitPrice * (1 + purchaseTaxPercent / 100));
-                      const badge = item.productId
-                        ? { label: "✓ MATCHED", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" }
-                        : { label: "⚠ Belum terdaftar", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" };
-                      // Row highlight for unmatched products
-                      const rowBg = !item.productId ? "bg-amber-50/40 dark:bg-amber-950/15" : "";
+                      // Review engine classification (module-level maps for perf)
+                      const { status: reviewStatus, subStatus } = classifyReviewStatus(item);
+                      const badge = REVIEW_BADGE_MAP[reviewStatus];
+                      const rowBg = REVIEW_ROW_BG[reviewStatus] ?? "";
                       return (
                       <tr key={item.id} className={`group hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${rowBg}`}>
                         <td className="px-2 py-1">
@@ -771,9 +922,14 @@ export function InventoryPurchasePanel() {
                             <div className="text-[9px] text-neutral-400 text-right">{baseSellingPrice.toLocaleString("id-ID")} / {prodMeta?.unit ?? "base"}</div>
                           )}
                         </td>
-                        {/* Status badge */}
+                        {/* Status badge with sub-status tooltip */}
                         <td className="px-2 py-1 text-center">
-                          <span className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}>{badge.label}</span>
+                          <span
+                            className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}
+                            title={REVIEW_SUBSTATUS_LABEL[subStatus] ?? subStatus}
+                          >
+                            {badge.label}
+                          </span>
                         </td>
                         {/* Actions */}
                         <td className="px-2 py-1">
@@ -799,25 +955,6 @@ export function InventoryPurchasePanel() {
                 </table>
               </div>
 
-              {/* Import Summary */}
-              {(() => {
-                const total = formItems.filter((it) => it.productName && it.quantity > 0).length;
-                const matched = formItems.filter((it) => it.productId && it.quantity > 0).length;
-                const unmatched = total - matched;
-                if (total === 0) return null;
-                return (
-                  <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800 dark:bg-amber-950/30">
-                    <p className="text-[11px] font-semibold text-amber-800 dark:text-amber-200">Import Summary</p>
-                    <div className="mt-1 space-y-0.5 text-[10px] text-amber-700 dark:text-amber-300">
-                      <div>✓ Terdaftar di Master : {matched}</div>
-                      {unmatched > 0 && (
-                        <div>⚠ Belum terdaftar : {unmatched}</div>
-                      )}
-                    </div>
-                  </div>
-                );
-              })()}
-
               {/* Add item + Submit */}
               <div className="flex items-center justify-between">
                 <button
@@ -837,10 +974,24 @@ export function InventoryPurchasePanel() {
                   </button>
                   <button
                     onClick={handleSubmit}
-                    className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors"
+                    disabled={!reviewResult.stats.canPost}
+                    title={(() => {
+                      const s = reviewResult.stats;
+                      if (s.canPost) return undefined;
+                      if (s.unmatched > 0) return `Masih ada ${s.unmatched} produk yang belum match`;
+                      if (s.needReview > 0) return `Masih ada ${s.needReview} produk yang perlu review`;
+                      return "Isi supplier terlebih dahulu";
+                    })()}
+                    className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="h-3 w-3" />
-                    Simpan Pembelian
+                    {(() => {
+                      const s = reviewResult.stats;
+                      const issues: string[] = [];
+                      if (s.unmatched > 0) issues.push(`${s.unmatched} belum match`);
+                      if (s.needReview > 0) issues.push(`${s.needReview} perlu review`);
+                      return issues.length > 0 ? `Simpan (${issues.join(", ")})` : "Simpan Pembelian";
+                    })()}
                   </button>
                 </div>
               </div>
