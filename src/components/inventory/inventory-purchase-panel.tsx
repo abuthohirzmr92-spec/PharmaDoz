@@ -533,7 +533,7 @@ export function InventoryPurchasePanel() {
                     className="rounded p-1 text-neutral-400 hover:text-neutral-600 dark:hover:text-neutral-300" title="Pengaturan PPN">
                     <Settings className="h-4 w-4" />
                   </button>
-                  <button onClick={() => setShowForm(false)}
+                  <button onClick={() => { setShowForm(false); setFormItems([{ id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" }]); setFormSupplier(""); setFormDueDate(""); }}
                   className="rounded p-1 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
                 >
                   <X className="h-4 w-4" />
@@ -830,7 +830,7 @@ export function InventoryPurchasePanel() {
 
                 <div className="flex gap-2">
                   <button
-                    onClick={() => setShowForm(false)}
+                    onClick={() => { setShowForm(false); setFormItems([{ id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" }]); setFormSupplier(""); setFormDueDate(""); }}
                     className="rounded-lg border border-neutral-200 bg-white px-3 py-1.5 text-xs text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400 dark:hover:bg-neutral-700"
                   >
                     Batal
