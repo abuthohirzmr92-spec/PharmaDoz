@@ -55,6 +55,13 @@ type PurchaseFormItem = {
   warnings?: Array<{ code: string; message: string; level: string }>;
   originalRowIndex?: number;  // original Excel/CSV row (0-based)
 
+  // === SPR-INV-REVIEW-001: Review Workflow metadata (UI-only) ===
+  reviewStatus?: string;     // User-set: "data_changed" | "new_product" | "not_purchased"
+  humanReviewed?: boolean;   // SPR-INV-REVIEW-001A: checkbox for need_review items
+  reviewedBy?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+
 };
 import { usePermission } from "@/hooks/use-auth";
 import { useProductStore } from "@/store/product-store";
@@ -84,20 +91,30 @@ const STATUS_STYLE: Record<PurchaseStatus, { icon: typeof CheckCircle; cls: stri
 };
 
 // RC1 — Review Priority Engine: module-level badge maps (not recreated per row)
-const REVIEW_BADGE_MAP: Record<ReviewStatus, { label: string; cls: string }> = {
+const REVIEW_BADGE_MAP: Record<string, { label: string; cls: string }> = {
   unmatched: { label: "🔴 Belum Match", cls: "bg-red-50 text-red-700 dark:bg-red-950 dark:text-red-400" },
   need_review: { label: "🟡 Perlu Review", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
   warning: { label: "🟡 Warning", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-400" },
   matched: { label: "🟢 Match", cls: "bg-green-50 text-green-700 dark:bg-green-950 dark:text-green-400" },
   empty: { label: "—", cls: "bg-neutral-50 text-neutral-400 dark:bg-neutral-800 dark:text-neutral-500" },
+  ocr_error: { label: "🔴 OCR Error", cls: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-500" },
+  data_changed: { label: "✏️ Data Diubah", cls: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400" },
+  new_product: { label: "➕ Produk Baru", cls: "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" },
+  not_purchased: { label: "🚫 Tidak Dibeli", cls: "bg-neutral-200 text-neutral-500 dark:bg-neutral-800 dark:text-neutral-500" },
+  ready_to_post: { label: "✅ Siap Diposting", cls: "bg-green-100 text-green-800 dark:bg-green-950 dark:text-green-400" },
 };
 
-const REVIEW_ROW_BG: Record<ReviewStatus, string> = {
+const REVIEW_ROW_BG: Record<string, string> = {
   unmatched: "bg-red-50/30 dark:bg-red-950/10",
   need_review: "bg-amber-50/40 dark:bg-amber-950/15",
   warning: "bg-amber-50/20 dark:bg-amber-950/8",
   matched: "",
   empty: "",
+  ocr_error: "bg-red-100/50 dark:bg-red-950/20",
+  data_changed: "bg-blue-50/30 dark:bg-blue-950/10",
+  new_product: "bg-purple-50/30 dark:bg-purple-950/10",
+  not_purchased: "bg-neutral-100/50 dark:bg-neutral-800/30",
+  ready_to_post: "",
 };
 
 const REVIEW_SUBSTATUS_LABEL: Record<ReviewSubStatus, string> = {
@@ -311,7 +328,9 @@ export function InventoryPurchasePanel() {
     { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" },
   ]);
   // RC1 — Review priority filter (default: "belum_match" per BUSINESS RULE)
-  const [reviewFilter, setReviewFilter] = useState<"all"|"belum_match"|"perlu_review"|"sudah_match">("belum_match");
+  // SPR-INV-REVIEW-001: Extended filter tabs
+  type ReviewFilterTab = "all" | "belum_match" | "perlu_review" | "sudah_match" | "ocr_error" | "new_product" | "ready_to_post";
+  const [reviewFilter, setReviewFilter] = useState<ReviewFilterTab>("belum_match");
   const [formItemSearch, setFormItemSearch] = useState("");
 
   // Review Priority Engine — compute once, sort by priority
@@ -335,7 +354,7 @@ export function InventoryPurchasePanel() {
     const filtered = filterByPriorityGroup(reviewResult, reviewFilter);
     if (filtered.length === 0 && reviewResult.stats.total > 0) {
       // Find next non-empty group
-      const order: Array<"belum_match"|"perlu_review"|"sudah_match"|"all"> = ["belum_match", "perlu_review", "sudah_match", "all"];
+      const order: ReviewFilterTab[] = ["belum_match", "ocr_error", "perlu_review", "new_product", "sudah_match", "ready_to_post", "all"];
       for (const next of order) {
         if (next === reviewFilter) continue;
         const nextFiltered = next === "all" ? reviewResult.items : filterByPriorityGroup(reviewResult, next);
@@ -778,8 +797,11 @@ export function InventoryPurchasePanel() {
                     {([
                       { key: "all", label: "Semua" },
                       { key: "belum_match", label: reviewResult.stats.unmatched > 0 ? `Belum Match (${reviewResult.stats.unmatched})` : "Belum Match" },
+                      { key: "ocr_error", label: "OCR Error" },
                       { key: "perlu_review", label: reviewResult.stats.needReview > 0 ? `Perlu Review (${reviewResult.stats.needReview})` : "Perlu Review" },
+                      { key: "new_product", label: "Produk Baru" },
                       { key: "sudah_match", label: "Sudah Match" },
+                      { key: "ready_to_post", label: "Siap Posting" },
                     ] as const).map((f) => (
                       <button
                         key={f.key}
@@ -832,7 +854,7 @@ export function InventoryPurchasePanel() {
                       const hpp = Math.round(baseUnitPrice * (1 + purchaseTaxPercent / 100));
                       // Review engine classification (module-level maps for perf)
                       const { status: reviewStatus, subStatus } = classifyReviewStatus(item);
-                      const badge = REVIEW_BADGE_MAP[reviewStatus];
+                      const badge = REVIEW_BADGE_MAP[reviewStatus] ?? REVIEW_BADGE_MAP["empty"]!;
                       const rowBg = REVIEW_ROW_BG[reviewStatus] ?? "";
                       return (
                       <tr key={item.id} className={`group hover:bg-neutral-50 dark:hover:bg-neutral-800/50 transition-colors ${rowBg}`}>
@@ -925,7 +947,7 @@ export function InventoryPurchasePanel() {
                             <div className="text-[9px] text-neutral-400 text-right">{baseSellingPrice.toLocaleString("id-ID")} / {prodMeta?.unit ?? "base"}</div>
                           )}
                         </td>
-                        {/* Status badge with sub-status tooltip */}
+                        {/* Status badge + human review checkbox (SPR-INV-REVIEW-001A) */}
                         <td className="px-2 py-1 text-center">
                           <span
                             className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}
@@ -933,6 +955,20 @@ export function InventoryPurchasePanel() {
                           >
                             {badge.label}
                           </span>
+                          {reviewStatus === "need_review" && (
+                            <label className="mt-1 flex items-center justify-center gap-1 text-[9px] text-neutral-500 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={item.humanReviewed === true}
+                                onChange={(e) => {
+                                  // UI hanya set humanReviewed — ENGINE yang menentukan transisi
+                                  handleItemChange(item.id, "humanReviewed" as any, e.target.checked as any);
+                                }}
+                                className="h-3 w-3 rounded border-neutral-300"
+                              />
+                              Review OK
+                            </label>
+                          )}
                         </td>
                         {/* Actions */}
                         <td className="px-2 py-1">
@@ -940,6 +976,8 @@ export function InventoryPurchasePanel() {
                             const v = e.target.value;
                             if (v === "match") setShowQuickCreate(true);
                             else if (v === "force") { setProductFormItemId(item.id); setShowProductForm(true); }
+                            else if (v === "edit") { /* Opens inline edit — mark as data_changed */ handleItemChange(item.id, "reviewStatus" as any, "data_changed"); toast.info("Aktifkan edit manual pada field"); }
+                            else if (v === "not_purchased") { handleItemChange(item.id, "reviewStatus" as any, "not_purchased"); toast.info("Item ditandai tidak dibeli"); }
                             else if (v === "remove") handleRemoveItem(item.id);
                           }}
                           className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-500 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-400">
@@ -948,6 +986,8 @@ export function InventoryPurchasePanel() {
                               <option value="match">🔗 Sesuaikan Produk</option>
                               <option value="force">➕ Tambah ke Master</option>
                             </>)}
+                            <option value="edit">✏️ Edit Data OCR</option>
+                            <option value="not_purchased">🚫 Tandai Tidak Dibeli</option>
                             <option value="remove">🗑 Hapus Item</option>
                           </select>
                         </td>
@@ -981,6 +1021,7 @@ export function InventoryPurchasePanel() {
                     title={(() => {
                       const s = reviewResult.stats;
                       if (s.canPost) return undefined;
+                      if ((s as any).ocrErrors > 0) return `Masih ada ${(s as any).ocrErrors} item dengan OCR Error`;
                       if (s.unmatched > 0) return `Masih ada ${s.unmatched} produk yang belum match`;
                       if (s.needReview > 0) return `Masih ada ${s.needReview} produk yang perlu review`;
                       return "Isi supplier terlebih dahulu";

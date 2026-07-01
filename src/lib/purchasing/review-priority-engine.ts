@@ -18,7 +18,7 @@
  *   Band P3 (Sudah Match)  — matched
  *   Band P4 (hidden)       — empty (blank rows)
  */
-export type ReviewStatus = "unmatched" | "need_review" | "warning" | "matched" | "empty";
+export type ReviewStatus = "unmatched" | "need_review" | "warning" | "matched" | "empty" | "ocr_error" | "data_changed" | "new_product" | "not_purchased" | "ready_to_post";
 
 /**
  * Fine-grained sub-status for detailed classification and debugging.
@@ -71,6 +71,8 @@ export interface ReviewItemMeta {
   warnings?: Array<{ code: string; message: string; level: string }>;
   /** Original row number from Excel/CSV import (0-based). */
   originalRowIndex?: number;
+  /** SPR-INV-REVIEW-001A: Human review checkbox for need_review items */
+  humanReviewed?: boolean;
 }
 
 /** A reviewable item with its computed review status, sub-status, and priority. */
@@ -143,6 +145,22 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
     return { status: "empty", subStatus: "unmatched" };
   }
 
+  // ── User-set status overrides (check metadata) ──
+  const userStatus = (meta as any).reviewStatus as ReviewStatus | undefined;
+  if (userStatus === "data_changed") return { status: "data_changed", subStatus: "manual_match" };
+  if (userStatus === "new_product") return { status: "new_product", subStatus: "manual_match" };
+  if (userStatus === "not_purchased") return { status: "not_purchased", subStatus: "unmatched" };
+  if (userStatus === "ready_to_post") return { status: "ready_to_post", subStatus: "ready" };
+
+  // ── OCR Error: has name but missing critical fields ──
+  if (hasName) {
+    const qty = (meta as any).quantity as number | undefined;
+    const price = (meta as any).unitPrice as number | undefined;
+    if ((qty === undefined || qty <= 0) || (price === undefined || price <= 0)) {
+      return { status: "ocr_error", subStatus: "unmatched" };
+    }
+  }
+
   // ── P1: Belum Match (no product assigned) ──
 
   if (!hasProduct && hasName) {
@@ -201,6 +219,13 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
     return { status: "warning", subStatus: "has_warnings" };
   }
 
+  // ── SPR-INV-REVIEW-001A: Auto-transition need_review → ready_to_post ──
+  // Perlu Review = product already matched, just needs human confirmation
+  // When humanReviewed checkbox is checked, auto-upgrade to ready_to_post
+  if (hasProduct && meta.humanReviewed && (status === "need_review" || status === "warning" || status === "fuzzy_match")) {
+    return { status: "ready_to_post", subStatus: "ready" };
+  }
+
   // ── P3: Sudah Match (clean) ──
   return { status: "matched", subStatus: "auto_match" };
 }
@@ -215,14 +240,19 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
  */
 export function classifyPriority(status: ReviewStatus): PriorityLevel {
   switch (status) {
+    case "ocr_error":
     case "unmatched":
       return 1;
     case "need_review":
     case "warning":
+    case "data_changed":
       return 2;
     case "matched":
+    case "new_product":
+    case "ready_to_post":
       return 3;
     case "empty":
+    case "not_purchased":
       return 4;
   }
 }
@@ -309,20 +339,22 @@ export function computeReview<T extends ReviewItemMeta>(
   });
 
   // Aggregate stats
-  const matched = reviewed.filter((r) => r.reviewStatus === "matched").length;
-  const needReview = reviewed.filter((r) => r.reviewStatus === "need_review" || r.reviewStatus === "warning").length;
+  const matched = reviewed.filter((r) => r.reviewStatus === "matched" || r.reviewStatus === "ready_to_post").length;
+  const needReview = reviewed.filter((r) => r.reviewStatus === "need_review" || r.reviewStatus === "warning" || r.reviewStatus === "data_changed").length;
   const unmatched = reviewed.filter((r) => r.reviewStatus === "unmatched").length;
+  const ocrErrors = reviewed.filter((r) => r.reviewStatus === "ocr_error").length;
 
   const stats: ReviewStats = {
     total: items.length,
     matched,
     needReview,
     unmatched,
-    progress: matched + needReview, // items with productId assigned
+    progress: matched + needReview,
     progressPercent: items.length > 0 ? Math.round(((matched + needReview) / items.length) * 100) : 0,
     canPost:
       unmatched === 0 &&
       needReview === 0 &&
+      ocrErrors === 0 &&
       items.length > 0 &&
       supplierSelected,
   };
@@ -356,7 +388,7 @@ export function filterByStatus<T extends ReviewItemMeta>(
  */
 export function filterByPriorityGroup<T extends ReviewItemMeta>(
   result: ReviewResult<T>,
-  group: "all" | "belum_match" | "perlu_review" | "sudah_match",
+  group: "all" | "belum_match" | "perlu_review" | "sudah_match" | "ocr_error" | "new_product" | "ready_to_post",
 ): ReviewedItem<T>[] {
   switch (group) {
     case "all":
@@ -366,7 +398,13 @@ export function filterByPriorityGroup<T extends ReviewItemMeta>(
     case "perlu_review":
       return result.items.filter((r) => r.priority === 2);
     case "sudah_match":
-      return result.items.filter((r) => r.priority === 3);
+      return result.items.filter((r) => r.priority === 3 && r.reviewStatus !== "new_product" && r.reviewStatus !== "ready_to_post");
+    case "ocr_error":
+      return result.items.filter((r) => r.reviewStatus === "ocr_error");
+    case "new_product":
+      return result.items.filter((r) => r.reviewStatus === "new_product");
+    case "ready_to_post":
+      return result.items.filter((r) => r.reviewStatus === "ready_to_post");
   }
 }
 
