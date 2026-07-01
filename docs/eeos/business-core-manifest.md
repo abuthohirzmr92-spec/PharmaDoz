@@ -102,3 +102,46 @@ Business Core Engines may ONLY:
 - Produce Output
 
 This rule applies to all current and future Business Core Engines.
+
+### RULE-BC-002: Business Core Engine Dependency Declaration
+
+All dependencies between Business Core Engines MUST be explicitly documented in the Business Core Manifest.
+
+Implicit dependencies are prohibited.
+
+Every engine must declare:
+- What it depends on
+- What depends on it
+- The nature of the dependency (required / optional)
+
+## Dependency Graph
+
+```
+L0 — FOUNDATION (zero dependencies)
+├── UUCE
+│   └── dependents: IAE, HPP*, Inventory*, Cashier*, Purchase*
+├── OTP Service
+│   └── dependents: Correction Engine
+
+L1 — DOMAIN (depend on L0)
+├── IAE ────────── depends on: UUCE
+│   └── dependents: Cashier*, Inventory*, Transfer*
+├── Review Priority ─ depends on: none
+├── Match Engine ── depends on: none
+├── Warning Engine ─ depends on: Match Engine
+├── Draft Engine ─── depends on: none
+├── Duplicate Engine ─ depends on: none
+└── Merge Engine ─── depends on: Duplicate Engine
+
+L2 — TRANSACTION (depend on L0+L1)
+└── Correction Engine ─ depends on: OTP Service, UUCE
+
+*Future engines — not yet certified
+```
+
+## Version History
+
+| Version | Date | Changes |
+|---------|------|---------|
+| 1.0.0 | 2026-07-01 | Initial Business Core Lockdown |
+| 1.1.0 | 2026-07-01 | Dependency graph, RULE-BC-002, Certification Registry |
