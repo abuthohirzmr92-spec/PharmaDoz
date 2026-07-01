@@ -93,7 +93,7 @@ export function SidebarLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main
-        className="flex flex-1 flex-col overflow-x-hidden"
+        className="flex flex-1 flex-col min-h-0 overflow-x-hidden"
         style={{ paddingBottom: MOBILE_BOTTOM_NAV_HEIGHT }}
       >
         <div className="flex flex-1 flex-col p-2 sm:p-3 lg:p-4">{children}</div>

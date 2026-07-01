@@ -5,6 +5,7 @@ import { X, Wallet, Banknote, CreditCard, Smartphone, Building2, Landmark, Alert
 import { useCashierStore, type PaymentMethod } from "@/store/cashier-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { cn } from "@/lib/cn";
+import { getPaymentAmount } from "@/lib/cashier/cash-rounding";
 
 export interface PaymentModalProps {
   open: boolean;
@@ -83,13 +84,16 @@ export function PaymentModal({ open, onClose, cartTotal }: PaymentModalProps) {
   if (!open) return null;
 
   const parsedAmount = Number(amount) || 0;
-  const change = parsedAmount - cartTotal;
-  const isExact = parsedAmount === cartTotal && parsedAmount > 0;
+  // Cash: effective total is rounded. Non-cash: exact.
+  const effectiveTotal = getPaymentAmount(cartTotal, method);
+  const change = parsedAmount - effectiveTotal;
+  const isExact = parsedAmount === effectiveTotal && parsedAmount > 0;
   const isOver = change > 0;
-  const isPartial = parsedAmount > 0 && parsedAmount < cartTotal;
+  const isPartial = parsedAmount > 0 && parsedAmount < effectiveTotal;
 
   const handleQuickNominal = (value: number) => {
-    const v = value === -1 ? cartTotal : value;
+    // Uang Pas: use rounded amount for cash, exact for others
+    const v = value === -1 ? getPaymentAmount(cartTotal, method) : value;
     setAmount(String(v));
     amountRef.current?.focus();
   };
