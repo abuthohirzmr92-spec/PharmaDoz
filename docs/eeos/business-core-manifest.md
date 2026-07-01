@@ -47,3 +47,24 @@ L3 — EXTENSION ENGINES (future)
 | **Level 1** | Pure functions, zero side effects, tested | Review Priority Engine |
 | **Level 2** | Level 1 + Architecture Board approved, ADRs, public API documented, 48+ tests | UUCE |
 | **Level 3** | Level 2 + production-hardened, performance benchmarks, load-tested | (target for UUCE) |
+
+## Core Rules
+
+### RULE-BC-001: Business Core Engine Purity
+
+All Business Core Engines MUST be pure functions.
+
+Business Core Engines are **PROHIBITED** from:
+- Accessing Database
+- Accessing Repository
+- Accessing Store
+- Accessing UI
+- Accessing Network
+- Performing Side Effects
+
+Business Core Engines may ONLY:
+- Receive Input
+- Process Data
+- Produce Output
+
+This rule applies to all current and future Business Core Engines.
