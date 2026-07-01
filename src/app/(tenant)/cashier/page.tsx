@@ -294,7 +294,7 @@ export default function CashierPage() {
 
   /* ---- render ---- */
   return (
-    <div className="flex flex-1 flex-col min-h-0">
+    <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
       {/* ============================================================ */}
       {/*  TOP BAR                                                     */}
       {/* ============================================================ */}
@@ -451,13 +451,15 @@ export default function CashierPage() {
       {/* ============================================================ */}
       {/*  CONTENT AREA                                                */}
       {/* ============================================================ */}
-      <div className="flex flex-1 overflow-hidden">
+      {/*  MAIN CONTENT — fixed viewport height, independent scroll   */}
+      {/* ============================================================ */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* -------------------------------------------------------- */}
         {/*  LEFT PANEL — Product area                               */}
         {/* -------------------------------------------------------- */}
         <div
           className={cn(
-            "flex flex-1 flex-col overflow-hidden",
+            "flex flex-1 flex-col min-h-0 overflow-hidden",
             "md:flex",
             mobileView === "cart" && "hidden md:flex",
           )}
@@ -699,7 +701,7 @@ export default function CashierPage() {
         {/* -------------------------------------------------------- */}
         <aside
           className={cn(
-            "flex w-full flex-col border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900",
+            "flex w-full flex-col min-h-0 border-l border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-900",
             "md:w-80 md:flex lg:w-96",
             mobileView === "products" && "hidden md:flex",
           )}
