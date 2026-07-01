@@ -1,5 +1,8 @@
 // ---------------------------------------------------------------------------
 // V2 Phase 1A — Multi Unit Helper (Pure Functions)
+// ⚠️ DEPRECATED — Use UUCE (src/lib/uuce/) instead.
+//    This file is maintained for backward compatibility during migration.
+//    New code: import { normalize, format, breakdown } from "@/lib/uuce"
 // ---------------------------------------------------------------------------
 // Semua fungsi pure — tidak ada side effect, DB call, atau store import.
 // Bisa di-test secara terisolasi.

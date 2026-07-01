@@ -1,5 +1,9 @@
 // ---------------------------------------------------------------------------
 // V2 Phase 3A — Unit Converter Engine (Facade over Phase 1A)
+// ⚠️ DEPRECATED — Use UUCE (src/lib/uuce/) instead.
+//    This file is maintained for backward compatibility during migration.
+//    New code should use: import { normalize, format, breakdown } from "@/lib/uuce"
+//    Migration: SPR-CORE-001B Phase 3 (module-by-module adoption)
 // ---------------------------------------------------------------------------
 // Pure functions. Zero side effects. Zero DB/repository/API.
 //
