@@ -46,7 +46,41 @@ L3 — EXTENSION ENGINES (future)
 |-------|----------|----------|
 | **Level 1** | Pure functions, zero side effects, tested | Review Priority Engine |
 | **Level 2** | Level 1 + Architecture Board approved, ADRs, public API documented, 48+ tests | UUCE |
-| **Level 3** | Level 2 + production-hardened, performance benchmarks, load-tested | (target for UUCE) |
+| **Level 3** | Production Proven — stable public API, no architecture drift, used by all relevant modules, passed one production release cycle | (target) |
+
+## Certification Registry
+
+| Engine | Version | Level | Certified | Modules Using |
+|--------|---------|-------|-----------|---------------|
+| UUCE | 1.0.0 | **Level 2** | ✅ | Purchasing, Cashier, Opname, Transfer, Reporting |
+| IAE | 1.0.0 | **Level 2** | ✅ | Inventory, Cashier |
+| OTP Service | 1.0.0 | **Level 1** | ✅ | Correction Engine |
+| Review Priority Engine | 2.0.0 | **Level 1** | ✅ | Purchasing |
+| Match Engine | 1.0.0 | **Level 1** | ✅ | Purchasing Import |
+| Warning Engine | 1.0.0 | **Level 1** | ✅ | Purchasing Import |
+| Draft Engine | 1.0.0 | **Level 1** | ✅ | Purchasing Draft |
+| Duplicate Engine | 1.0.0 | **Level 1** | ✅ | Purchasing Draft |
+| Merge Engine | 1.0.0 | **Level 1** | ✅ | Purchasing Draft |
+| Transaction Correction | 1.0.0 | **Level 1** | ✅ | Purchase Invoice |
+
+## Certified Module Matrix
+
+| Module | UUCE | IAE | OTP | Review | Match | Warn | Draft | Dup | Merge | Correct | Coverage |
+|--------|------|-----|-----|--------|-------|------|------|-----|-------|---------|----------|
+| Purchasing | ✅ | — | — | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | 100% |
+| Inventory | ✅ | ✅ | — | — | — | — | — | — | — | — | 100% |
+| Cashier | ✅ | ✅ | — | — | — | — | — | — | — | — | 100% |
+| Stock Opname | ✅ | — | — | — | — | — | — | — | — | — | 100% |
+| Stock Transfer | ✅ | — | — | — | — | — | — | — | — | — | 100% |
+| Reporting | ✅ | — | — | — | — | — | — | — | — | — | 100% |
+
+## Deprecation Status
+
+| Component | Status | Replacement | Removal Target |
+|-----------|--------|-------------|----------------|
+| `unit-helper.ts` | ⚠️ Deprecated | UUCE | MEDISYNC v2.0 |
+| `unit-converter.ts` (old impl) | ⚠️ Deprecated | UUCE bridge | MEDISYNC v2.0 |
+| `fefo-allocator.ts` (old impl) | ⚠️ Deprecated | IAE | MEDISYNC v2.0 |
 
 ## Core Rules
 
