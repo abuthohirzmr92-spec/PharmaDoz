@@ -57,7 +57,7 @@ type PurchaseFormItem = {
 
 };
 import { usePermission } from "@/hooks/use-auth";
-import { productRepo, supplierRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
 import { ProductFormModal } from "@/components/products/product-form-modal";
@@ -67,7 +67,8 @@ import { toBaseUnit } from "@/lib/unit-converter";
 import { computeReview, filterByPriorityGroup, searchItems, classifyReviewStatus } from "@/lib/purchasing/review-priority-engine";
 import type { ReviewStatus, ReviewSubStatus } from "@/lib/purchasing/review-priority-engine";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
-import { Loader2 } from "lucide-react";
+import { InventoryCorrectionModal } from "./inventory-correction-modal";
+import { Loader2, AlertTriangle, FileText } from "lucide-react";
 
 const STATUS_FILTERS: { label: string; value: PurchaseStatus | "all" }[] = [
   { label: "Semua", value: "all" },
@@ -140,6 +141,8 @@ export function InventoryPurchasePanel() {
   const [newSupplierName, setNewSupplierName] = useState("");
   const [creatingSupplier, setCreatingSupplier] = useState(false);
   const [payingInvoice, setPayingInvoice] = useState<{ id: string; remaining: number } | null>(null);
+  // EEOS V5 — Invoice Correction
+  const [correctingInvoice, setCorrectingInvoice] = useState<PurchaseInvoice | null>(null);
   const [importing, setImporting] = useState(false);
   const [purchaseTaxPercent, setPurchaseTaxPercent] = useState(() => {
     if (typeof window !== "undefined") {
@@ -266,8 +269,9 @@ export function InventoryPurchasePanel() {
   };
 
   useEffect(() => {
-    if (productRepo.isConnected) {
-      productRepo.getRawProducts({ isActive: true }).then(prods => {
+    const productStore = useProductStore.getState();
+    if (productStore.isConnected) {
+      productStore.loadRawProducts({ isActive: true }).then(prods => {
         setProductList(prods.map(p => ({ id: p.id, name: p.name, defaultPrice: p.defaultPrice ?? 0, defaultSellingPrice: p.defaultSellingPrice ?? 0, unit: p.unit ?? '', defaultStorageAreaId: p.defaultStorageAreaId ?? null, defaultStorageSlot: p.defaultStorageSlot ?? null })));
       }).catch(() => {
         // Fallback to batch-derived products
@@ -288,7 +292,7 @@ export function InventoryPurchasePanel() {
       }
       setProductList(Array.from(grouped.values()));
     }
-  }, [batches, productRepo.isConnected]);
+  }, [batches, useProductStore((s) => s.isConnected)]);
 
   const canCreatePurchase = usePermission("purchases.create");
 
@@ -380,8 +384,7 @@ export function InventoryPurchasePanel() {
     if (!newSupplierName.trim()) return;
     setCreatingSupplier(true);
     try {
-      const created = await supplierRepo.createSupplier({ name: newSupplierName.trim() });
-      useInventoryStore.getState().addSupplier(created);
+      const created = await useInventoryStore.getState().createSupplier({ name: newSupplierName.trim() });
       setFormSupplier(created.id);
       setNewSupplierName("");
       setShowNewSupplier(false);
@@ -1166,8 +1169,16 @@ export function InventoryPurchasePanel() {
         <PurchaseDetailPanel
           invoiceId={expandedInvoice}
           onClose={() => setExpandedInvoice(null)}
+          onCorrect={(inv) => setCorrectingInvoice(inv)}
         />
       )}
+
+      {/* EEOS V5 — Invoice Correction Modal */}
+      <InventoryCorrectionModal
+        open={correctingInvoice !== null}
+        invoice={correctingInvoice}
+        onClose={() => setCorrectingInvoice(null)}
+      />
 
       {/* Full product form modal (normalization entry) */}
       <ProductFormModal
@@ -1270,15 +1281,25 @@ export function InventoryPurchasePanel() {
 function PurchaseDetailPanel({
   invoiceId,
   onClose,
+  onCorrect,
 }: {
   invoiceId: string;
   onClose: () => void;
+  onCorrect: (invoice: PurchaseInvoice) => void;
 }) {
   const invoice = useInventoryStore((s) =>
     s.purchaseInvoices.find((i) => i.id === invoiceId),
   );
+  const [activeTab, setActiveTab] = useState<"items" | "riwayat">("items");
 
   if (!invoice) return null;
+
+  // Check revision window
+  const postedAt = invoice.postedAt ?? invoice.purchaseDate;
+  const deadline = new Date(postedAt);
+  deadline.setDate(deadline.getDate() + 3);
+  const canRevise = new Date() <= deadline;
+  const daysRemaining = Math.max(0, Math.ceil((deadline.getTime() - Date.now()) / (24 * 60 * 60 * 1000)));
 
   return (
     <div className="mt-3 rounded-xl border border-brand-200 bg-brand-50/50 p-4 dark:border-brand-800 dark:bg-brand-950/20">
@@ -1289,65 +1310,138 @@ function PurchaseDetailPanel({
           </h4>
           <p className="text-[10px] text-neutral-500 mt-0.5">
             {invoice.items.length} item · Total: Rp {invoice.totalAmount.toLocaleString("id-ID")} · Dibayar: Rp {invoice.paidAmount.toLocaleString("id-ID")}
+            {(invoice.revisionNumber ?? 0) > 0 && (
+              <span className="ml-2 text-amber-600">· Revisi #{invoice.revisionNumber}</span>
+            )}
           </p>
         </div>
-        <button onClick={onClose} className="text-[10px] text-neutral-400 hover:text-neutral-600">
-          Tutup
+        <div className="flex items-center gap-2">
+          {/* EEOS V5 — Revisi Invoice button */}
+          <button
+            onClick={() => onCorrect(invoice)}
+            disabled={!canRevise}
+            title={!canRevise ? `Invoice sudah melewati masa revisi 3 hari. Gunakan Retur Pembelian atau Stock Adjustment.` : `Revisi invoice (${daysRemaining} hari tersisa)`}
+            className="inline-flex items-center gap-1 rounded-lg border border-amber-300 bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-700 hover:bg-amber-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors dark:border-amber-800 dark:bg-amber-950/30 dark:text-amber-400"
+          >
+            <AlertTriangle className="h-3 w-3" />
+            Revisi Invoice
+          </button>
+          <button onClick={onClose} className="text-[10px] text-neutral-400 hover:text-neutral-600">
+            Tutup
+          </button>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="flex gap-1 mb-3 border-b border-neutral-200 dark:border-neutral-700">
+        <button
+          onClick={() => setActiveTab("items")}
+          className={cn(
+            "px-3 py-1.5 text-[10px] font-medium border-b-2 -mb-[1px] transition-colors",
+            activeTab === "items"
+              ? "border-brand-500 text-brand-600"
+              : "border-transparent text-neutral-400 hover:text-neutral-600",
+          )}
+        >
+          Items
+        </button>
+        <button
+          onClick={() => setActiveTab("riwayat")}
+          className={cn(
+            "px-3 py-1.5 text-[10px] font-medium border-b-2 -mb-[1px] transition-colors",
+            activeTab === "riwayat"
+              ? "border-brand-500 text-brand-600"
+              : "border-transparent text-neutral-400 hover:text-neutral-600",
+          )}
+        >
+          Riwayat Revisi
         </button>
       </div>
 
-      {/* Payment progress bar */}
-      {invoice.status !== "paid" && invoice.totalAmount > 0 && (
-        <div className="mb-3">
-          <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
-            <span>Progress Pembayaran</span>
-            <span>{Math.round((invoice.paidAmount / invoice.totalAmount) * 100)}%</span>
-          </div>
-          <div className="h-1.5 w-full rounded-full bg-neutral-200 dark:bg-neutral-700">
-            <div
-              className="h-1.5 rounded-full bg-brand-500 transition-all"
-              style={{
-                width: `${Math.min((invoice.paidAmount / invoice.totalAmount) * 100, 100)}%`,
-              }}
-            />
-          </div>
-          <div className="flex justify-between text-[10px] text-neutral-400 mt-0.5">
-            <span>Rp {invoice.paidAmount.toLocaleString("id-ID")}</span>
-            <span>Rp {invoice.totalAmount.toLocaleString("id-ID")}</span>
-          </div>
+      {activeTab === "items" ? (
+        <>
+          {/* Payment progress bar */}
+          {invoice.status !== "paid" && invoice.totalAmount > 0 && (
+            <div className="mb-3">
+              <div className="flex justify-between text-[10px] text-neutral-500 mb-1">
+                <span>Progress Pembayaran</span>
+                <span>{Math.round((invoice.paidAmount / invoice.totalAmount) * 100)}%</span>
+              </div>
+              <div className="h-1.5 w-full rounded-full bg-neutral-200 dark:bg-neutral-700">
+                <div
+                  className="h-1.5 rounded-full bg-brand-500 transition-all"
+                  style={{
+                    width: `${Math.min((invoice.paidAmount / invoice.totalAmount) * 100, 100)}%`,
+                  }}
+                />
+              </div>
+              <div className="flex justify-between text-[10px] text-neutral-400 mt-0.5">
+                <span>Rp {invoice.paidAmount.toLocaleString("id-ID")}</span>
+                <span>Rp {invoice.totalAmount.toLocaleString("id-ID")}</span>
+              </div>
+            </div>
+          )}
+
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-neutral-200 dark:border-neutral-700">
+                <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">Produk</th>
+                <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">Batch</th>
+                <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">ED</th>
+                <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Qty</th>
+                <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Harga</th>
+                <th className="py-1.5 text-right text-[10px] font-medium text-neutral-400">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
+              {invoice.items.map((item) => (
+                <tr key={item.id}>
+                  <td className="py-1.5 pr-2 text-neutral-700 dark:text-neutral-300">{item.productName}</td>
+                  <td className="py-1.5 pr-2 font-mono text-neutral-500">{item.batchNumber}</td>
+                  <td className="py-1.5 pr-2 text-neutral-500">
+                    {new Date(item.expiredDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
+                  </td>
+                  <td className="py-1.5 pr-2 text-right tabular-nums font-medium">{item.quantity}</td>
+                  <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
+                    {item.unitPrice.toLocaleString("id-ID")}
+                  </td>
+                  <td className="py-1.5 text-right tabular-nums font-medium text-neutral-700 dark:text-neutral-300">
+                    {(item.quantity * item.unitPrice).toLocaleString("id-ID")}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      ) : (
+        /* Riwayat Revisi Tab */
+        <div className="text-xs">
+          {(invoice.revisionNumber ?? 0) === 0 ? (
+            <div className="text-center py-6 text-neutral-400">
+              <FileText className="h-5 w-5 mx-auto mb-2 opacity-50" />
+              <p className="text-[11px]">Belum ada riwayat revisi.</p>
+              <p className="text-[10px] mt-0.5">Invoice ini masih dalam keadaan original.</p>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="border-l-2 border-brand-200 pl-4 py-2 space-y-3 dark:border-brand-800">
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 h-2 w-2 rounded-full bg-brand-500" />
+                  <p className="text-[11px] font-medium text-neutral-700 dark:text-neutral-300">
+                    Invoice Dibuat
+                  </p>
+                  <p className="text-[10px] text-neutral-500">
+                    {new Date(invoice.purchaseDate).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" })}
+                  </p>
+                  <p className="text-[10px] text-neutral-400">
+                    Total: Rp {invoice.totalAmount.toLocaleString("id-ID")} · {invoice.items.length} item
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
-
-      <table className="w-full text-xs">
-        <thead>
-          <tr className="border-b border-neutral-200 dark:border-neutral-700">
-            <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">Produk</th>
-            <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">Batch</th>
-            <th className="py-1.5 pr-2 text-left text-[10px] font-medium text-neutral-400">ED</th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Qty</th>
-            <th className="py-1.5 pr-2 text-right text-[10px] font-medium text-neutral-400">Harga</th>
-            <th className="py-1.5 text-right text-[10px] font-medium text-neutral-400">Subtotal</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-          {invoice.items.map((item) => (
-            <tr key={item.id}>
-              <td className="py-1.5 pr-2 text-neutral-700 dark:text-neutral-300">{item.productName}</td>
-              <td className="py-1.5 pr-2 font-mono text-neutral-500">{item.batchNumber}</td>
-              <td className="py-1.5 pr-2 text-neutral-500">
-                {new Date(item.expiredDate).toLocaleDateString("id-ID", { day: "numeric", month: "short", year: "2-digit" })}
-              </td>
-              <td className="py-1.5 pr-2 text-right tabular-nums font-medium">{item.quantity}</td>
-              <td className="py-1.5 pr-2 text-right tabular-nums text-neutral-500">
-                {item.unitPrice.toLocaleString("id-ID")}
-              </td>
-              <td className="py-1.5 text-right tabular-nums font-medium text-neutral-700 dark:text-neutral-300">
-                {(item.quantity * item.unitPrice).toLocaleString("id-ID")}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
     </div>
   );
 }

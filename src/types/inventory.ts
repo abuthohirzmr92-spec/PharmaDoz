@@ -56,6 +56,10 @@ export interface PurchaseItem {
   /** RC1 M2 — Storage location from Purchase Assignment */
   storageAreaId?: string | null;
   storageSlot?: string | null;
+  /** EEOS V5 — Correction Framework: soft-deactivate on revision */
+  isActive?: boolean;
+  replacedByItemId?: string | null;
+  createdByCorrectionId?: string | null;
 }
 
 export interface PurchaseInvoice {
@@ -70,6 +74,10 @@ export interface PurchaseInvoice {
   totalAmount: number;
   paidAmount: number;
   items: PurchaseItem[];
+  /** EEOS V5 — Correction Framework */
+  revisionNumber?: number;
+  postedAt?: string;
+  isActive?: boolean;
 }
 
 /* ------------------------------------------------------------------ */
@@ -83,7 +91,9 @@ export type MovementType =
   | "expired"
   | "opname"
   | "adjustment"
-  | "transfer";
+  | "transfer"
+  | "revision_reversal"
+  | "revision";
 
 export interface StockMovement {
   id: string;

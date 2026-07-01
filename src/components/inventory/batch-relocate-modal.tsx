@@ -4,7 +4,7 @@ import { useState, useMemo } from "react";
 import { X, Move } from "lucide-react";
 import { toast } from "sonner";
 import { useLocationMasterStore } from "@/store/location-master-store";
-import { inventoryRepo } from "@/lib/repository-instances";
+import { useInventoryStore } from "@/store/inventory-store";
 import type { ProductBatch } from "@/types/inventory";
 
 interface Props {
@@ -36,7 +36,7 @@ export function BatchRelocateModal({ open, batch, productName, onClose, onReloca
     if (!selectedAreaId) { toast.error("Pilih Area Penyimpanan terlebih dahulu."); return; }
     setSaving(true);
     try {
-      const updated = await inventoryRepo.updateBatchLocation(batch.id, {
+      const updated = await useInventoryStore.getState().updateBatchLocation(batch.id, {
         storageAreaId: selectedAreaId || null,
         storageSlot: selectedSlot.trim() || null,
         isRelocated: true,

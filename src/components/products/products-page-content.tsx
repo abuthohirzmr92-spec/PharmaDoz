@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useMemo, useCallback } from "react";
 import { Pill, Plus, Search, Upload, Download } from "lucide-react";
@@ -12,7 +12,7 @@ import { ProductFormModal } from "@/components/products/product-form-modal";
 import { ProductImportModal } from "@/components/products/product-import-modal";
 import { ProductLocationModal } from "@/components/products/product-location-modal";
 import { usePermission } from "@/hooks/use-auth";
-import { productRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useBranchStore } from "@/store/branch-store";
 import { isDemoMode as checkDemoMode } from "@/config/env";
@@ -43,12 +43,12 @@ export function ProductsPageContent() {
     setIsLoading(true);
 
     try {
-      if (productRepo.isConnected) {
+      if (useProductStore.getState().isConnected) {
         setIsDemoMode(false);
 
         // Use getProducts() which JOINs product_batches and computes
         // totalStock = SUM(batch.quantity) — filtered by active branch.
-        const inventoryProducts = await productRepo.getProducts();
+        const inventoryProducts = await useProductStore.getState().loadCatalog();
 
         const mapped: ProductRow[] = inventoryProducts.map((p) => ({
           id: p.id,
@@ -69,7 +69,7 @@ export function ProductsPageContent() {
           storageAreaCode: (p as any).storageAreaCode ?? undefined,
           storageAreaName: (p as any).storageAreaName ?? undefined,
           totalStock: activeBranch
-            ? p.batches.filter((b) => b.pharmacyId === activeBranch.id).reduce((s, b) => s + b.quantity, 0)
+            ? p.batches.filter((b: any) => b.pharmacyId === activeBranch.id).reduce((s: number, b: any) => s + b.quantity, 0)
             : p.totalStock,
           isActive: p.isActive,
         }));
@@ -104,7 +104,7 @@ export function ProductsPageContent() {
           storageAreaCode: (p as any).storageAreaCode ?? undefined,
           storageAreaName: (p as any).storageAreaName ?? undefined,
           totalStock: activeBranch
-            ? p.batches.filter((b) => b.pharmacyId === activeBranch.id).reduce((s, b) => s + b.quantity, 0)
+            ? p.batches.filter((b: any) => b.pharmacyId === activeBranch.id).reduce((s: number, b: any) => s + b.quantity, 0)
             : p.totalStock,
           isActive: p.isActive,
         }));
@@ -174,8 +174,8 @@ export function ProductsPageContent() {
   const handleToggleActive = useCallback(
     async (product: ProductRow) => {
       try {
-        if (productRepo.isConnected) {
-          await productRepo.updateProduct(product.id, {
+        if (useProductStore.getState().isConnected) {
+          await useProductStore.getState().updateProduct(product.id, {
             isActive: !product.isActive,
           });
         }

@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, Check } from "lucide-react";
 import { toast } from "sonner";
 import { generateProductCode } from "@/lib/barcode-utils";
-import { productRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { NumericInput } from "@/components/shared/numeric-input";
 import { BASE_UNITS } from "@/constants/unit-options";
@@ -75,11 +75,11 @@ export function QuickCreateProductModal({
     if (!open) return;
 
     const fetchLookups = async () => {
-      if (productRepo.isConnected) {
+      if (useProductStore.getState().isConnected) {
         try {
           const [cats, unitRows] = await Promise.all([
-            productRepo.getCategories(),
-            productRepo.getUnits(),
+            useProductStore.getState().loadCategories(),
+            useProductStore.getState().loadUnits(),
           ]);
 
           if (cats.length > 0) {
@@ -140,11 +140,11 @@ export function QuickCreateProductModal({
     setIsSubmitting(true);
 
     try {
-      if (productRepo.isConnected) {
+      if (useProductStore.getState().isConnected) {
         const categoryId =
           categoryIdMapRef.current.get(category) || category;
 
-        const created = await productRepo.createProduct({
+        const created = await useProductStore.getState().createProduct({
           categoryId,
           name: name.trim(),
           barcode: barcode.trim() || null,
@@ -301,7 +301,7 @@ export function QuickCreateProductModal({
                         if (categories.includes(name)) { toast.error("Kategori sudah ada."); return; }
                         setCreatingCategory(true);
                         try {
-                          if (productRepo.isConnected) await productRepo.createCategory(name);
+                          if (useProductStore.getState().isConnected) await useProductStore.getState().createCategory(name);
                           setCategories((prev) => [...prev, name]);
                           setCategory(name);
                           setShowNewCategory(false);
@@ -324,7 +324,7 @@ export function QuickCreateProductModal({
                     if (categories.includes(name)) { toast.error("Kategori sudah ada."); return; }
                     setCreatingCategory(true);
                     try {
-                      if (productRepo.isConnected) await productRepo.createCategory(name);
+                      if (useProductStore.getState().isConnected) await useProductStore.getState().createCategory(name);
                       setCategories((prev) => [...prev, name]);
                       setCategory(name);
                       setShowNewCategory(false);

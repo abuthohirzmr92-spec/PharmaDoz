@@ -6,7 +6,7 @@ import { toast } from "sonner";
 import { supabase, isSupabaseConnected } from "@/lib/supabase/client";
 import { useStockTransferStore } from "@/store/stock-transfer-store";
 import { useBranchStore } from "@/store/branch-store";
-import { productRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import type { ProductBatch } from "@/types/inventory";
 import { cn } from "@/lib/cn";
 import { NumericInput } from "@/components/shared/numeric-input";
@@ -60,8 +60,9 @@ export function CreateTransferForm() {
     async function load() {
       setIsLoadingProducts(true);
       try {
-        if (productRepo.isConnected) {
-          const raw = await productRepo.getRawProducts({ isActive: true });
+        const productStore = useProductStore.getState();
+        if (productStore.isConnected) {
+          const raw = await productStore.loadRawProducts({ isActive: true });
           if (!cancelled) {
             setProducts(
               raw.map((p) => ({ id: p.id, name: p.name })).sort((a, b) => a.name.localeCompare(b.name)),
@@ -94,7 +95,7 @@ export function CreateTransferForm() {
       try {
         // Query batches directly for the selected product in the source branch
         if (isSupabaseConnected()) {
-          const tenantId = productRepo.getTenantId();
+          const tenantId = useProductStore.getState().getTenantId();
           if (!tenantId) throw new Error("Tenant context required to load transfer batches");
 
           const { data, error } = await supabase!

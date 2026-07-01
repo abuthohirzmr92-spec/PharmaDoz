@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
 import { X, AlertTriangle, Scan, Plus, Loader2 } from "lucide-react";
 import { cn } from "@/lib/cn";
 import { generateProductCode, validateBarcode } from "@/lib/barcode-utils";
-import { productRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { MultiUnitEditor } from "@/components/products/multi-unit-editor";
 import { isDemoMode } from "@/config/env";
 import { toast } from "sonner";
@@ -148,11 +148,11 @@ export function ProductFormModal({
     if (!open) return;
 
     const fetchLookups = async () => {
-      if (productRepo.isConnected) {
+      if (useProductStore.getState().isConnected) {
         try {
           const [cats, unitRows] = await Promise.all([
-            productRepo.getCategories(),
-            productRepo.getUnits(),
+            useProductStore.getState().loadCategories(),
+            useProductStore.getState().loadUnits(),
           ]);
 
           if (cats.length > 0) {
@@ -226,7 +226,7 @@ export function ProductFormModal({
 
     // V2 Multi Unit — populate unit levels when editing
     if (editingProduct) {
-      productRepo.getUnitLevels(editingProduct.id).then((levels) => {
+      useProductStore.getState().loadUnitLevels(editingProduct.id).then((levels) => {
         const l2 = levels.find((l) => l.level === 2);
         const l3 = levels.find((l) => l.level === 3);
         setLevel2Name(l2?.unitName ?? "");
@@ -383,9 +383,9 @@ export function ProductFormModal({
     let savedProduct: { id: string; name: string; unit: string } | undefined;
 
     try {
-      if (productRepo.isConnected) {
+      if (useProductStore.getState().isConnected) {
         if (isEdit) {
-          const updated = await productRepo.updateProduct(editingProduct!.id, {
+          const updated = await useProductStore.getState().updateProduct(editingProduct!.id, {
             categoryId: form.categoryId || form.category,
             name: form.name.trim(),
             barcode: form.barcode.trim() || null,
@@ -406,7 +406,7 @@ export function ProductFormModal({
           });
           savedProduct = { id: updated.id, name: updated.name, unit: updated.unit ?? form.unit };
         } else {
-          const created = await productRepo.createProduct({
+          const created = await useProductStore.getState().createProduct({
             categoryId: form.categoryId,
             name: form.name.trim(),
             barcode: form.barcode.trim() || null,
@@ -449,7 +449,7 @@ export function ProductFormModal({
     if (!name || name.length < 2) return;
     setCreatingCategory(true);
     try {
-      const cat = await productRepo.createCategory(name);
+      const cat = await useProductStore.getState().createCategory(name);
       const option: CategoryOption = { id: cat.id, name: cat.name };
       setCategories((prev) => [...prev, option]);
       updateField("categoryId", cat.id);

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useRef } from "react";
-import { activityLogRepo } from "@/lib/repository-instances";
+import { useAuditStore } from "@/store/audit-store";
 import { ExportBar } from "./export-bar";
 import { exportTableToPdf } from "@/lib/export-pdf";
 import { toast } from "sonner";
@@ -41,7 +41,7 @@ export function ActivityLogTable({ branchId: _branchId = "all" }: { branchId?: s
   const load = useCallback(async (p: number) => {
     setIsLoading(true);
     try {
-      const { data, count } = await activityLogRepo.getLogs({
+      const { data, count } = await useAuditStore.getState().loadActivityLogs({
         action: actionFilter || undefined,
         dateFrom: dateFrom || undefined,
         dateTo: dateTo ? dateTo + "T23:59:59" : undefined,

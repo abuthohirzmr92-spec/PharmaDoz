@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, memo, useCallback, Fragment } from "react
 import { Search, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useLocationMasterStore } from "@/store/location-master-store";
-import { productRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { cn } from "@/lib/cn";
 import { getDaysUntilExpiry, buildInventoryProducts } from "@/lib/inventory-demo";
 import type { InventoryProduct, ProductBatch } from "@/types/inventory";
@@ -270,9 +270,10 @@ export function InventoryStockTable() {
 
   // PERF-P0.1: Load catalog only if batches NOT loaded by loadDemoData (avoids duplicate getProducts())
   useEffect(() => {
-    if (!productRepo.isConnected) return;
+    const productStore = useProductStore.getState();
+    if (!productStore.isConnected) return;
     if (batches.length > 0) return; // loadDemoData already fetched products
-    productRepo.getProducts().then(setCatalogProducts).catch(() => {});
+    productStore.loadCatalog().then(setCatalogProducts).catch(() => {});
   }, [batches.length]);
 
   // Merge batch-derived products with catalog products (show zero-stock items)

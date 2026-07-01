@@ -3,7 +3,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { X, Clipboard, Loader2 } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
-import { productRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { canPerformOpname } from "@/lib/opname/session-guard";
 import type { StockOpname, StockOpnameItem } from "@/types/inventory";
 import type { InventoryProduct } from "@/types/inventory";
@@ -49,8 +49,9 @@ export function InventoryOpnameFormModal({ open, onClose }: Props) {
 
   // Load catalog products for unitLevels (existing query, reused)
   useEffect(() => {
-    if (open && productRepo.isConnected) {
-      productRepo.getProducts().then(setCatalogProducts).catch(() => setCatalogProducts([]));
+    const productStore = useProductStore.getState();
+    if (open && productStore.isConnected) {
+      productStore.loadCatalog().then(setCatalogProducts).catch(() => setCatalogProducts([]));
     }
   }, [open]);
 

@@ -17,6 +17,11 @@ interface AuditState {
   getPage(page: number, filter?: AuditFilter): { entries: AuditEntry[]; totalPages: number };
   seedDemo(): void;
   clear(): void;
+  /** Repository Compliance — wraps activityLogRepo.getLogs() */
+  loadActivityLogs: (params: {
+    action?: string; dateFrom?: string; dateTo?: string;
+    page?: number; limit?: number;
+  }) => Promise<{ data: any[]; count: number }>;
 }
 
 export const useAuditStore = create<AuditState>((set, get) => ({
@@ -64,5 +69,18 @@ export const useAuditStore = create<AuditState>((set, get) => ({
 
   clear() {
     set({ entries: [], isLoading: false });
+  },
+
+  loadActivityLogs: async (params) => {
+    set({ isLoading: true });
+    try {
+      const { activityLogRepo } = await import("@/lib/repository-instances");
+      const result = await activityLogRepo.getLogs(params);
+      set({ isLoading: false });
+      return result;
+    } catch {
+      set({ isLoading: false });
+      return { data: [], count: 0 };
+    }
   },
 }));

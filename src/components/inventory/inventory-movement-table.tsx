@@ -14,6 +14,8 @@ const TYPE_CONFIG: Record<MovementType, { icon: typeof TrendingUp; cls: string; 
   opname: { icon: Clipboard, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Opname" },
   adjustment: { icon: Settings, cls: "text-neutral-600 bg-neutral-100 dark:bg-neutral-800", label: "Adjust" },
   transfer: { icon: TrendingUp, cls: "text-purple-600 bg-purple-50 dark:bg-purple-950/30", label: "Transfer" },
+  revision_reversal: { icon: RotateCcw, cls: "text-amber-600 bg-amber-50 dark:bg-amber-950/30", label: "Rev-Reversal" },
+  revision: { icon: TrendingUp, cls: "text-green-600 bg-green-50 dark:bg-green-950/30", label: "Revisi" },
 };
 
 const TYPE_FILTERS: { label: string; value: MovementType | "all" }[] = [
@@ -25,6 +27,8 @@ const TYPE_FILTERS: { label: string; value: MovementType | "all" }[] = [
   { label: "Opname", value: "opname" },
   { label: "Transfer", value: "transfer" },
   { label: "Adjust", value: "adjustment" },
+  { label: "Revisi", value: "revision" },
+  { label: "Rev-Reversal", value: "revision_reversal" },
 ];
 
 /* ------------------------------------------------------------------ */

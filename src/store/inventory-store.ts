@@ -72,6 +72,7 @@ interface InventoryState {
 
   /* Actions — supplier */
   addSupplier: (supplier: Supplier) => void;
+  createSupplier: (data: { name: string }) => Promise<Supplier>;
 
   /* Actions — purchase */
   addPurchase: (invoice: PurchaseInvoice) => Promise<void>;
@@ -79,6 +80,8 @@ interface InventoryState {
   /* Actions — batch queries */
   /** RC1 M2 — Replace a single batch in local state (store sync after relocation). */
   updateBatch: (batch: ProductBatch) => void;
+  /** Repository Compliance — wraps inventoryRepo.updateBatchLocation */
+  updateBatchLocation: (batchId: string, data: { storageAreaId?: string | null; storageSlot?: string | null; isRelocated?: boolean }) => Promise<ProductBatch>;
   getFefoBatches: (productId?: string) => ProductBatch[];
   getNearExpiryBatches: (daysThreshold?: number) => ProductBatch[];
   getExpiredBatches: () => ProductBatch[];
@@ -92,6 +95,21 @@ interface InventoryState {
 
   /* Actions — payment */
   recordPayment: (invoiceId: string, amount: number, walletId?: string, paymentMethod?: string) => Promise<void>;
+
+  /* Actions — correction (EEOS V5) */
+  correctInvoice: (params: {
+    invoiceId: string;
+    details: Array<{
+      resourceItemId?: string;
+      productId?: string;
+      productName: string;
+      fieldName: string;
+      oldValue: string;
+      newValue: string;
+      dataType: string;
+    }>;
+    reason: string;
+  }) => Promise<{ success: boolean; error?: string; correctionId?: string }>;
 
   /* Actions — sale deduction */
   deductForSale: (cart: { id?: string; productId: string; productName?: string; quantity: number }[], transactionId: string) => Promise<void>;
@@ -160,9 +178,23 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
     set((s) => ({ batches: s.batches.map((b) => (b.id === batch.id ? batch : b)) }));
   },
 
+  updateBatchLocation: async (batchId, data) => {
+    const { inventoryRepo } = await import("@/lib/repository-instances");
+    const updated = await inventoryRepo.updateBatchLocation(batchId, data as any);
+    get().updateBatch(updated as unknown as ProductBatch);
+    return updated as unknown as ProductBatch;
+  },
+
   /* ---- supplier ---- */
   addSupplier: (supplier) => {
     set({ suppliers: [...get().suppliers, supplier] });
+  },
+
+  createSupplier: async (data) => {
+    const { supplierRepo } = await import("@/lib/repository-instances");
+    const created = await supplierRepo.createSupplier(data);
+    get().addSupplier(created);
+    return created;
   },
 
   /* ---- purchase ---- */
@@ -755,6 +787,92 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       dataSource: "demo",
       isDemoMode: true,
     });
+  },
+
+  /* ---- correction (EEOS V5) — Engine delegates all business logic ---- */
+
+  correctInvoice: async (params) => {
+    const state = get();
+    const { invoiceId, details, reason } = params;
+
+    // ── ENGINE: all validation lives in PurchaseCorrectionEngine ──
+    const invoice = state.purchaseInvoices.find((i) => i.id === invoiceId);
+    if (!invoice) {
+      return { success: false, error: "Invoice tidak ditemukan." };
+    }
+
+    // Delegate to engine for validation + computation
+    const { getCorrectionEngine } = await import("@/lib/correction/correction-engine");
+    const engine = getCorrectionEngine("purchase_invoice");
+    if (!engine) {
+      return { success: false, error: "Correction engine not registered." };
+    }
+
+    // Validate via engine
+    const resourceCheck = engine.validateResource(invoice);
+    if (!resourceCheck.valid) {
+      return { success: false, error: resourceCheck.reason ?? "Validasi resource gagal." };
+    }
+
+    const permCheck = engine.validatePermission({ role: "pharmacist" });
+    if (!permCheck.valid) {
+      return { success: false, error: permCheck.reason ?? "Permission denied." };
+    }
+
+    // Compute new state via engine
+    const correctionDetails = details.map((d) => ({
+      id: crypto.randomUUID(),
+      correlationId: crypto.randomUUID(),
+      correctionId: "",
+      resourceItemId: d.resourceItemId,
+      productId: d.productId,
+      productName: d.productName,
+      fieldName: d.fieldName,
+      oldValue: d.oldValue,
+      newValue: d.newValue,
+      dataType: (d.dataType as any) ?? "text",
+      createdAt: new Date().toISOString(),
+    }));
+
+    const newState = engine.computeNewState(invoice, correctionDetails);
+    const correlationId = crypto.randomUUID();
+
+    try {
+      // Apply via engine (all business logic here)
+      const result = await engine.applyCorrection(invoice, newState, correlationId);
+
+      if (!result.success) {
+        return { success: false, error: result.error ?? "Gagal menerapkan koreksi." };
+      }
+
+      // ── STORE: only UI state updates below ──
+      const updatedInvoice = result.newState as PurchaseInvoice;
+
+      // Update batch quantities for qty changes
+      let updatedBatches = [...state.batches];
+      const qtyChanges = details.filter((d) => d.fieldName === "quantity");
+      for (const change of qtyChanges) {
+        const item = invoice.items.find((i) => i.id === change.resourceItemId);
+        if (!item) continue;
+        const qtyDiff = parseInt(change.newValue, 10) - parseInt(change.oldValue, 10);
+        updatedBatches = updatedBatches.map((b) =>
+          b.productId === item.productId && b.batchNumber === item.batchNumber
+            ? { ...b, quantity: b.quantity + qtyDiff }
+            : b,
+        );
+      }
+
+      set({
+        purchaseInvoices: state.purchaseInvoices.map((inv) =>
+          inv.id === invoiceId ? updatedInvoice : inv,
+        ),
+        batches: updatedBatches,
+      });
+
+      return { success: true, correctionId: result.correctionId };
+    } catch (err: any) {
+      return { success: false, error: err?.message ?? "Gagal menerapkan revisi." };
+    }
   },
 
   /* ---- computed ---- */

@@ -1,10 +1,10 @@
-"use client";
+﻿"use client";
 
 import { useState, useCallback, useMemo, useEffect } from "react";
 import { X, Download, Upload, Check, AlertTriangle, Loader2, RefreshCw, SkipForward } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
-import { productRepo, supplierRepo } from "@/lib/repository-instances";
+import { useProductStore } from "@/store/product-store";
 import { parseProductRows, generateTemplateWorkbook, type ImportedProductRow, type ParseError } from "@/lib/import/excel-product-parser";
 import { logActivity } from "@/lib/audit/activity-logger";
 
@@ -45,8 +45,8 @@ export function ProductImportModal({ open, onClose, onImported, existingNames, e
 
   // Load product cache on open
   useEffect(() => {
-    if (open && productRepo.isConnected) {
-      productRepo.getRawProducts({ isActive: true }).then(prods => {
+    if (open && useProductStore.getState().isConnected) {
+      useProductStore.getState().loadRawProducts({ isActive: true }).then(prods => {
         const nameMap = new Map<string, string>();
         const barcodeMap = new Map<string, string>();
         for (const p of prods) {
@@ -134,7 +134,7 @@ export function ProductImportModal({ open, onClose, onImported, existingNames, e
     // RC1 P0D — Pre-build category ID cache (UUID safety)
     const categoryMap = new Map<string, string>(); // name→id
     try {
-      const allCats = await productRepo.getCategories();
+      const allCats = await useProductStore.getState().loadCategories();
       for (const c of allCats) { categoryMap.set(c.name.trim().toLowerCase(), c.id); }
     } catch { /* best-effort */ }
     // Create missing categories (each unique name once)
@@ -146,7 +146,7 @@ export function ProductImportModal({ open, onClose, onImported, existingNames, e
     }
     for (const catName of pendingCategories) {
       try {
-        const cat = await productRepo.createCategory(catName);
+        const cat = await useProductStore.getState().createCategory(catName);
         categoryMap.set(catName.toLowerCase(), cat.id);
       } catch { /* best-effort */ }
     }
@@ -183,10 +183,10 @@ export function ProductImportModal({ open, onClose, onImported, existingNames, e
             if (row.baseUnit) updateData.unit = row.baseUnit;
             if (unitLevels.length > 0) updateData.unitLevels = unitLevels;
           }
-          await productRepo.updateProduct(existingProductId, updateData);
+          await useProductStore.getState().updateProduct(existingProductId, updateData);
           updated++;
         } else {
-          const createdProduct = await productRepo.createProduct({
+          const createdProduct = await useProductStore.getState().createProduct({
             categoryId,
             name: row.namaProduk.trim(),
             barcode: row.barcode?.trim() || null,
