@@ -120,6 +120,12 @@ If a Business Core Engine is expected to have more than one algorithm, the Bluep
 
 Single-algorithm engines may use a simple function. Multi-algorithm engines MUST define a strategy interface, a registry, and pluggable implementations.
 
+### RULE-BC-004: Financial Immutability
+
+Financial Business Core Engines MUST produce immutable calculation snapshots for every transaction.
+
+Historical financial data is NEVER recalculated when algorithms change. Only new transactions use updated algorithms.
+
 ## Dependency Graph
 
 ```
@@ -152,3 +158,4 @@ L2 — TRANSACTION (depend on L0+L1)
 | 1.0.0 | 2026-07-01 | Initial Business Core Lockdown |
 | 1.1.0 | 2026-07-01 | Dependency graph, RULE-BC-002, Certification Registry |
 | 1.2.0 | 2026-07-01 | RULE-BC-003 Strategy Pattern Mandate, CVE Blueprint init |
+| 1.3.0 | 2026-07-01 | RULE-BC-004 Financial Immutability, CVE Blueprint v2 deepened |
