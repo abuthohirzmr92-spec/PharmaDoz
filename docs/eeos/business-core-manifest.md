@@ -114,6 +114,12 @@ Every engine must declare:
 - What depends on it
 - The nature of the dependency (required / optional)
 
+### RULE-BC-003: Strategy Pattern Mandate
+
+If a Business Core Engine is expected to have more than one algorithm, the Blueprint MUST use Strategy Pattern from day one.
+
+Single-algorithm engines may use a simple function. Multi-algorithm engines MUST define a strategy interface, a registry, and pluggable implementations.
+
 ## Dependency Graph
 
 ```
@@ -145,3 +151,4 @@ L2 — TRANSACTION (depend on L0+L1)
 |---------|------|---------|
 | 1.0.0 | 2026-07-01 | Initial Business Core Lockdown |
 | 1.1.0 | 2026-07-01 | Dependency graph, RULE-BC-002, Certification Registry |
+| 1.2.0 | 2026-07-01 | RULE-BC-003 Strategy Pattern Mandate, CVE Blueprint init |
