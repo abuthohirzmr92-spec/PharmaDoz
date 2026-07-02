@@ -294,11 +294,11 @@ export default function CashierPage() {
 
   /* ---- render ---- */
   return (
-    <div className="flex flex-1 flex-col min-h-0 overflow-hidden">
+    <div className="flex flex-col h-screen">
       {/* ============================================================ */}
       {/*  TOP BAR                                                     */}
       {/* ============================================================ */}
-      <header className="flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900 sm:px-4">
+      <header className="sticky top-0 z-20 flex shrink-0 items-center justify-between border-b border-neutral-200 bg-white px-3 py-2.5 dark:border-neutral-800 dark:bg-neutral-900 sm:px-4">
         {/* Left: invoice info */}
         <div className="flex items-center gap-3">
           {currentSaleId || cart.length > 0 ? (
@@ -453,7 +453,7 @@ export default function CashierPage() {
       {/* ============================================================ */}
       {/*  MAIN CONTENT — fixed viewport height, independent scroll   */}
       {/* ============================================================ */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
+      <div className="flex flex-1 min-h-0 overflow-hidden pb-10">
         {/* -------------------------------------------------------- */}
         {/*  LEFT PANEL — Product area                               */}
         {/* -------------------------------------------------------- */}
@@ -874,7 +874,7 @@ export default function CashierPage() {
 
           {/* Cart footer — total + actions */}
           {cart.length > 0 && (
-            <div className="shrink-0 border-t border-neutral-200 px-3 py-3 dark:border-neutral-800 sm:px-4">
+            <div className="shrink-0 border-t border-neutral-200 px-3 py-3 pb-5 dark:border-neutral-800 sm:px-4">
               {/* Total */}
               <div className="mb-3 flex items-center justify-between">
                 <span className="text-sm text-neutral-600 dark:text-neutral-400">
