@@ -59,7 +59,7 @@ const StockRow = memo(function StockRow({
     [fefoBatches],
   );
 
-  const COLSPAN = 6;
+  const COLSPAN = 7;
 
   return (
     <Fragment>
@@ -77,6 +77,9 @@ const StockRow = memo(function StockRow({
             )}
           </button>
         </td>
+        <td className="hidden sm:table-cell px-3 py-2.5">
+          <span className="text-xs text-neutral-500">{product.category}</span>
+        </td>
         <td className="px-3 py-2.5">
           <div className="flex items-center gap-1.5">
             <span className="text-sm font-medium text-neutral-900 dark:text-neutral-50 truncate">
@@ -89,8 +92,10 @@ const StockRow = memo(function StockRow({
             )}
           </div>
         </td>
-        <td className="hidden sm:table-cell px-3 py-2.5">
-          <span className="text-xs text-neutral-500">{product.category}</span>
+        <td className="px-3 py-2.5">
+          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            {product.unit || "—"}
+          </span>
         </td>
         <td className="px-3 py-2.5 text-right">
           <span
@@ -332,19 +337,22 @@ export function InventoryStockTable() {
           <thead>
             <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
               <th className="w-[5%] px-3 py-2.5" />
-              <th className="w-[30%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Produk
-              </th>
-              <th className="w-[15%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[14%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Kategori
               </th>
-              <th className="w-[12%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[26%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Produk
+              </th>
+              <th className="w-[12%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Satuan Dasar Jual
+              </th>
+              <th className="w-[11%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Stok
               </th>
-              <th className="w-[12%] hidden sm:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[8%] hidden sm:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Batch
               </th>
-              <th className="w-[26%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[24%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Status Batch
               </th>
             </tr>
