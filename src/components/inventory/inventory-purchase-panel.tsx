@@ -65,16 +65,17 @@ type PurchaseFormItem = {
 };
 import { usePermission } from "@/hooks/use-auth";
 import { useProductStore } from "@/store/product-store";
+import { useLocationMasterStore } from "@/store/location-master-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { QuickCreateProductModal } from "@/components/products/quick-create-product-modal";
 import { ProductFormModal } from "@/components/products/product-form-modal";
 import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
 import { NumericInput } from "@/components/shared/numeric-input";
 import { toBaseUnit } from "@/lib/unit-converter";
-import { computeReview, filterByPriorityGroup, searchItems, classifyReviewStatus } from "@/lib/purchasing/review-priority-engine";
-import type { ReviewStatus, ReviewSubStatus } from "@/lib/purchasing/review-priority-engine";
+import { searchItems } from "@/lib/purchasing/review-priority-engine";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { InventoryCorrectionModal } from "./inventory-correction-modal";
+import { ProductMatchModal } from "./product-match-modal";
 import { Loader2, AlertTriangle, FileText } from "lucide-react";
 
 const STATUS_FILTERS: { label: string; value: PurchaseStatus | "all" }[] = [
@@ -117,21 +118,6 @@ const REVIEW_ROW_BG: Record<string, string> = {
   ready_to_post: "",
 };
 
-const REVIEW_SUBSTATUS_LABEL: Record<ReviewSubStatus, string> = {
-  unmatched: "Belum ditemukan di master",
-  barcode_not_found: "Barcode tidak ditemukan",
-  multiple_candidates: "Ditemukan beberapa kandidat",
-  ambiguous_match: "Hasil pencocokan ambigu",
-  missing_product: "Produk belum terdaftar di master",
-  need_review: "Perlu ditinjau",
-  fuzzy_match: "Hasil fuzzy matching",
-  manual_match: "Dipasangkan manual",
-  low_confidence: "Tingkat kepercayaan rendah",
-  has_warnings: "Memiliki peringatan",
-  auto_match: "Otomatis cocok",
-  valid: "Valid",
-  ready: "Siap posting",
-};
 
 export function InventoryPurchasePanel() {
   const searchQuery = useInventoryStore((s) => s.searchQuery);
@@ -285,6 +271,30 @@ export function InventoryPurchasePanel() {
     toast.success("Template Excel berhasil diunduh.");
   };
 
+  // Load storage areas for location columns
+  const storageAreas = useLocationMasterStore((s) => s.locations);
+  const loadStorageAreas = useLocationMasterStore((s) => s.loadLocations);
+  useEffect(() => { loadStorageAreas(); }, [loadStorageAreas]);
+
+  // Cascading Storage Slot lookup — derive from existing batch data per area
+  const storageSlotsByArea = useMemo(() => {
+    const map = new Map<string, Set<string>>();
+    for (const b of batches) {
+      const areaId = (b as any).storageAreaId as string | undefined;
+      const slot = (b as any).storageSlot as string | undefined;
+      if (areaId && slot) {
+        if (!map.has(areaId)) map.set(areaId, new Set());
+        map.get(areaId)!.add(slot);
+      }
+    }
+    return map;
+  }, [batches]);
+
+  const getSlotsForArea = (areaId: string): string[] => {
+    const slots = storageSlotsByArea.get(areaId);
+    return slots ? Array.from(slots).sort() : [];
+  };
+
   useEffect(() => {
     const productStore = useProductStore.getState();
     if (productStore.isConnected) {
@@ -327,44 +337,45 @@ export function InventoryPurchasePanel() {
   const [formItems, setFormItems] = useState<PurchaseFormItem[]>([
     { id: "1", productId: "", productName: "", batchNumber: "", expiredDate: "", quantity: 1, unitPrice: 0, sellingPrice: 0, storageAreaId: "", storageSlot: "" },
   ]);
-  // RC1 — Review priority filter (default: "belum_match" per BUSINESS RULE)
-  // SPR-INV-REVIEW-001: Extended filter tabs
-  type ReviewFilterTab = "all" | "belum_match" | "perlu_review" | "sudah_match" | "ocr_error" | "new_product" | "ready_to_post";
-  const [reviewFilter, setReviewFilter] = useState<ReviewFilterTab>("belum_match");
+  // Product Matching — simple: productId → MATCH, no productId → UNMATCHED
+  type MatchFilterTab = "all" | "belum_match" | "match";
+  const [reviewFilter, setReviewFilter] = useState<MatchFilterTab>("belum_match");
+  // INV-REVIEW-BUG-002: React state untuk product matching workflow
+  const [matchingItemId, setMatchingItemId] = useState<string | null>(null);
+  // INV-REVIEW-BUG-003: Product Match Modal state
+  const [matchingItem, setMatchingItem] = useState<PurchaseFormItem | null>(null);
   const [formItemSearch, setFormItemSearch] = useState("");
 
-  // Review Priority Engine — compute once, sort by priority
-  const reviewResult = useMemo(() => {
-    return computeReview(formItems, formSupplier.trim().length > 0);
+  // Product Matching stats — independent of Review/Validation Engine
+  const matchStats = useMemo(() => {
+    const total = formItems.length;
+    const matched = formItems.filter((it) => !!it.productId).length;
+    const unmatched = formItems.filter((it) => !it.productId).length;
+    const canPost = unmatched === 0 && total > 0 && formSupplier.trim().length > 0;
+    const progressPercent = total > 0 ? Math.round((matched / total) * 100) : 0;
+    return { total, matched, unmatched, canPost, progressPercent };
   }, [formItems, formSupplier]);
 
-  // Items to display (search overrides group filter per spec TASK 5)
+  // Items to display (search overrides group filter)
   const displayItems = useMemo(() => {
-    // When searching, span ALL items regardless of current group filter
+    let items = [...formItems];
+    // Sort: unmatched first
+    items.sort((a, b) => {
+      const aMatch = !!a.productId;
+      const bMatch = !!b.productId;
+      if (aMatch !== bMatch) return aMatch ? 1 : -1;
+      return (a.productName || "").localeCompare(b.productName || "");
+    });
+    // Search across all items
     if (formItemSearch.trim()) {
-      const allItems = reviewResult.items.map((r) => r.item);
-      return searchItems(allItems, formItemSearch);
+      items = searchItems(items, formItemSearch);
+    } else if (reviewFilter === "belum_match") {
+      items = items.filter((it) => !it.productId);
+    } else if (reviewFilter === "match") {
+      items = items.filter((it) => !!it.productId);
     }
-    // Normal mode: apply group filter
-    return filterByPriorityGroup(reviewResult, reviewFilter).map((r) => r.item);
-  }, [reviewResult, reviewFilter, formItemSearch]);
-
-  // Auto-collapse: if current filter group is empty, switch to next available
-  useEffect(() => {
-    const filtered = filterByPriorityGroup(reviewResult, reviewFilter);
-    if (filtered.length === 0 && reviewResult.stats.total > 0) {
-      // Find next non-empty group
-      const order: ReviewFilterTab[] = ["belum_match", "ocr_error", "perlu_review", "new_product", "sudah_match", "ready_to_post", "all"];
-      for (const next of order) {
-        if (next === reviewFilter) continue;
-        const nextFiltered = next === "all" ? reviewResult.items : filterByPriorityGroup(reviewResult, next);
-        if (nextFiltered.length > 0) {
-          setReviewFilter(next);
-          break;
-        }
-      }
-    }
-  }, [reviewResult, reviewFilter]);
+    return items;
+  }, [formItems, reviewFilter, formItemSearch]);
 
   const handleAddItem = () => {
     setFormItems((prev) => [
@@ -399,6 +410,32 @@ export function InventoryPurchasePanel() {
     );
   };
 
+  // INV-REVIEW-BUG-003: Match import item to existing master product.
+  // User decision is FINAL — clears all OCR metadata. System never overrides human choice.
+  // Transaction data (price, qty, batch, expiry, supplier) fully preserved.
+  const handleMatchProduct = (itemId: string, masterProductId: string) => {
+    setFormItems((prev) =>
+      prev.map((it) => {
+        if (it.id !== itemId) return it;
+        const prod = productList.find((p) => p.id === masterProductId);
+        return {
+          ...it,
+          productId: masterProductId,
+          productName: prod?.name ?? it.productName,
+          // Human decision is final — clear all OCR matching metadata
+          matchMethod: undefined,
+          matchConfidence: undefined,
+          draftStatus: undefined,
+          warnings: undefined,
+          reviewStatus: undefined,
+        };
+      }),
+    );
+    setMatchingItem(null);
+    setMatchingItemId(null);
+    toast.success("Produk berhasil disatukan. Status: Match");
+  };
+
   const handleCreateSupplier = async () => {
     if (!newSupplierName.trim()) return;
     setCreatingSupplier(true);
@@ -419,17 +456,18 @@ export function InventoryPurchasePanel() {
     const supplier = suppliers.find((s) => s.id === formSupplier);
     if (!supplier) { toast.error("Pilih supplier terlebih dahulu"); return; }
 
-    // V3 P0.7 — Guard: semua item harus sudah terdaftar di Master
-    const unresolved = formItems.filter((it) => it.productName && !it.productId);
+    // STEP 1 — Product Matching: semua item harus memiliki productId
+    const unresolved = formItems.filter((it) => !it.productId);
     if (unresolved.length > 0) {
       toast.error(
-        `Masih ada ${unresolved.length} produk yang belum terdaftar ke Master Produk. ` +
-        `Gunakan "➕ Tambah ke Master" pada setiap baris ⚠ Belum terdaftar.`
+        `Masih ada ${unresolved.length} produk yang belum match ke Master Produk. ` +
+        `Gunakan "🔗 Sesuaikan Produk" pada setiap baris ⚠ Belum Match.`
       );
       return;
     }
 
-    const validItems = formItems.filter((it) => it.productId && it.productName && it.quantity > 0);
+    // STEP 2 — Transaction Validation: field transaksi wajib terisi
+    const validItems = formItems.filter((it) => it.productId && it.quantity > 0);
     if (validItems.length === 0) { toast.error("Isi minimal 1 item pembelian"); return; }
     for (const it of validItems) {
       if (!it.expiredDate) { toast.error("Isi tanggal kadaluarsa untuk semua item"); return; }
@@ -629,7 +667,7 @@ export function InventoryPurchasePanel() {
               Tambah Pembelian
             </button>
           ) : (
-            <div className="rounded-xl border border-brand-200 bg-white p-4 dark:border-brand-800 dark:bg-neutral-900">
+            <div className="-mx-4 rounded-xl border border-brand-200 bg-white px-4 py-4 dark:border-brand-800 dark:bg-neutral-900 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
               <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-neutral-800 dark:text-neutral-100">
                   Tambah Pembelian
@@ -756,27 +794,21 @@ export function InventoryPurchasePanel() {
                 <div className="flex items-center gap-3 flex-wrap">
                   <span className="text-[10px] font-medium text-neutral-500">Review:</span>
                   <span className="text-[11px] tabular-nums">
-                    <strong className="text-neutral-700 dark:text-neutral-300">{reviewResult.stats.total}</strong>
+                    <strong className="text-neutral-700 dark:text-neutral-300">{matchStats.total}</strong>
                     <span className="text-neutral-400"> Item</span>
                   </span>
                   <span className="text-[11px] tabular-nums">
-                    <strong className="text-green-600">{reviewResult.stats.matched}</strong>
+                    <strong className="text-green-600">{matchStats.matched}</strong>
                     <span className="text-neutral-400"> Match</span>
                   </span>
-                  {reviewResult.stats.needReview > 0 && (
+                  {matchStats.unmatched > 0 && (
                     <span className="text-[11px] tabular-nums">
-                      <strong className="text-amber-600">{reviewResult.stats.needReview}</strong>
-                      <span className="text-neutral-400"> Perlu Review</span>
-                    </span>
-                  )}
-                  {reviewResult.stats.unmatched > 0 && (
-                    <span className="text-[11px] tabular-nums">
-                      <strong className="text-red-600">{reviewResult.stats.unmatched}</strong>
+                      <strong className="text-red-600">{matchStats.unmatched}</strong>
                       <span className="text-neutral-400"> Belum Match</span>
                     </span>
                   )}
                   <span className="text-[11px] tabular-nums">
-                    <strong className="text-neutral-600 dark:text-neutral-300">{reviewResult.stats.progress}/{reviewResult.stats.total}</strong>
+                    <strong className="text-neutral-600 dark:text-neutral-300">{matchStats.matched}/{matchStats.total}</strong>
                     <span className="text-neutral-400"> selesai</span>
                   </span>
                   {/* Progress bar + percentage */}
@@ -784,11 +816,11 @@ export function InventoryPurchasePanel() {
                     <span className="block h-1.5 w-16 rounded-full bg-neutral-200 dark:bg-neutral-700 overflow-hidden">
                       <span
                         className="block h-full rounded-full bg-brand-500 transition-all duration-300"
-                        style={{ width: `${reviewResult.stats.progressPercent}%` }}
+                        style={{ width: `${matchStats.progressPercent}%` }}
                       />
                     </span>
                     <span className="text-[10px] tabular-nums font-medium text-neutral-500">
-                      {reviewResult.stats.progressPercent}%
+                      {matchStats.progressPercent}%
                     </span>
                   </span>
                   <span className="flex-1" />
@@ -796,12 +828,8 @@ export function InventoryPurchasePanel() {
                   <div className="flex gap-1">
                     {([
                       { key: "all", label: "Semua" },
-                      { key: "belum_match", label: reviewResult.stats.unmatched > 0 ? `Belum Match (${reviewResult.stats.unmatched})` : "Belum Match" },
-                      { key: "ocr_error", label: "OCR Error" },
-                      { key: "perlu_review", label: reviewResult.stats.needReview > 0 ? `Perlu Review (${reviewResult.stats.needReview})` : "Perlu Review" },
-                      { key: "new_product", label: "Produk Baru" },
-                      { key: "sudah_match", label: "Sudah Match" },
-                      { key: "ready_to_post", label: "Siap Posting" },
+                      { key: "belum_match", label: matchStats.unmatched > 0 ? `Belum Match (${matchStats.unmatched})` : "Belum Match" },
+                      { key: "match", label: matchStats.matched > 0 ? `Match (${matchStats.matched})` : "Match" },
                     ] as const).map((f) => (
                       <button
                         key={f.key}
@@ -828,6 +856,8 @@ export function InventoryPurchasePanel() {
                     <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-700 dark:bg-neutral-800/50">
                       <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">Produk</th>
                       <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">Batch</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">Area</th>
+                      <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">Slot</th>
                       <th className="px-2 py-1.5 text-left text-[10px] font-medium text-neutral-400">ED</th>
                       <th className="px-2 py-1.5 text-right text-[10px] font-medium text-neutral-400">Qty</th>
                       <th className="px-2 py-1.5 text-center text-[10px] font-medium text-neutral-400 w-[60px]">Satuan</th>
@@ -852,8 +882,9 @@ export function InventoryPurchasePanel() {
                       const baseSellingPrice = multiplier > 1 ? Math.round(item.sellingPrice / multiplier) : item.sellingPrice;
                       // V3 P1A — HPP must use base unit price, not display unit price
                       const hpp = Math.round(baseUnitPrice * (1 + purchaseTaxPercent / 100));
-                      // Review engine classification (module-level maps for perf)
-                      const { status: reviewStatus, subStatus } = classifyReviewStatus(item);
+                      // Product Matching — simple: productId exists → MATCH
+                      const isMatched = !!item.productId;
+                      const reviewStatus = isMatched ? "matched" : "unmatched";
                       const badge = REVIEW_BADGE_MAP[reviewStatus] ?? REVIEW_BADGE_MAP["empty"]!;
                       const rowBg = REVIEW_ROW_BG[reviewStatus] ?? "";
                       return (
@@ -862,10 +893,16 @@ export function InventoryPurchasePanel() {
                           <select
                             value={item.productId || (item.productName ? "__imported__" : "")}
                             onChange={(e) => {
-                              if (e.target.value === "__new__") { setShowQuickCreate(true); return; }
+                              if (e.target.value === "__new__") { setShowQuickCreate(true); setMatchingItemId(null); return; }
                               handleItemChange(item.id, "productId", e.target.value);
+                              if (matchingItemId === item.id) setMatchingItemId(null);
                             }}
-                            className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                            className={cn(
+                              "w-full rounded border bg-white py-1 px-1.5 text-[11px] text-neutral-700 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50",
+                              matchingItemId === item.id
+                                ? "border-brand-500 ring-2 ring-brand-300 bg-brand-50 dark:border-brand-400 dark:bg-brand-950/30"
+                                : "border-neutral-200 focus:border-brand-400 focus:ring-2 focus:ring-brand-100",
+                            )}
                           >
                             {!item.productId && item.productName ? (
                               <option value="__imported__" disabled>{item.productName}</option>
@@ -895,6 +932,41 @@ export function InventoryPurchasePanel() {
                             onChange={(e) => handleItemChange(item.id, "batchNumber", e.target.value)}
                             placeholder="Kosongkan untuk auto-generate"
                             className="w-full rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-neutral-700 placeholder-neutral-300 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50" />
+                        </td>
+                        {/* Storage Area — searchable select */}
+                        <td className="px-2 py-1">
+                          <select
+                            value={item.storageAreaId || ""}
+                            onChange={(e) => {
+                              handleItemChange(item.id, "storageAreaId" as any, e.target.value);
+                              // Clear slot when area changes (slot belongs to previous area)
+                              handleItemChange(item.id, "storageSlot" as any, "");
+                            }}
+                            className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                          >
+                            <option value="">—</option>
+                            {storageAreas.filter(a => a.isActive).map((area) => (
+                              <option key={area.id} value={area.id}>{area.name}</option>
+                            ))}
+                          </select>
+                        </td>
+                        {/* Storage Slot — cascading select from Area */}
+                        <td className="px-2 py-1">
+                          <select
+                            value={item.storageSlot || ""}
+                            onChange={(e) => handleItemChange(item.id, "storageSlot" as any, e.target.value)}
+                            disabled={!item.storageAreaId}
+                            className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-700 focus:border-brand-400 focus:outline-none disabled:bg-neutral-100 disabled:text-neutral-400 dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50 dark:disabled:bg-neutral-800"
+                          >
+                            <option value="">{item.storageAreaId ? "Pilih slot..." : "Pilih area dulu"}</option>
+                            {getSlotsForArea(item.storageAreaId || "").map((slot) => (
+                              <option key={slot} value={slot}>{slot}</option>
+                            ))}
+                            {/* Allow manual entry via other means — show current value as option if not in list */}
+                            {item.storageSlot && !getSlotsForArea(item.storageAreaId || "").includes(item.storageSlot) && (
+                              <option value={item.storageSlot}>{item.storageSlot}</option>
+                            )}
+                          </select>
                         </td>
                         <td className="px-2 py-1">
                           <input type="date" value={item.expiredDate}
@@ -951,30 +1023,16 @@ export function InventoryPurchasePanel() {
                         <td className="px-2 py-1 text-center">
                           <span
                             className={`rounded px-1.5 py-0.5 text-[9px] font-medium ${badge.cls}`}
-                            title={REVIEW_SUBSTATUS_LABEL[subStatus] ?? subStatus}
+                            title={isMatched ? "Produk sudah dipetakan ke Master Product" : "Produk belum dipetakan ke Master Product"}
                           >
                             {badge.label}
                           </span>
-                          {reviewStatus === "need_review" && (
-                            <label className="mt-1 flex items-center justify-center gap-1 text-[9px] text-neutral-500 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={item.humanReviewed === true}
-                                onChange={(e) => {
-                                  // UI hanya set humanReviewed — ENGINE yang menentukan transisi
-                                  handleItemChange(item.id, "humanReviewed" as any, e.target.checked as any);
-                                }}
-                                className="h-3 w-3 rounded border-neutral-300"
-                              />
-                              Review OK
-                            </label>
-                          )}
                         </td>
                         {/* Actions */}
                         <td className="px-2 py-1">
                           <select value="" onChange={(e) => {
                             const v = e.target.value;
-                            if (v === "match") setShowQuickCreate(true);
+                            if (v === "match") setMatchingItem(item);
                             else if (v === "force") { setProductFormItemId(item.id); setShowProductForm(true); }
                             else if (v === "edit") { /* Opens inline edit — mark as data_changed */ handleItemChange(item.id, "reviewStatus" as any, "data_changed"); toast.info("Aktifkan edit manual pada field"); }
                             else if (v === "not_purchased") { handleItemChange(item.id, "reviewStatus" as any, "not_purchased"); toast.info("Item ditandai tidak dibeli"); }
@@ -1017,23 +1075,14 @@ export function InventoryPurchasePanel() {
                   </button>
                   <button
                     onClick={handleSubmit}
-                    disabled={!reviewResult.stats.canPost}
-                    title={(() => {
-                      const s = reviewResult.stats;
-                      if (s.canPost) return undefined;
-                      if ((s as any).ocrErrors > 0) return `Masih ada ${(s as any).ocrErrors} item dengan OCR Error`;
-                      if (s.unmatched > 0) return `Masih ada ${s.unmatched} produk yang belum match`;
-                      if (s.needReview > 0) return `Masih ada ${s.needReview} produk yang perlu review`;
-                      return "Isi supplier terlebih dahulu";
-                    })()}
+                    disabled={!matchStats.canPost}
+                    title={!matchStats.canPost ? (matchStats.unmatched > 0 ? `Masih ada ${matchStats.unmatched} produk yang belum match` : "Isi supplier terlebih dahulu") : undefined}
                     className="inline-flex items-center gap-1 rounded-lg bg-brand-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-brand-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     <ShoppingCart className="h-3 w-3" />
                     {(() => {
-                      const s = reviewResult.stats;
                       const issues: string[] = [];
-                      if (s.unmatched > 0) issues.push(`${s.unmatched} belum match`);
-                      if (s.needReview > 0) issues.push(`${s.needReview} perlu review`);
+                      if (matchStats.unmatched > 0) issues.push(`${matchStats.unmatched} belum match`);
                       return issues.length > 0 ? `Simpan (${issues.join(", ")})` : "Simpan Pembelian";
                     })()}
                   </button>
@@ -1219,6 +1268,15 @@ export function InventoryPurchasePanel() {
         open={correctingInvoice !== null}
         invoice={correctingInvoice}
         onClose={() => setCorrectingInvoice(null)}
+      />
+
+      {/* INV-REVIEW-BUG-003: Product Match Modal */}
+      <ProductMatchModal
+        open={matchingItem !== null}
+        importItem={matchingItem}
+        productList={productList}
+        onClose={() => { setMatchingItem(null); setMatchingItemId(null); }}
+        onMatch={handleMatchProduct}
       />
 
       {/* Full product form modal (normalization entry) */}

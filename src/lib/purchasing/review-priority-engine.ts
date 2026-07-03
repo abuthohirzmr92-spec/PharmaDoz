@@ -152,8 +152,8 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
   if (userStatus === "not_purchased") return { status: "not_purchased", subStatus: "unmatched" };
   if (userStatus === "ready_to_post") return { status: "ready_to_post", subStatus: "ready" };
 
-  // ── OCR Error: has name but missing critical fields ──
-  if (hasName) {
+  // ── OCR Error: has name but missing critical fields (only when NOT matched) ──
+  if (hasName && !hasProduct) {
     const qty = (meta as any).quantity as number | undefined;
     const price = (meta as any).unitPrice as number | undefined;
     if ((qty === undefined || qty <= 0) || (price === undefined || price <= 0)) {
@@ -186,7 +186,8 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
   const conf = meta.matchConfidence;
   const method = meta.matchMethod;
   const status = meta.draftStatus;
-  const hasWarnings = (meta.warnings?.length ?? 0) > 0;
+  // Only count active (non-resolved) warnings — user action can resolve warnings
+  const hasWarnings = (meta.warnings?.filter((w) => !(w as any).resolved).length ?? 0) > 0;
 
   // Check each P2 trigger condition and return appropriate sub-status
 
@@ -199,6 +200,13 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
   }
   if (status === "fuzzy_match") {
     return { status: "need_review", subStatus: "fuzzy_match" };
+  }
+
+  // ── SPR-INV-REVIEW-001A: humanReviewed gates all P2 checks ──
+  // When user has reviewed, fuzzy match / low confidence / warnings are ACCEPTED.
+  // Skip P2 classification entirely — proceed to P3 (matched/ready_to_post).
+  if (hasProduct && meta.humanReviewed) {
+    return { status: "ready_to_post", subStatus: "ready" };
   }
 
   // Match method signals
@@ -217,13 +225,6 @@ export function classifyReviewStatus(meta: ReviewItemMeta): {
   // Active warnings
   if (hasWarnings) {
     return { status: "warning", subStatus: "has_warnings" };
-  }
-
-  // ── SPR-INV-REVIEW-001A: Auto-transition need_review → ready_to_post ──
-  // Perlu Review = product already matched, just needs human confirmation
-  // When humanReviewed checkbox is checked, auto-upgrade to ready_to_post
-  if (hasProduct && meta.humanReviewed && (status === "need_review" || status === "warning" || status === "fuzzy_match")) {
-    return { status: "ready_to_post", subStatus: "ready" };
   }
 
   // ── P3: Sudah Match (clean) ──

@@ -45,6 +45,10 @@ export interface DraftWarning {
   code: string;
   message: string;
   detail?: string;
+  /** Auto-resolved when the triggering condition is fixed by user action */
+  resolved?: boolean;
+  /** When the warning was resolved (user-triggered or auto-detected) */
+  resolvedAt?: string;
 }
 
 // ─── Purchase Draft Item ───

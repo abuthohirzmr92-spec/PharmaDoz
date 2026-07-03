@@ -196,5 +196,62 @@ export function countWarnings(warnings: DraftWarning[]): {
 }
 
 export function hasCriticalWarnings(warnings: DraftWarning[]): boolean {
-  return warnings.some((w) => w.level === "critical");
+  return warnings.some((w) => w.level === "critical" && !w.resolved);
+}
+
+// ---------------------------------------------------------------------------
+// Warning Resolution — auto-resolve when user action fixes the trigger
+// ---------------------------------------------------------------------------
+
+/**
+ * Auto-resolve warnings based on current item state.
+ * Called whenever item fields change (match, price edit, date fix).
+ * Returns a new warnings array with resolved flags set.
+ */
+export function resolveWarnings(
+  warnings: DraftWarning[],
+  item: PurchaseDraftItem,
+): DraftWarning[] {
+  const now = new Date().toISOString();
+  return warnings.map((w) => {
+    if (w.resolved) return w; // already resolved
+
+    let resolved = false;
+
+    switch (w.code) {
+      case "NO_MATCH":
+        // Resolved: product has been matched
+        resolved = !!item.matchedProductId;
+        break;
+      case "LOW_CONFIDENCE":
+        // Resolved: user explicitly matched or confidence improved
+        resolved = item.matchConfidence >= 90 || item.matchMethod === "exact_name";
+        break;
+      case "MISSING_PRICE":
+        // Resolved: price has been filled
+        resolved = item.enteredBuyPrice > 0;
+        break;
+      case "MISSING_EXPIRED":
+        // Resolved: expired date has been filled
+        resolved = !!item.expiredDate;
+        break;
+      case "INVALID_DATE":
+      case "EXPIRED_PAST":
+        // Resolved: date has been corrected to a valid future date
+        if (item.expiredDate) {
+          const d = new Date(item.expiredDate);
+          resolved = !isNaN(d.getTime()) && d > new Date();
+        }
+        break;
+    }
+
+    return resolved ? { ...w, resolved: true, resolvedAt: now } : w;
+  });
+}
+
+/**
+ * Get only active (non-resolved) warnings.
+ */
+export function getActiveWarnings(warnings: DraftWarning[]): DraftWarning[] {
+  return warnings.filter((w) => !w.resolved);
 }
