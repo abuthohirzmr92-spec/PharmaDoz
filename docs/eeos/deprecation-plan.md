@@ -38,9 +38,25 @@ const baseQty = normalize(5, "Dus", tree);
 | M3 | 2026-12-01 | Remove from public documentation |
 | M4 | MEDISYNC v2.0 | Remove deprecated files |
 
+## Technical Debt Registry
+
+### TD-UUCE-001: Bridge Migration
+
+| Field | Value |
+|-------|-------|
+| **ID** | TD-UUCE-001 |
+| **Title** | Bridge Migration |
+| **Priority** | P2 |
+| **Status** | Recorded |
+| **Description** | 4 callers still use `unit-converter.ts` compatibility bridge. Migrate to UUCE directly. |
+| **Current Impact** | None — bridge is pure adapter, zero business logic |
+| **Migration** | Deferred. Remove only after Architecture Review. |
+| **Target** | MEDISYNC v2.0 |
+
 ## Policy
 
 1. Deprecated components remain functional until removal
 2. No new code may use deprecated components
 3. All replacements must be documented
 4. Removal requires Architecture Board approval
+5. UUCE is the Single Source of Truth for all unit conversion

@@ -1,13 +1,21 @@
-// ---------------------------------------------------------------------------
-// UUCE Bridge — Backward-compatible facade over UUCE Core
-// SPR-CORE-001C: All conversion routes through UUCE
-// ---------------------------------------------------------------------------
-// This file delegates ALL conversion logic to UUCE internally.
-// The old toBaseUnit/fromBaseUnit/breakdownBaseUnit API is preserved
-// for backward compatibility.
+// =================================================================
+// @adapter — Compatibility Layer
+// =================================================================
+// THIS BRIDGE IS AN ADAPTER ONLY.
 //
-// New code should use: import { normalize, format, breakdown } from "@/lib/uuce"
-// ---------------------------------------------------------------------------
+// PROHIBITED: Business Rule, Stock Logic, Conversion Logic,
+//             Database access, Side effects
+//
+// ALL business logic resides in UUCE (src/lib/uuce/).
+// New code: import { normalize, format, breakdown } from "@/lib/uuce"
+//
+// 🔒 UUCE v1.0 LOCKED — do not modify without ADR
+// =================================================================
+//
+// SPR-CORE-001C: All conversion routes through UUCE.
+// Delegates ALL conversion logic to UUCE internally.
+// Old API preserved for backward compatibility.
+// =================================================================
 
 import type { UnitLevel } from "@/types/unit";
 import { buildTree } from "@/lib/uuce/uuce-tree";
