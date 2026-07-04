@@ -10,6 +10,7 @@ import * as XLSX from "xlsx";
 import { normalizeHeader } from "../csv/parser";
 import { IMPORT_COLUMNS, EXPECTED_HEADER } from "../import/import-types";
 import type { ImportRow, ImportParseResult, ImportParseError } from "../import/import-types";
+import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 
 /**
  * Parse an Excel file (.xlsx) into structured import rows.
@@ -176,7 +177,7 @@ function parseExcelRow(
   // Optional selling price (harga_jual) — reject NaN, empty, non-numeric
   const sellingPriceRaw = (values[4] ?? "").trim();
   const sellingPriceParsed = sellingPriceRaw ? parseFloat(sellingPriceRaw.replace(/[^\d.]/g, "")) : NaN;
-  const sellingPrice = !isNaN(sellingPriceParsed) ? sellingPriceParsed : undefined;
+  const sellingPrice = !isNaN(sellingPriceParsed) ? normalizeRupiah(sellingPriceParsed) : undefined;
 
   // Convert Excel serial date to ISO string if needed
   const expiredRaw = values[6] ?? "";
@@ -206,7 +207,7 @@ function parseExcelRow(
     productName,
     quantity: qty,
     unit,
-    buyPrice,
+    buyPrice: normalizeRupiah(buyPrice),
     sellingPrice,
     batchNumber: (values[5] ?? "") || undefined,
     expiredDate,

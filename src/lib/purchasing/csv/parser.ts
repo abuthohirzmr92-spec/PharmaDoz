@@ -7,6 +7,7 @@
 
 import { IMPORT_COLUMNS, EXPECTED_HEADER } from "../import/import-types";
 import type { ImportRow, ImportParseResult, ImportParseError } from "../import/import-types";
+import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 
 /**
  * Parse CSV text into structured import rows.
@@ -146,17 +147,17 @@ function parseLine(
     };
   }
 
-  // Optional: selling price (harga_jual) — reject NaN, empty, non-numeric
+  // Optional: selling price (harga_jual) — normalize to integer Rupiah
   const sellingPriceRaw = trimValue(values[4]);
   const sellingPriceParsed = sellingPriceRaw ? parseFloat(sellingPriceRaw.replace(/[^\d.]/g, "")) : NaN;
-  const sellingPrice = !isNaN(sellingPriceParsed) ? sellingPriceParsed : undefined;
+  const sellingPrice = !isNaN(sellingPriceParsed) ? normalizeRupiah(sellingPriceParsed) : undefined;
 
   const row: ImportRow = {
     rowNumber,
     productName,
     quantity: qty,
     unit,
-    buyPrice,
+    buyPrice: normalizeRupiah(buyPrice),
     sellingPrice,
     batchNumber: trimValue(values[5]) || undefined,
     expiredDate: trimValue(values[6]) || undefined,

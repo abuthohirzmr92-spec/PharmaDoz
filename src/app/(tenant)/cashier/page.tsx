@@ -130,7 +130,7 @@ export default function CashierPage() {
 
   /* ---- computed values ---- */
   const cartTotal = useMemo(
-    () => cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0),
+    () => Math.round(cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)),
     [cart],
   );
   const cartItemCount = useMemo(

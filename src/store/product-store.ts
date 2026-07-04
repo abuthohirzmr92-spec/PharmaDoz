@@ -35,6 +35,8 @@ interface ProductStoreState {
   loadRawProducts: (filter?: { isActive?: boolean }) => Promise<any[]>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   loadCatalog: (filter?: { isActive?: boolean }) => Promise<any[]>;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  loadPurchaseProducts: (filter?: { isActive?: boolean }) => Promise<any[]>;
   loadCategories: () => Promise<Array<{ id: string; name: string }>>;
   loadUnits: () => Promise<Array<{ id: string; name: string }>>;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -63,6 +65,29 @@ export const useProductStore = create<ProductStoreState>((set, get) => ({
       const products = await (productRepo as any).getRawProducts(filter ?? { isActive: true });
       set({ isLoading: false, isConnected: (productRepo as any).isConnected });
       return products as any[];
+    } catch {
+      set({ isLoading: false });
+      return [];
+    }
+  },
+
+  // Purchase-specific: includes unitLevels for multi-unit dropdown
+  loadPurchaseProducts: async (filter) => {
+    set({ isLoading: true });
+    try {
+      const products = await (productRepo as any).getProducts(filter);
+      const mapped = products.map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        defaultPrice: p.defaultPrice ?? 0,
+        defaultSellingPrice: p.defaultSellingPrice ?? 0,
+        unit: p.unit ?? "",
+        unitLevels: p.unitLevels ?? [],
+        defaultStorageAreaId: p.defaultStorageAreaId ?? null,
+        defaultStorageSlot: p.defaultStorageSlot ?? null,
+      }));
+      set({ isLoading: false, isConnected: (productRepo as any).isConnected });
+      return mapped;
     } catch {
       set({ isLoading: false });
       return [];

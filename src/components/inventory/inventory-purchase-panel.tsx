@@ -298,8 +298,8 @@ export function InventoryPurchasePanel() {
   useEffect(() => {
     const productStore = useProductStore.getState();
     if (productStore.isConnected) {
-      productStore.loadRawProducts({ isActive: true }).then(prods => {
-        setProductList(prods.map(p => ({ id: p.id, name: p.name, defaultPrice: p.defaultPrice ?? 0, defaultSellingPrice: p.defaultSellingPrice ?? 0, unit: p.unit ?? '', defaultStorageAreaId: p.defaultStorageAreaId ?? null, defaultStorageSlot: p.defaultStorageSlot ?? null })));
+      productStore.loadPurchaseProducts({ isActive: true }).then(prods => {
+        setProductList(prods.map(p => ({ id: p.id, name: p.name, defaultPrice: p.defaultPrice ?? 0, defaultSellingPrice: p.defaultSellingPrice ?? 0, unit: p.unit ?? '', unitLevels: p.unitLevels ?? [], defaultStorageAreaId: p.defaultStorageAreaId ?? null, defaultStorageSlot: p.defaultStorageSlot ?? null })));
       }).catch(() => {
         // Fallback to batch-derived products
         const grouped = new Map<string, any>();
@@ -879,7 +879,6 @@ export function InventoryPurchasePanel() {
                         ? (() => { try { return toBaseUnit(1, item.unit, levels); } catch { return 1; } })()
                         : 1;
                       const baseUnitPrice = multiplier > 1 ? Math.round(item.unitPrice / multiplier) : item.unitPrice;
-                      const baseSellingPrice = multiplier > 1 ? Math.round(item.sellingPrice / multiplier) : item.sellingPrice;
                       // V3 P1A — HPP must use base unit price, not display unit price
                       const hpp = Math.round(baseUnitPrice * (1 + purchaseTaxPercent / 100));
                       // Product Matching — simple: productId exists → MATCH
@@ -981,13 +980,54 @@ export function InventoryPurchasePanel() {
                             className="w-14 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                           />
                         </td>
-                        {/* Satuan — single source: item.unit → product → "—" */}
+                        {/* Satuan — dynamic dropdown from Master Product unit hierarchy */}
                         <td className="px-2 py-1 text-center">
-                          <span className="text-[10px] text-neutral-500 whitespace-nowrap">
-                            {item.unit
-                              || productList.find(p => p.id === item.productId)?.unit
-                              || "—"}
-                          </span>
+                          {(() => {
+                            const prod = productList.find(p => p.id === item.productId);
+                            const levels = prod?.unitLevels ?? [];
+                            const baseUnit = prod?.unit || item.unit || "—";
+                            const hasLevels = levels.length > 0;
+
+                            if (!item.productId) {
+                              return (
+                                <span className="text-[10px] text-neutral-400 whitespace-nowrap">
+                                  {item.unit || "—"}
+                                </span>
+                              );
+                            }
+
+                            // Build unit options from product hierarchy
+                            const options: { label: string; value: string }[] = [];
+
+                            // Base unit first
+                            options.push({ label: `${baseUnit} (1)`, value: baseUnit });
+
+                            // Level units (largest to smallest for readability)
+                            const sorted = [...levels].sort((a, b) => b.level - a.level);
+                            for (const lv of sorted) {
+                              const multiplier = levels
+                                .filter((l) => l.level <= lv.level)
+                                .reduce((m, l) => m * l.contains, 1);
+                              options.push({
+                                label: `${lv.unitName} (${multiplier} ${baseUnit})`,
+                                value: lv.unitName,
+                              });
+                            }
+
+                            return (
+                              <select
+                                value={item.unit || baseUnit}
+                                onChange={(e) => handleItemChange(item.id, "unit" as any, e.target.value)}
+                                className="w-full rounded border border-neutral-200 bg-white py-1 px-1 text-[10px] text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
+                              >
+                                {options.map((opt) => (
+                                  <option key={opt.value} value={opt.value}>
+                                    {opt.label}
+                                  </option>
+                                ))}
+                              </select>
+                            );
+                          })()}
                         </td>
                         <td className="px-2 py-1">
                           <NumericInput
@@ -1015,9 +1055,6 @@ export function InventoryPurchasePanel() {
                             onChange={(v) => handleItemChange(item.id, "sellingPrice", v)}
                             className="w-20 rounded border border-neutral-200 bg-white py-1 px-1.5 text-[11px] text-right text-neutral-700 focus:border-brand-400 focus:outline-none dark:border-neutral-700 dark:bg-neutral-800 dark:text-neutral-50"
                           />
-                          {hasMultiUnit && multiplier > 1 && (
-                            <div className="text-[9px] text-neutral-400 text-right">{baseSellingPrice.toLocaleString("id-ID")} / {prodMeta?.unit ?? "base"}</div>
-                          )}
                         </td>
                         {/* Status badge + human review checkbox (SPR-INV-REVIEW-001A) */}
                         <td className="px-2 py-1 text-center">
