@@ -72,6 +72,7 @@ import { ProductFormModal } from "@/components/products/product-form-modal";
 import { MultiUnitBadge } from "@/components/products/product-multi-unit-display";
 import { NumericInput } from "@/components/shared/numeric-input";
 import { toBaseUnit } from "@/lib/unit-converter";
+import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 import { searchItems } from "@/lib/purchasing/review-priority-engine";
 import { InventoryPayInvoiceModal } from "./inventory-pay-invoice-modal";
 import { InventoryCorrectionModal } from "./inventory-correction-modal";
@@ -494,7 +495,7 @@ export function InventoryPurchasePanel() {
           baseQty = toBaseUnit(it.quantity, it.unit, levels);
           // Adjust unit price to per-base-unit (e.g., Dus Rp 200.000 → Tablet Rp 1.000)
           if (baseQty > 0 && baseQty !== it.quantity) {
-            baseUnitPrice = Math.round(it.unitPrice * it.quantity / baseQty);
+            baseUnitPrice = normalizeRupiah(it.unitPrice * it.quantity / baseQty);
           }
         }
       }

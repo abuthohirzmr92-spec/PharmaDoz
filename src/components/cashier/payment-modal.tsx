@@ -5,6 +5,7 @@ import { X, Wallet, Banknote, CreditCard, Smartphone, Building2, Landmark, Alert
 import { useCashierStore, type PaymentMethod } from "@/store/cashier-store";
 import { useWalletStore } from "@/store/wallet-store";
 import { cn } from "@/lib/cn";
+import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 
 export interface PaymentModalProps {
   open: boolean;
@@ -91,7 +92,7 @@ export function PaymentModal({ open, onClose, cartTotal }: PaymentModalProps) {
 
   const handleQuickNominal = (value: number) => {
     // Rupiah is always integer — ensure no decimal in "Uang Pas"
-    const v = value === -1 ? Math.round(cartTotal) : value;
+    const v = value === -1 ? normalizeRupiah(cartTotal) : value;
     setAmount(String(v));
     amountRef.current?.focus();
   };

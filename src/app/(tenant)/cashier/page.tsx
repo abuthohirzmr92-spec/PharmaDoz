@@ -19,6 +19,7 @@ import { cn } from "@/lib/cn";
 import { EmptyState } from "@/components/shared/empty-state";
 import { toast } from "sonner";
 import { fromBaseUnit } from "@/lib/unit-converter";
+import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 import {
   Search,
   ShoppingCart,
@@ -130,7 +131,7 @@ export default function CashierPage() {
 
   /* ---- computed values ---- */
   const cartTotal = useMemo(
-    () => Math.round(cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)),
+    () => normalizeRupiah(cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)),
     [cart],
   );
   const cartItemCount = useMemo(
