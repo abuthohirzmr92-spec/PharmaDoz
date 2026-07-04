@@ -11,6 +11,7 @@ import { isSupabaseConnected } from "@/lib/supabase/client";
 import { localPersistence } from "@/lib/local-persistence";
 import { getBusinessDayKey } from "@/lib/business-day";
 import { logActivity } from "@/lib/audit/activity-logger";
+import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -171,7 +172,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       return { success: false, error: "Keranjang kosong." };
     }
 
-    const subtotal = cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0);
+    const subtotal = normalizeRupiah(cart.reduce((s, i) => s + i.quantity * i.unitPrice, 0));
     const paymentTotal = payments.reduce((s, p) => s + p.amount, 0);
 
     if (paymentTotal < subtotal) {
@@ -239,7 +240,7 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
         productName: item.productName,
         quantity: item.baseQuantity ?? item.quantity,
         unitPrice: item.unitPrice,
-        subtotal: (item.baseQuantity ?? item.quantity) * item.unitPrice,
+        subtotal: normalizeRupiah((item.baseQuantity ?? item.quantity) * item.unitPrice),
       })),
       payments: payments.map((p) => ({
         amount: p.amount,
@@ -350,10 +351,10 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
 
   addPayment: (payment) => {
     const { cart, payments } = get();
-    const cartTotal = cart.reduce(
+    const cartTotal = normalizeRupiah(cart.reduce(
       (sum, i) => sum + i.quantity * i.unitPrice,
       0,
-    );
+    ));
     const paymentTotal = payments.reduce((sum, p) => sum + p.amount, 0);
     if (paymentTotal + payment.amount > cartTotal) return;
     set({ payments: [...payments, payment] });
