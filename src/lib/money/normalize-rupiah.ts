@@ -1,6 +1,6 @@
 // =================================================================
 // MEDISYNC MONEY POLICY — Single Source of Truth for Rupiah
-// 🔒 SPR-MONEY-003 — Architecture Locked
+// 🔒 ARCHITECTURE LOCKED — SPR-MONEY-003A
 //
 // Owner:     EEOS Architecture Board
 // Lifecycle: Permanent — all monetary values flow through here
@@ -12,35 +12,41 @@
 //   ALL monetary values MUST be stored as integers in the database.
 //   VALIDATION and NORMALIZATION are SEPARATE responsibilities.
 //
-// FLOW (REQUIRED):
+// PUBLIC API (3 functions only):
+//   validateRupiah()  — Validation only
+//   normalizeRupiah() — Normalization only (pure Math.round)
+//   formatRupiah()    — Display formatting only
+//
+// REQUIRED FLOW:
 //   Raw Value → validateRupiah() → normalizeRupiah() → Database
 //
 // PROHIBITED:
+//   ❌ Shortcut APIs (validateAndNormalize, Safe variants)
 //   ❌ normalizeRupiah() without validateRupiah() first
 //   ❌ Math.round() on monetary values outside this helper
 //   ❌ Silent failure (NaN → 0, Inf → 0, Negative → 0)
 //   ❌ Decimal prices in database
 //
-// ONE MONEY POLICY — VALIDATION ≠ NORMALIZATION — NO SILENT FAILURE
+// MINIMAL PUBLIC SURFACE — NO SHORTCUT API — VALIDATION ≠ NORMALIZATION
 // =================================================================
 
 // ─── Types ───
 
+/** Structured validation result. Caller decides how to handle errors. */
 export interface RupiahValidationResult {
   valid: boolean;
   errors: string[];
 }
 
-// ─── Validation ───
+// ─── Public API ───
 
 /**
- * Validate a raw monetary value BEFORE normalization.
+ * validateRupiah — Validation only.
  *
- * PURE FUNCTION — no side effects.
- * Returns structured result. Caller decides how to handle errors.
- * NEVER throws. NEVER silently converts to 0.
+ * Responsibility: Check that a raw value is a valid Rupiah amount.
+ * Returns structured result. NEVER throws. NEVER converts to 0.
  *
- * @param value — Raw monetary value to validate
+ * @param value — Raw value to validate
  * @param label — Optional field name for error messages
  */
 export function validateRupiah(value: unknown, label?: string): RupiahValidationResult {
@@ -70,54 +76,28 @@ export function validateRupiah(value: unknown, label?: string): RupiahValidation
   return { valid: true, errors: [] };
 }
 
-// ─── Normalization ───
-
 /**
- * Normalize a VALID monetary value to integer Rupiah.
+ * normalizeRupiah — Normalization only.
  *
- * PURE FUNCTION — assumes input has been validated.
- * Call validateRupiah() FIRST, then call this.
- *
- * Business Rule: Math.round() — nearest integer Rupiah.
+ * Responsibility: Convert a VALID float to integer Rupiah.
+ * Assumes input has been validated by validateRupiah().
+ * Pure Math.round() — nothing else.
  *
  * @param value — VALID monetary value (non-NaN, finite, ≥0)
- * @returns Integer Rupiah
  */
 export function normalizeRupiah(value: number): number {
   return Math.round(value);
 }
 
-// ─── Convenience ───
-
 /**
- * Validate THEN normalize in one call.
- * Convenience for callers that want both in one step.
- * Returns 0 if invalid (for backward compatibility).
- */
-export function validateAndNormalizeRupiah(value: number): number {
-  const result = validateRupiah(value);
-  if (!result.valid) return 0;
-  return normalizeRupiah(value);
-}
-
-/**
- * Normalize an array of valid monetary values.
- */
-export function normalizeRupiahAll(values: number[]): number[] {
-  return values.map(normalizeRupiah);
-}
-
-/**
- * Format a monetary value for display.
- * Validates internally, defaults to 0 on invalid.
+ * formatRupiah — Display formatting only.
+ *
+ * Responsibility: Format an integer Rupiah value for display.
+ * Uses explicit validate → normalize flow internally.
+ * Falls back to "Rp 0" on invalid input.
  */
 export function formatRupiah(value: number): string {
-  const safe = validateAndNormalizeRupiah(value);
-  return `Rp ${safe.toLocaleString("id-ID")}`;
+  const validation = validateRupiah(value);
+  if (!validation.valid) return "Rp 0";
+  return `Rp ${normalizeRupiah(value).toLocaleString("id-ID")}`;
 }
-
-// ─── Backward Compatible Alias ───
-// Callers that previously used normalizeRupiah() which handled
-// NaN/Inf/negative → 0 can use this for zero-risk migration.
-// New code should use validateRupiah() → normalizeRupiah().
-export { validateAndNormalizeRupiah as normalizeRupiahSafe };
