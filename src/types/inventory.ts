@@ -161,6 +161,8 @@ export interface InventoryProduct {
   description?: string | null;     // product description — for edit forms
   barcode: string | null;
   unit: string;                   // "Tablet", "Botol", "Strip", etc. (Level 1 base unit)
+  /** V10.x Sales Unit Baseline — derived from unitLevels, falls back to unit. Display purpose only. */
+  salesUnit?: string;             // "Strip", "Botol", "Dus" — customer-facing sales unit
   unitLevels?: import("./unit").UnitLevel[];  // V2 Multi Unit — Level 2 & 3
   defaultPrice: number;           // default purchase price (cost)
   defaultSellingPrice: number;    // default retail price

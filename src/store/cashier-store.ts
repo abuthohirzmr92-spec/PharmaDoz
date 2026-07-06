@@ -12,6 +12,11 @@ import { localPersistence } from "@/lib/local-persistence";
 import { getBusinessDayKey } from "@/lib/business-day";
 import { logActivity } from "@/lib/audit/activity-logger";
 import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
+import type { AllocationDraft, PriceSnapshot } from "@/lib/cashier/types";
+import { CheckoutSessionService } from "@/services/checkout-session.service";
+import { createBatchProvider } from "@/lib/cashier/adapters/batch-provider.adapter";
+import { createBatchPriceProvider } from "@/lib/cashier/adapters/batch-price-provider.adapter";
+import { createInventorySnapshotProvider } from "@/lib/cashier/adapters/inventory-snapshot-provider.adapter";
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                             */
@@ -19,17 +24,41 @@ import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
 
 export type PaymentMethod = "cash" | "debit" | "credit" | "qris" | "transfer";
 
+// ─── Legacy re-export (external consumers may still reference this) ───
+// AllocationSnapshot REMOVED in V10.3 — replaced by AllocationDraft + PriceSnapshot.
+// If any external code still imports AllocationSnapshot, update to:
+//   allocation data   → AllocationDraft (from @/lib/cashier/types)
+//   pricing data      → PriceSnapshot (from @/lib/cashier/types)
+
 export interface CartItem {
   productId: string;
   productName: string;
+
+  // ── Canonical (V8) — Single Source of Truth ──
+  baseQuantity: number;      // ALWAYS Base Unit (e.g., 200 Tablet)
+  baseUnitPrice: number;     // ALWAYS Per Base Unit (e.g., 1500/Tablet)
+  selectedUnitCode?: string; // FK → product_unit_levels.unit_code
+
+  // ── Allocation Draft (V10.2) — Canonical allocation ──
+  /** Pure allocation (NO sellingPrice). Built by AllocationBuilder. */
+  allocationDraft?: AllocationDraft;
+
+  // ── Price Snapshot (V10.3) — Canonical pricing ──
+  /** Pricing breakdown (sellingPrice lives HERE). Built by PricingEngine. */
+  priceSnapshot?: PriceSnapshot;
+
+  // ── Legacy (deprecated — removed in V11.0) ──
+  /** @deprecated Use baseQuantity */
   quantity: number;
+  /** @deprecated Use baseUnitPrice */
   unitPrice: number;
+  /** @deprecated Use selectedUnitCode */
+  selectedUnit?: string;
+  /** @deprecated Use resolveUnitDisplay() */
+  displayQuantity?: number;
+
   batchNumber?: string;
   stockAvailable: number;
-  /** V3 C3 — Multi Unit */
-  selectedUnit?: string;
-  displayQuantity?: number;
-  baseQuantity?: number;
 }
 
 export interface Payment {
@@ -258,6 +287,93 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
       status: "completed",
       createdAt: now,
     };
+
+    // V10.4 — Dual-write: run CheckoutSessionService in parallel (development only)
+    if (process.env.NODE_ENV === "development" && cart.some((i) => i.allocationDraft && i.priceSnapshot)) {
+      try {
+        // Use adapters over the existing store batches (inject via adapter, not direct store access)
+        const batches = useInventoryStore.getState().batches;
+        const svc = new CheckoutSessionService(
+          createBatchProvider(batches),
+          createBatchPriceProvider(batches),
+          createInventorySnapshotProvider(batches),
+        );
+
+        // Run service pipeline for the first item (single-product checkout)
+        const firstItem = cart[0]!;
+        let session = svc.createSession({
+          cartId: get().currentSaleId ?? "unknown",
+          tenantId: auth.user?.tenantId ?? "",
+          branchId: pharmacyId,
+          cashierId: cashierId ?? "unknown",
+        });
+
+        session = svc.allocateInventory(session, firstItem.productId, firstItem.baseQuantity ?? firstItem.quantity);
+        session = svc.calculatePricing(session);
+        session = svc.validate(session);
+
+        // Validate allocation, pricing, AND validation — not just total
+        const comparisons: string[] = [];
+
+        // Allocation comparison
+        if (session.allocationDraft && firstItem.allocationDraft) {
+          const svcTotal = session.allocationDraft.totalAllocated;
+          const cartTotal = firstItem.allocationDraft.totalAllocated;
+          if (svcTotal !== cartTotal) {
+            comparisons.push(`ALLOC: service=${svcTotal} cart=${cartTotal}`);
+          }
+        }
+
+        // Pricing comparison
+        if (session.priceSnapshot && firstItem.priceSnapshot) {
+          const svcGrand = session.priceSnapshot.grandTotal;
+          const cartGrand = firstItem.priceSnapshot.grandTotal;
+          if (svcGrand !== cartGrand) {
+            comparisons.push(`PRICE: service=${svcGrand} cart=${cartGrand}`);
+          }
+        }
+
+        // Validation result
+        if (session.validationResult) {
+          if (session.validationResult.status !== "VALID") {
+            comparisons.push(`VALIDATION: ${session.validationResult.status} (${session.validationResult.issues.length} issues)`);
+          }
+        }
+
+        // Freeze + total comparison
+        if (session.validationResult?.status === "VALID") {
+          session = svc.freeze(
+            session,
+            cart.map((i) => ({
+              productId: i.productId,
+              productName: i.productName,
+              baseQuantity: i.baseQuantity ?? i.quantity,
+              baseUnitPrice: i.baseUnitPrice ?? i.unitPrice,
+              selectedUnitCode: i.selectedUnitCode,
+              allocationDraft: i.allocationDraft,
+              priceSnapshot: i.priceSnapshot,
+            })),
+            payments.map((p) => ({ amount: p.amount, method: p.method, ref: p.ref, walletId: p.walletId })),
+            transactionId,
+            transaction.invoiceNumber,
+            cashierName,
+          );
+
+          if (session.transactionSnapshot) {
+            const snapTotal = session.transactionSnapshot.total;
+            if (snapTotal !== subtotal) {
+              comparisons.push(`TOTAL: snapshot=${snapTotal} store=${subtotal}`);
+            }
+          }
+        }
+
+        if (comparisons.length > 0) {
+          console.warn("[V10.4 DUAL-WRITE] Differences detected:", comparisons.join(" | "));
+        }
+      } catch (svcErr) {
+        console.warn("[V10.4 DUAL-WRITE] Service path failed (store path unaffected):", svcErr);
+      }
+    }
 
     try {
       // Persist transaction — capture DB-returned object with real IDs

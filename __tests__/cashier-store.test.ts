@@ -13,6 +13,8 @@ const dummyItem = (overrides: Partial<CartItem> = {}): CartItem => ({
   productName: "Paracetamol 500mg",
   quantity: 1,
   unitPrice: 15000,
+  baseQuantity: 1,
+  baseUnitPrice: 15000,
   stockAvailable: 100,
   ...overrides,
 });

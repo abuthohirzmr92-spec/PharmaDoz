@@ -5,6 +5,12 @@ import { useCashierStore, type CartItem } from "@/store/cashier-store";
 import { productRepo } from "@/lib/repository-instances";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { toBaseUnit } from "@/lib/unit-converter";
+import { buildAllocation } from "@/lib/cashier/allocation-builder";
+import { calculatePricing } from "@/lib/cashier/pricing-engine";
+import { createBatchPriceProvider } from "@/lib/cashier/adapters/batch-price-provider.adapter";
+import { resolveCurrentSellingPrice } from "@/lib/cashier/resolve-current-selling-price";
+import type { AllocationDraft, PriceSnapshot } from "@/lib/cashier/types";
+import type { ProductBatch } from "@/types/inventory";
 
 /* ------------------------------------------------------------------ */
 /*  Demo product catalogue                                             */
@@ -59,6 +65,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Vitamin",
     batchNumber: "VTC-2026-001",
     expiredDate: "2027-09-30",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-004",
@@ -68,6 +78,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Obat Bebas",
     batchNumber: "ANT-2026-001",
     expiredDate: "2026-08-31",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-005",
@@ -77,6 +91,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Obat Bebas",
     batchNumber: "IBU-2026-001",
     expiredDate: "2027-03-31",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-006",
@@ -86,6 +104,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Obat Bebas",
     batchNumber: "CET-2026-001",
     expiredDate: "2027-11-30",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-007",
@@ -95,6 +117,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Obat Keras",
     batchNumber: "OME-2026-001",
     expiredDate: "2027-01-31",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-008",
@@ -104,6 +130,7 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Obat Keras",
     batchNumber: "SAL-2026-001",
     expiredDate: "2026-07-31",
+    unit: "Inhaler",
   },
   {
     productId: "demo-009",
@@ -113,6 +140,10 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Vitamin",
     batchNumber: "MLT-2026-001",
     expiredDate: "2027-08-31",
+    unit: "Tablet",
+    unitLevels: [
+      { level: 2, unitName: "Strip", contains: 10 },
+    ],
   },
   {
     productId: "demo-010",
@@ -122,6 +153,7 @@ export const DEMO_PRODUCTS: readonly DemoProduct[] = [
     category: "Lainnya",
     batchNumber: "MKP-2026-001",
     expiredDate: "2028-06-30",
+    unit: "Botol",
   },
 ] as const;
 
@@ -169,7 +201,7 @@ export function useDemoCashier() {
           const items: ProductCatalogItem[] = products.map((p) => ({
             productId: p.id,
             productName: p.name,
-            unitPrice: p.batches[0]?.sellingPrice ?? 0,
+            unitPrice: resolveCurrentSellingPrice(p.id, p.batches, p.defaultSellingPrice),
             stockAvailable: p.totalStock,
             category: p.category,
             batchNumber: p.batches[0]?.batchNumber ?? "",
@@ -189,28 +221,80 @@ export function useDemoCashier() {
     store.setCurrentSale(saleId, invoiceNumber);
   }, [store]);
 
-  /** Add a demo product to the cart (quantity = 1). */
+  /** Add a demo product to the cart (quantity = 1).
+   * @param product — Demo product to add
+   * @param availableBatches — Optional batch snapshot from Inventory (passed by caller). */
   const addDemoProductToCart = useCallback(
-    (product: DemoProduct) => {
-      // V3 C3 — default to largest unit level if multi-unit exists
+    (product: DemoProduct, availableBatches?: ProductBatch[]) => {
+      // V10.3 — canonical allocation + pricing (CV-1, CV-2, CV-3 resolved)
       const levels = product.unitLevels ?? [];
       const largestLevel = levels.length > 0
         ? levels.reduce((a, b) => a.level > b.level ? a : b)
         : null;
       const selectedUnit = largestLevel?.unitName ?? product.unit ?? undefined;
+      const selectedUnitCode = selectedUnit?.trim().toLowerCase();
+      const baseQty = selectedUnitCode && levels.length > 0
+        ? toBaseUnit(1, selectedUnit!, levels)
+        : 1;
+
+      // V10.3: Build allocation + pricing via pure Domain Services
+      // CV-1: NO inventory-store access
+      // CV-2: NO direct allocateFefo() call
+      // CV-3: sellingPrice lives in PriceSnapshot, not in AllocationDraft
+      let allocationDraft: AllocationDraft | undefined;
+      let priceSnapshot: PriceSnapshot | undefined;
+      try {
+        if (availableBatches && availableBatches.length > 0) {
+          // 1. Allocate via AllocationBuilder (V10.2)
+          allocationDraft = buildAllocation({
+            productId: product.productId,
+            baseQty,
+            availableBatches,
+          });
+
+          // 2. Price via PricingEngine (V10.3)
+          // Uses BatchPriceProvider adapter (V10.4 Story 2) — no inline adapter
+          priceSnapshot = calculatePricing({
+            allocationDraft,
+            priceProvider: createBatchPriceProvider(availableBatches, product.unitPrice),
+          });
+
+          // Enrich batch numbers from actual batch data
+          priceSnapshot = {
+            ...priceSnapshot,
+            entries: priceSnapshot.entries.map((entry) => {
+              const batch = availableBatches.find((b) => b.id === entry.batchId);
+              return {
+                ...entry,
+                batchNumber: batch?.batchNumber ?? entry.batchId.slice(-6),
+              };
+            }),
+          };
+        }
+      } catch { /* demo/offline — no allocation/pricing available */ }
+
+      // Canonical price from PriceSnapshot (not from allocation!)
+      const snapshotPrice = priceSnapshot?.entries[0]?.sellingPrice;
+      const canonicalPrice = snapshotPrice || product.unitPrice;
 
       const cartItem: CartItem = {
         productId: product.productId,
         productName: product.productName,
+        // Canonical (V8-V10)
+        baseQuantity: baseQty,
+        baseUnitPrice: canonicalPrice,
+        selectedUnitCode,
+        // Allocation Draft (V10.2 — canonical, NO sellingPrice)
+        allocationDraft,
+        // Price Snapshot (V10.3 — canonical pricing, sellingPrice lives HERE)
+        priceSnapshot,
+        // Legacy (deprecated — V11.0 removal)
         quantity: 1,
-        unitPrice: product.unitPrice,
+        unitPrice: canonicalPrice,
         stockAvailable: product.stockAvailable,
         batchNumber: product.batchNumber,
         selectedUnit,
         displayQuantity: 1,
-        baseQuantity: selectedUnit && levels.length > 0
-          ? toBaseUnit(1, selectedUnit, levels)
-          : 1,
       };
       store.addToCart(cartItem);
     },
@@ -253,7 +337,7 @@ export function useDemoCashier() {
           setDbProducts(products.map((p) => ({
             productId: p.id,
             productName: p.name,
-            unitPrice: p.batches[0]?.sellingPrice ?? 0,
+            unitPrice: resolveCurrentSellingPrice(p.id, p.batches, p.defaultSellingPrice),
             stockAvailable: p.totalStock,
             category: p.category,
             batchNumber: p.batches[0]?.batchNumber ?? "",

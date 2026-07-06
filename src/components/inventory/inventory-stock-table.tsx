@@ -4,7 +4,7 @@ import { useState, useMemo, useEffect, memo, useCallback, Fragment } from "react
 import { Search, ChevronDown, ChevronRight, Package } from "lucide-react";
 import { useInventoryStore } from "@/store/inventory-store";
 import { useLocationMasterStore } from "@/store/location-master-store";
-import { useProductStore } from "@/store/product-store";
+import { useProductCatalog } from "@/hooks/use-product-catalog";
 import { cn } from "@/lib/cn";
 import { getDaysUntilExpiry, buildInventoryProducts } from "@/lib/inventory-demo";
 import type { InventoryProduct, ProductBatch } from "@/types/inventory";
@@ -94,7 +94,7 @@ const StockRow = memo(function StockRow({
         </td>
         <td className="px-3 py-2.5">
           <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            {product.unit || "—"}
+            {product.salesUnit || product.unit || "—"}
           </span>
         </td>
         <td className="px-3 py-2.5 text-right">
@@ -108,7 +108,7 @@ const StockRow = memo(function StockRow({
                   : "text-neutral-900 dark:text-neutral-50",
             )}
           >
-            {product.totalStock}
+            {product.totalStock} {product.salesUnit || product.unit}
           </span>
           {product.totalStock <= product.minStock && product.totalStock > 0 && (
             <span className="ml-1 text-[10px] text-amber-500">MIN</span>
@@ -164,7 +164,7 @@ const StockRow = memo(function StockRow({
                   return (
                     <tr key={b.id}>
                       <td className="py-1 pr-3 font-mono text-neutral-700 dark:text-neutral-300">{b.batchNumber}</td>
-                      <td className="py-1 pr-3 text-right tabular-nums font-medium">{b.quantity}</td>
+                      <td className="py-1 pr-3 text-right tabular-nums font-medium">{b.quantity} {product.salesUnit || product.unit}</td>
                       <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">{b.unitPrice.toLocaleString("id-ID")}</td>
                       <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">{b.sellingPrice.toLocaleString("id-ID")}</td>
                       <td className="py-1 pr-3 text-right tabular-nums text-neutral-500">
@@ -257,13 +257,15 @@ export function InventoryStockTable() {
   const setSearchQuery = useInventoryStore((s) => s.setSearchQuery);
   const loadDemoData = useInventoryStore((s) => s.loadDemoData);
   const batches = useInventoryStore((s) => s.batches);
-  const [catalogProducts, setCatalogProducts] = useState<InventoryProduct[]>([]);
   // RC1 M2 — Batch relocation modal state
   const [relocateBatch, setRelocateBatch] = useState<ProductBatch | null>(null);
   const [relocateProductName, setRelocateProductName] = useState("");
   // RC1 M2 — Load storage area master for batch location display
   const loadLocations = useLocationMasterStore((s) => s.loadLocations);
   const locationCount = useLocationMasterStore((s) => s.locations.length);
+
+  // V11.0: Single source of truth — catalog from canonical provider
+  const { catalog: productCatalog, isLoading: catalogLoading } = useProductCatalog();
 
   useEffect(() => {
     if (locationCount === 0) loadLocations();
@@ -273,32 +275,39 @@ export function InventoryStockTable() {
     if (batches.length === 0) loadDemoData();
   }, [batches.length, loadDemoData]);
 
-  // PERF-P0.1: Load catalog only if batches NOT loaded by loadDemoData (avoids duplicate getProducts())
-  useEffect(() => {
-    const productStore = useProductStore.getState();
-    if (!productStore.isConnected) return;
-    if (batches.length > 0) return; // loadDemoData already fetched products
-    productStore.loadCatalog().then(setCatalogProducts).catch(() => {});
-  }, [batches.length]);
-
   // Merge batch-derived products with catalog products (show zero-stock items)
   const products = useMemo(() => {
-    const batchProducts = buildInventoryProducts(batches);
+    // Wait for catalog to load before computing — prevents "Pcs" flash
+    if (catalogLoading || productCatalog.size === 0) return [];
+
+    const batchProducts = buildInventoryProducts(batches, productCatalog);
     const batchIds = new Set(batchProducts.map((p) => p.id));
 
     // Add catalog products that have no batches (stock = 0)
-    for (const cat of catalogProducts) {
-      if (!batchIds.has(cat.id)) {
+    for (const [id, cat] of productCatalog) {
+      if (!batchIds.has(id)) {
         batchProducts.push({
-          ...cat,
+          id,
+          tenantId: "demo-tenant",
+          name: "",
+          category: cat.category,
+          barcode: cat.barcode,
+          unit: cat.unit,
+          unitLevels: cat.unitLevels,
+          salesUnit: cat.unit,  // Satuan Dasar Jual = Base Unit (not packaging level)
+          defaultPrice: cat.defaultPrice,
+          defaultSellingPrice: cat.defaultSellingPrice,
+          minStock: 5,
           totalStock: 0,
           batches: [],
+          requiresPrescription: false,
+          isActive: true,
         });
       }
     }
 
     return batchProducts;
-  }, [batches, catalogProducts]);
+  }, [batches, productCatalog, catalogLoading]);
 
   const [expandedProduct, setExpandedProduct] = useState<string | null>(null);
 
@@ -358,7 +367,14 @@ export function InventoryStockTable() {
             </tr>
           </thead>
           <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-            {filtered.length === 0 ? (
+            {catalogLoading || productCatalog.size === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-12 text-center text-sm text-neutral-400">
+                  <div className="h-4 w-48 mx-auto mb-2 animate-pulse rounded bg-neutral-200 dark:bg-neutral-700" />
+                  Memuat katalog produk...
+                </td>
+              </tr>
+            ) : filtered.length === 0 ? (
               <tr>
                 <td colSpan={6} className="px-4 py-12 text-center text-sm text-neutral-400">
                   <Package className="mx-auto mb-2 h-6 w-6 opacity-40" />

@@ -17,6 +17,7 @@ import { useInventoryStore } from "@/store/inventory-store";
 import { useBranchStore } from "@/store/branch-store";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { useFeature } from "@/lib/features/use-feature";
+import { resolveCurrentSellingPrice } from "@/lib/cashier/resolve-current-selling-price";
 import { cn } from "@/lib/cn";
 
 export function ProductsPageContent() {
@@ -59,7 +60,8 @@ export function ProductsPageContent() {
           unitLevels: p.unitLevels ?? [],
           barcode: p.barcode,
           defaultPrice: p.defaultPrice,
-          defaultSellingPrice: p.defaultSellingPrice,
+          // Current Active Selling Price (FEFO first sellable batch)
+          defaultSellingPrice: resolveCurrentSellingPrice(p.id, p.batches ?? [], p.defaultSellingPrice),
           description: p.description ?? null,
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,
@@ -94,7 +96,8 @@ export function ProductsPageContent() {
           unitLevels: p.unitLevels ?? [],
           barcode: p.barcode,
           defaultPrice: p.defaultPrice,
-          defaultSellingPrice: p.defaultSellingPrice,
+          // Current Active Selling Price (FEFO first sellable batch)
+          defaultSellingPrice: resolveCurrentSellingPrice(p.id, p.batches ?? [], p.defaultSellingPrice),
           description: p.description ?? null,
           requiresPrescription: p.requiresPrescription,
           minStock: p.minStock,

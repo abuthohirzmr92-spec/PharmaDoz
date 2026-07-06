@@ -871,6 +871,7 @@ export function getExpiredBatches(batches: ProductBatch[]): ProductBatch[] {
 /** Build InventoryProduct records from demo data. */
 export function buildInventoryProducts(
   batches: ProductBatch[],
+  productCatalog?: Map<string, { unit?: string; unitLevels?: import("@/types/unit").UnitLevel[] }>,
 ): InventoryProduct[] {
   const grouped = new Map<string, ProductBatch[]>();
   for (const b of batches) {
@@ -893,25 +894,16 @@ export function buildInventoryProducts(
     "demo-010": "Lainnya",
   };
 
-  // Unit mapping derived from product names
-  const unitMap: Record<string, string> = {
-    "demo-001": "Tablet",
-    "demo-002": "Tablet",
-    "demo-003": "Tablet",
-    "demo-004": "Tablet",
-    "demo-005": "Tablet",
-    "demo-006": "Tablet",
-    "demo-007": "Tablet",
-    "demo-008": "Inhaler",
-    "demo-009": "Tablet",
-    "demo-010": "Botol",
-  };
-
   const rxSet = new Set(["demo-002", "demo-007", "demo-008"]);
 
   return Array.from(grouped.entries()).map(([productId, productBatches]) => {
     const totalStock = productBatches.reduce((s, b) => s + b.quantity, 0);
     const first = productBatches[0];
+
+    // Unit: prefer product catalog, fall back to safe regex
+    const catalogUnit = productCatalog?.get(productId)?.unit;
+    const unit = catalogUnit || first?.productName?.match(/(Tablet|Kapsul|Botol|Ampul|Sachet|Strip|Dus|Tube|Box|Pack|Inhaler|Pcs)/i)?.[0] || "Pcs";
+    const salesUnit = unit;
 
     // Compute default prices as averages across all batches for this product
     const batchCount = productBatches.length;
@@ -926,7 +918,8 @@ export function buildInventoryProducts(
       name: first?.productName ?? "",
       category: catMap[productId] ?? "Lainnya",
       barcode: null,
-      unit: unitMap[productId] ?? "Unit",
+      unit,
+      salesUnit,
       defaultPrice: Math.round(avgUnitPrice),
       defaultSellingPrice: Math.round(avgSellingPrice),
       minStock: 10,

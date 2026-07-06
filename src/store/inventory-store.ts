@@ -877,7 +877,7 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   /* ---- computed ---- */
 
-  getInventoryProducts: () => buildInventoryProducts(get().batches),
+  getInventoryProducts: (productCatalog?: Map<string, { unit?: string; unitLevels?: import("@/types/unit").UnitLevel[]; defaultSellingPrice?: number }>) => buildInventoryProducts(get().batches, productCatalog),
 
   getDashboardSummary: () =>
     buildDashboardSummary(
@@ -886,8 +886,8 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
       get().stockMovements,
     ),
 
-  getLowStockProducts: () => {
-    const products = buildInventoryProducts(get().batches);
+  getLowStockProducts: (productCatalog?: Map<string, { unit?: string; unitLevels?: import("@/types/unit").UnitLevel[]; defaultSellingPrice?: number }>) => {
+    const products = buildInventoryProducts(get().batches, productCatalog);
     return products.filter((p) => p.totalStock <= p.minStock);
   },
 

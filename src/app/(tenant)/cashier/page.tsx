@@ -20,6 +20,7 @@ import { EmptyState } from "@/components/shared/empty-state";
 import { toast } from "sonner";
 import { fromBaseUnit } from "@/lib/unit-converter";
 import { normalizeRupiah } from "@/lib/money/normalize-rupiah";
+import { resolveUnitDisplay } from "@/lib/cashier/resolve-unit-display";
 import {
   Search,
   ShoppingCart,
@@ -131,7 +132,7 @@ export default function CashierPage() {
 
   /* ---- computed values ---- */
   const cartTotal = useMemo(
-    () => normalizeRupiah(cart.reduce((sum, i) => sum + i.quantity * i.unitPrice, 0)),
+    () => normalizeRupiah(cart.reduce((sum, i) => sum + (i.baseQuantity ?? i.quantity) * (i.baseUnitPrice ?? i.unitPrice), 0)),
     [cart],
   );
   const cartItemCount = useMemo(
@@ -242,9 +243,10 @@ export default function CashierPage() {
       if (!currentSaleId) {
         startDemoSale();
       }
-      addDemoProductToCart(product);
+      // V10.2: Pass batch snapshot to hook (CV-1: hook no longer accesses store directly)
+      addDemoProductToCart(product, batches);
     },
-    [currentSaleId, startDemoSale, addDemoProductToCart],
+    [currentSaleId, startDemoSale, addDemoProductToCart, batches],
   );
 
   const handleSearchKeyDown = useCallback(
@@ -744,8 +746,16 @@ export default function CashierPage() {
                         return (
                           <>
                             <p className="text-xs text-neutral-500">
-                              {formatCurrency(item.unitPrice)} / {item.selectedUnit || baseUnit}
-                            </p>
+                            {(() => {
+                              const display = resolveUnitDisplay(
+                                item.baseQuantity ?? item.quantity,
+                                item.baseUnitPrice ?? item.unitPrice,
+                                item.selectedUnitCode ?? item.selectedUnit,
+                                { baseUnit, unitLevels: levels },
+                              );
+                              return `${formatCurrency(display.displayPrice)} / ${display.displayUnit}`;
+                            })()}
+                          </p>
 
                             {/* Unit selector */}
                             {hasMultiUnit && (
@@ -780,10 +790,22 @@ export default function CashierPage() {
                         );
                       })()}
 
-                      {item.batchNumber && (
-                        <p className="text-[10px] text-neutral-400">
-                          Batch: {item.batchNumber}
-                        </p>
+                      {/* Allocation + Pricing (V10.3) — canonical sources */}
+                      {item.allocationDraft && item.allocationDraft.entries.length > 0 && (
+                        <div className="text-[10px] text-neutral-400 space-y-0.5">
+                          {item.allocationDraft.entries.map((entry) => {
+                            // Canonical relationship: batchId — NOT array index
+                            const price = item.priceSnapshot?.entries.find(
+                              (p) => p.batchId === entry.batchId,
+                            );
+                            return (
+                              <p key={entry.batchId}>
+                                {entry.batchId.slice(-6)} ({entry.allocatedQty}
+                                {price ? ` × ${price.sellingPrice.toLocaleString("id-ID")}` : ""})
+                              </p>
+                            );
+                          })}
+                        </div>
                       )}
                       {/* V3 C1.2 — Reserved indicator */}
                       <p className="text-[10px] text-amber-600 dark:text-amber-400">
