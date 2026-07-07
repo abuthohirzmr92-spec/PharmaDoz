@@ -58,11 +58,10 @@ export function InventoryCorrectionModal({
 
   const correctInvoice = useInventoryStore((s) => s.correctInvoice);
 
-  if (!open || !invoice) return null;
-
   // ── Step data ──
+  // BUG-INV-REV-001: useMemo must execute BEFORE early return (Rules of Hooks)
 
-  const selectedItem = invoice.items.find((i) => i.id === selectedItemId);
+  const selectedItem = invoice?.items.find((i) => i.id === selectedItemId);
   const fieldMeta = PURCHASE_REVISABLE_FIELDS.find((f) => f.value === selectedField);
 
   const oldValue = useMemo(() => {
@@ -82,6 +81,8 @@ export function InventoryCorrectionModal({
         return "";
     }
   }, [selectedItem, selectedField]);
+
+  if (!open || !invoice) return null;
 
   // ── Handlers ──
 
