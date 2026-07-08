@@ -232,18 +232,23 @@ export default function CashierPage() {
 
   const handleDemoProductClick = useCallback(
     (product: DemoProduct) => {
-      // V3 C2 — oversell protection: check total reserved across all cart rows
-      const totalReserved = useCashierStore.getState().cart
-        .filter(c => c.productId === product.productId)
-        .reduce((s, c) => s + c.quantity, 0);
-      if (totalReserved >= product.stockAvailable) {
-        toast.warning(`Stok tersedia hanya ${product.stockAvailable}. Produk ini sudah ditahan seluruhnya di keranjang.`);
+      // Cart is the single source of transaction editing.
+      // Product List ONLY inserts NEW products — never increments existing ones.
+      const alreadyInCart = useCashierStore.getState().cart.some(
+        (c) => c.productId === product.productId,
+      );
+      if (alreadyInCart) {
+        // Already in cart → editing happens in Cart panel, not here
+        return;
+      }
+      // V3 C2 — oversell protection
+      if (product.stockAvailable <= 0) {
+        toast.warning(`Stok ${product.productName} habis.`);
         return;
       }
       if (!currentSaleId) {
         startDemoSale();
       }
-      // V10.2: Pass batch snapshot to hook (CV-1: hook no longer accesses store directly)
       addDemoProductToCart(product, batches);
     },
     [currentSaleId, startDemoSale, addDemoProductToCart, batches],
@@ -564,7 +569,7 @@ export default function CashierPage() {
                     const qtyInCart = inCart?.quantity ?? 0;
                     // V3 C1 — Virtual Reserved Stock (UI only, no DB mutation)
                     const availableStock = Math.max(0, product.stockAvailable - qtyInCart);
-                    const canAdd = availableStock > 0;
+                    const canAdd = availableStock > 0 && qtyInCart === 0;
                     const nearExpiry = isNearExpiry(product.expiredDate);
                     const isSelected = index === selectedIndex && searchQuery.length > 0;
 
@@ -576,7 +581,7 @@ export default function CashierPage() {
                           "transition-colors",
                           canAdd &&
                             "cursor-pointer hover:bg-brand-50/50 dark:hover:bg-brand-950/20",
-                          !canAdd && "cursor-not-allowed opacity-50",
+                          !canAdd && "cursor-default",
                           qtyInCart > 0 &&
                             "bg-brand-50/30 dark:bg-brand-950/10",
                           isSelected &&
@@ -655,24 +660,31 @@ export default function CashierPage() {
                           </div>
                         </td>
 
-                        {/* Quick add */}
+                        {/* Quick add / Cart indicator */}
                         <td className="py-1 pl-1 pr-3 text-center sm:pr-4">
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (canAdd) handleDemoProductClick(product);
-                            }}
-                            disabled={!canAdd}
-                            className={cn(
-                              "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
-                              canAdd
-                                ? "text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950"
-                                : "cursor-not-allowed text-neutral-300 dark:text-neutral-600",
-                            )}
-                            aria-label={`Tambah ${product.productName}`}
-                          >
-                            <Plus className="h-4 w-4" />
-                          </button>
+                          {qtyInCart > 0 ? (
+                            <span className="inline-flex items-center gap-1 rounded-md bg-brand-50 px-2 py-1 text-[11px] font-medium text-brand-600 dark:bg-brand-950/30 dark:text-brand-400">
+                              <ShoppingCart className="h-3 w-3" />
+                              {qtyInCart}
+                            </span>
+                          ) : (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (canAdd) handleDemoProductClick(product);
+                              }}
+                              disabled={!canAdd}
+                              className={cn(
+                                "flex h-7 w-7 items-center justify-center rounded-md transition-colors",
+                                canAdd
+                                  ? "text-brand-600 hover:bg-brand-50 dark:text-brand-400 dark:hover:bg-brand-950"
+                                  : "cursor-not-allowed text-neutral-300 dark:text-neutral-600",
+                              )}
+                              aria-label={`Tambah ${product.productName}`}
+                            >
+                              <Plus className="h-4 w-4" />
+                            </button>
+                          )}
                         </td>
                       </tr>
                     );

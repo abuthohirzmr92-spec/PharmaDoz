@@ -51,24 +51,26 @@ describe("CashierStore", () => {
     });
   });
 
-  it("increments quantity when adding a duplicate product", () => {
+  it("rejects duplicate product — cart is single source of transaction editing", () => {
     const store = useCashierStore.getState();
     store.addToCart(dummyItem({ productId: "dup", quantity: 2 }));
     store.addToCart(dummyItem({ productId: "dup", quantity: 3 }));
 
     const { cart } = useCashierStore.getState();
+    // Duplicate is ignored — quantity stays at original add value
     expect(cart).toHaveLength(1);
-    expect(cart[0]?.quantity).toBe(5); // 2 + 3
+    expect(cart[0]?.quantity).toBe(2);
   });
 
-  it("caps duplicate quantity at stockAvailable", () => {
+  it("rejects duplicate product — second add is no-op", () => {
     const store = useCashierStore.getState();
     store.addToCart(dummyItem({ productId: "cap", quantity: 80, stockAvailable: 100 }));
     store.addToCart(dummyItem({ productId: "cap", quantity: 50, stockAvailable: 100 }));
 
     const { cart } = useCashierStore.getState();
+    // Duplicate ignored — original quantity preserved
     expect(cart).toHaveLength(1);
-    expect(cart[0]?.quantity).toBe(100); // capped at stockAvailable
+    expect(cart[0]?.quantity).toBe(80);
   });
 
   it("rejects adding item with quantity exceeding stockAvailable", () => {

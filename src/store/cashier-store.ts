@@ -141,25 +141,13 @@ export const useCashierStore = create<CashierState>()((set, get) => ({
 
   addToCart: (item) => {
     const { cart } = get();
-    const existingIndex = cart.findIndex(
-      (i) => i.productId === item.productId,
-    );
-    if (existingIndex >= 0) {
-      const existing = cart[existingIndex];
-      if (!existing) return;
-      const newQuantity = Math.min(
-        existing.quantity + item.quantity,
-        existing.stockAvailable,
-      );
-      set({
-        cart: cart.map((i, idx) =>
-          idx === existingIndex ? { ...i, quantity: newQuantity } : i,
-        ),
-      });
-    } else {
-      if (item.quantity > item.stockAvailable) return;
-      set({ cart: [...cart, item] });
-    }
+    // Cart is the single source of transaction editing.
+    // addToCart ONLY inserts NEW products — never increments existing ones.
+    // Quantity editing happens exclusively via updateCartQuantity.
+    const alreadyExists = cart.some((i) => i.productId === item.productId);
+    if (alreadyExists) return;
+    if (item.quantity > item.stockAvailable) return;
+    set({ cart: [...cart, item] });
   },
 
   removeFromCart: (productId) => {
