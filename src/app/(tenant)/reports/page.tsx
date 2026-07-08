@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Container } from "@/components/shared/container";
 import { ReportTabs } from "@/components/reports/report-tabs";
 import { useBranchStore } from "@/store/branch-store";
+import { useInventoryStore } from "@/store/inventory-store";
 import { SalesTable } from "@/components/reports/sales-table";
 import { InventoryReportTable } from "@/components/reports/inventory-report-table";
 import { ExpiredReportTable } from "@/components/reports/expired-report-table";
@@ -17,6 +18,13 @@ export default function ReportsPage() {
   const [activeTab, setActiveTab] = useState<ReportTab>("sales");
   const activeBranch = useBranchStore((s) => s.activeBranch);
   const branchId = activeBranch?.id ?? "all";
+
+  // Initialize inventory store — required for HPP/profit data in reports
+  const batches = useInventoryStore((s) => s.batches);
+  const loadInventory = useInventoryStore((s) => s.loadDemoData);
+  useEffect(() => {
+    if (batches.length === 0) loadInventory();
+  }, [batches.length, loadInventory]);
 
   return (
     <Container>

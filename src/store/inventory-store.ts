@@ -25,6 +25,8 @@ import {
   buildInventoryProducts,
   buildDashboardSummary,
 } from "@/lib/inventory-demo";
+import { generateDemoTransactions } from "@/lib/demo-transactions";
+import { generateDemoSaleAllocations } from "@/lib/demo-sale-allocations";
 import { isDemoMode as checkDemoMode } from "@/config/env";
 import { productRepo, supplierRepo, inventoryRepo, transactionRepo } from "@/lib/repository-instances";
 import { logActivity } from "@/lib/audit/activity-logger";
@@ -1153,12 +1155,17 @@ export const useInventoryStore = create<InventoryState>()((set, get) => ({
 
   _loadDemoFallback: () => {
     if (checkDemoMode()) {
+      // Generate matching demo transactions + sale allocations
+      const demoTxns = generateDemoTransactions(90);
+      const demoAllocations = generateDemoSaleAllocations(demoTxns);
+
       set({
         batches: DEMO_BATCHES.map((b) => ({ ...b })),
         suppliers: [...DEMO_SUPPLIERS],
         purchaseInvoices: [...DEMO_PURCHASE_INVOICES],
         stockMovements: [...DEMO_STOCK_MOVEMENTS],
         stockOpnames: [DEMO_STOCK_OPNAME],
+        saleAllocations: demoAllocations,
         dataSource: "demo",
         isDemoMode: true,
         isLoading: false,
