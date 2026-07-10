@@ -92,12 +92,7 @@ const StockRow = memo(function StockRow({
             )}
           </div>
         </td>
-        <td className="px-3 py-2.5">
-          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
-            {product.salesUnit || product.unit || "—"}
-          </span>
-        </td>
-        <td className="px-3 py-2.5 text-right">
+        <td className="px-3 py-2.5 text-center">
           <span
             className={cn(
               "text-sm font-semibold tabular-nums",
@@ -108,13 +103,34 @@ const StockRow = memo(function StockRow({
                   : "text-neutral-900 dark:text-neutral-50",
             )}
           >
-            {product.totalStock} {product.salesUnit || product.unit}
+            {product.totalStock}
           </span>
-          {product.totalStock <= product.minStock && product.totalStock > 0 && (
-            <span className="ml-1 text-[10px] text-amber-500">MIN</span>
-          )}
         </td>
-        <td className="hidden sm:table-cell px-3 py-2.5 text-right">
+        <td className="px-0 py-2.5 text-center">
+          <span
+            className={cn(
+              "mx-auto block h-2 w-2 rounded-full",
+              product.totalStock > product.minStock
+                ? "bg-green-500"
+                : product.totalStock > 0
+                  ? "bg-amber-400"
+                  : "bg-red-500",
+            )}
+            title={
+              product.totalStock > product.minStock
+                ? "Stock Available"
+                : product.totalStock > 0
+                  ? "Minimum Stock"
+                  : "Out of Stock"
+            }
+          />
+        </td>
+        <td className="px-3 py-2.5">
+          <span className="text-xs font-medium text-neutral-600 dark:text-neutral-400">
+            {product.salesUnit || product.unit || "—"}
+          </span>
+        </td>
+        <td className="hidden sm:table-cell px-3 py-2.5 text-center">
           <span className="text-sm tabular-nums text-neutral-600 dark:text-neutral-400">
             {product.batches.filter((b) => b.quantity > 0).length}
           </span>
@@ -285,11 +301,12 @@ export function InventoryStockTable() {
 
     // Add catalog products that have no batches (stock = 0)
     for (const [id, cat] of productCatalog) {
-      if (!batchIds.has(id)) {
+      // Only add catalog entries that represent valid products
+      if (!batchIds.has(id) && cat.name) {
         batchProducts.push({
           id,
           tenantId: "demo-tenant",
-          name: "",
+          name: cat.name,
           category: cat.category,
           barcode: cat.barcode,
           unit: cat.unit,
@@ -342,26 +359,28 @@ export function InventoryStockTable() {
 
       {/* Table */}
       <div className="overflow-x-auto rounded-xl border border-neutral-200 dark:border-neutral-800">
+        <div className="max-h-[calc(100vh-280px)] overflow-y-auto">
         <table className="w-full table-fixed">
-          <thead>
+          <thead className="sticky top-0 z-10">
             <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
               <th className="w-[5%] px-3 py-2.5" />
-              <th className="w-[14%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[12%] hidden sm:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Kategori
               </th>
-              <th className="w-[26%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[28%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Produk
               </th>
-              <th className="w-[12%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
-                Satuan Dasar Jual
-              </th>
-              <th className="w-[11%] px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[7%] px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Stok
               </th>
-              <th className="w-[8%] hidden sm:table-cell px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[3%] px-0 py-2.5" />
+              <th className="w-[10%] px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+                Satuan Dasar Jual
+              </th>
+              <th className="w-[8%] hidden sm:table-cell px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Batch
               </th>
-              <th className="w-[24%] hidden md:table-cell px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
+              <th className="w-[29%] hidden md:table-cell px-3 py-2.5 text-center text-[11px] font-semibold uppercase tracking-wide text-neutral-500">
                 Status Batch
               </th>
             </tr>
@@ -394,6 +413,7 @@ export function InventoryStockTable() {
             )}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* RC1 M2 — Batch Relocation Modal */}

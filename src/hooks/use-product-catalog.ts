@@ -7,6 +7,7 @@ import type { UnitLevel } from "@/types/unit";
 // ─── Types ───
 
 export interface ProductCatalogEntry {
+  name: string;
   unit: string;
   unitLevels: UnitLevel[];
   defaultPrice: number;
@@ -54,6 +55,7 @@ export function useProductCatalog(): ProductCatalogState {
         const map = new Map<string, ProductCatalogEntry>();
         for (const p of products) {
           map.set(p.id, {
+            name: p.name ?? "",
             unit: p.unit ?? "Pcs",
             unitLevels: (p.unitLevels as UnitLevel[]) ?? [],
             defaultPrice: p.defaultPrice ?? 0,
