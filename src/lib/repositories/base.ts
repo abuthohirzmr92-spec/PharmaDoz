@@ -28,18 +28,29 @@ export interface TenantContext {
 }
 
 export class BaseRepository {
+  // Optional injected client (e.g. service-role for privileged cron execution).
+  // Defaults to the anon module client, preserving all existing behavior.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  protected injectedClient: any;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  constructor(injectedClient?: any) {
+    this.injectedClient = injectedClient;
+  }
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   protected get client(): any {
-    if (!supabase) {
+    const c = this.injectedClient ?? supabase;
+    if (!c) {
       throw new Error(
         "Database not connected — running in demo mode. Set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY to connect.",
       );
     }
-    return supabase;
+    return c;
   }
 
   public get isConnected(): boolean {
-    return supabase !== null;
+    return (this.injectedClient ?? supabase) !== null;
   }
 
   protected pharmacyId: string | undefined;

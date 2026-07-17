@@ -11,6 +11,7 @@ import { ALL_FEATURE_KEYS, FEATURE_LABELS } from "@/lib/features/registry";
 import type { TenantDetail, TenantSummary } from "@/types";
 import type { PackageRow } from "@/lib/repositories/package";
 import { Shield, ChevronLeft, Building2, Users, Store, Package, ArrowUpCircle, ArrowDownCircle, Ban, RotateCw, XCircle, Clock, Send } from "lucide-react";
+import { AppBadge } from "@/components/ui/app-badge";
 import { toast } from "sonner";
 
 function formatDate(iso?: string): string {
@@ -21,6 +22,71 @@ function formatDate(iso?: string): string {
 function formatRupiah(n: number): string {
   if (n === 0) return "Gratis";
   return new Intl.NumberFormat("id-ID", { style: "currency", currency: "IDR", minimumFractionDigits: 0 }).format(n);
+}
+
+/* ─── SLE Subscription & Billing section (self-contained) ─── */
+import { WidgetShell } from "@/components/subscription/widget-shell";
+import { useAsync } from "@/components/subscription/use-async";
+import { subscriptionRepo, invoiceRepo } from "@/lib/repository-instances";
+import { tenantHealthScore, tenantBillingSummary } from "@/lib/subscription/tenant-health-model";
+
+function SleTenantSection({ tenantId }: { tenantId: string }) {
+  const { data, loading, error } = useAsync(async () => {
+    const [sub, invoices] = await Promise.all([
+      subscriptionRepo.getCurrent(tenantId),
+      invoiceRepo.listByTenant(tenantId),
+    ]);
+    const bill = tenantBillingSummary(invoices.map((i) => ({ status: i.status })));
+    const health = tenantHealthScore({
+      lifecycleState: sub?.lifecycleState ?? null,
+      hasOverdueInvoice: bill.overdue > 0,
+      hasSentInvoice: bill.sent > 0,
+    });
+    return { sub, bill, health };
+  }, [tenantId]);
+
+  return (
+    <WidgetShell title="Informasi Langganan & Penagihan" loading={loading} error={error} isEmpty={!data}>
+      {data?.sub && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <SubscriptionOverviewCard sub={data.sub} health={data.health} />
+          <BillingSummaryCard bill={data.bill} />
+        </div>
+      )}
+    </WidgetShell>
+  );
+}
+
+function SubscriptionOverviewCard({ sub, health }: { sub: NonNullable<Awaited<ReturnType<typeof subscriptionRepo.getCurrent>>>; health: ReturnType<typeof tenantHealthScore> }) {
+  return (
+    <div className="space-y-1.5 text-sm">
+      <Row label="Paket" value={sub.packageId?.slice(0, 8) ?? "—"} />
+      <Row label="Status lifecycle" value={<AppBadge variant={String(health.icon).includes("🟢") ? "success" : String(health.icon).includes("🔴") ? "danger" : "warning"}>{health.icon} {sub.lifecycleState?.replace(/_/g, " ")}</AppBadge> as unknown as string} />
+      <Row label="Tipe" value={<span className="capitalize">{sub.subscriptionType ?? "—"}</span>} />
+      <Row label="Perpanjangan" value={formatDate(sub.currentPeriodEnd)} />
+      <Row label="Auto Renew" value={sub.autoRenew ? "Aktif" : "Nonaktif"} />
+    </div>
+  );
+}
+
+function BillingSummaryCard({ bill }: { bill: ReturnType<typeof tenantBillingSummary> }) {
+  return (
+    <div className="space-y-1.5 text-sm">
+      <Row label="Total Invoice" value={String(bill.total)} />
+      <Row label="Overdue" value={<AppBadge variant="danger">{bill.overdue}</AppBadge> as unknown as string} />
+      <Row label="Tertunggak" value={<AppBadge variant="warning">{bill.sent}</AppBadge> as unknown as string} />
+      <Row label="Lunas" value={<AppBadge variant="success">{bill.paid}</AppBadge> as unknown as string} />
+    </div>
+  );
+}
+
+function Row({ label, value }: { label: string; value: string | React.ReactNode }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-neutral-500">{label}</span>
+      <span className="font-medium text-neutral-900 dark:text-neutral-50">{value}</span>
+    </div>
+  );
 }
 
 export default function TenantDetailPage() {
@@ -270,6 +336,24 @@ export default function TenantDetailPage() {
           </div>
         </div>
       </div>
+
+      {/* ─── SLE Subscription & Billing Section ─── */}
+      <SleTenantSection tenantId={tenantId} />
+
+      {/* ─── Subscription Timeline (from loaded events) ─── */}
+      {events.length > 0 && (
+        <div className="rounded-2xl border border-neutral-200 bg-white p-4 shadow-sm dark:border-neutral-800 dark:bg-neutral-950">
+          <h3 className="mb-2 text-sm font-semibold text-neutral-900 dark:text-neutral-50">Aktivitas Langganan</h3>
+          <ol className="space-y-1.5">
+            {events.slice(-10).reverse().map((e: any, i: number) => (
+              <li key={`evt-${i}`} className="flex items-center justify-between text-sm">
+                <span className="capitalize text-neutral-700 dark:text-neutral-300">{(e.eventType ?? e.event_type ?? "").replace(/_/g, " ")}</span>
+                <span className="text-xs text-neutral-400">{formatDate(e.createdAt ?? e.created_at)}</span>
+              </li>
+            ))}
+          </ol>
+        </div>
+      )}
 
       {/* Package Change Modal */}
       {showChangeModal && (

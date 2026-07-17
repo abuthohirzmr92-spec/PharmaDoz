@@ -21,6 +21,8 @@ export interface TenantRow {
   settings: Json;
   is_active: boolean;
   package_id: string | null;
+  status: string | null;
+  status_changed_at: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -34,6 +36,8 @@ export interface TenantInsert {
   settings?: Json;
   is_active?: boolean;
   package_id?: string | null;
+  status?: string | null;
+  status_changed_at?: string | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -47,6 +51,8 @@ export interface TenantUpdate {
   settings?: Json;
   is_active?: boolean;
   package_id?: string | null;
+  status?: string | null;
+  status_changed_at?: string | null;
   created_at?: string;
   updated_at?: string;
   deleted_at?: string | null;
@@ -1027,6 +1033,14 @@ export interface TenantPackageRow {
   max_products: number;
   monthly_price: number;
   is_active: boolean;
+  resource_limits: Json;
+  billing_interval: string | null;
+  version: number;
+  parent_package_id: string | null;
+  is_current: boolean;
+  is_trial_package: boolean;
+  max_storage_mb: number | null;
+  max_cashier: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -1146,6 +1160,14 @@ export interface SubscriptionRow {
   current_period_end: string;
   trial_end: string | null;
   canceled_at: string | null;
+  is_trial: boolean;
+  previous_package_id: string | null;
+  subscription_type: string | null;
+  lifecycle_state: string | null;
+  grace_until: string | null;
+  read_only_at: string | null;
+  auto_renew: boolean;
+  cancel_at_period_end: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -1410,4 +1432,79 @@ export interface Database {
     Functions: Record<string, never>;
     Enums: Record<string, never>;
   };
+}
+
+// ============================================================================
+// SLE (Subscription Lifecycle Engine) — new tables (migrations 047–066)
+// Row types only; Insert/Update added when writers land (Phase 5/7).
+// ============================================================================
+
+export interface SubscriptionSettingsRow {
+  id: string;
+  key: string;
+  value: Json;
+  description: string | null;
+  version: number;
+  effective_from: string;
+  effective_until: string | null;
+  updated_by: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ResourceDefinitionRow {
+  id: string;
+  resource_key: string;
+  label: string;
+  unit: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ServiceCatalogRow {
+  id: string;
+  service_key: string;
+  label: string;
+  description: string | null;
+  category: string;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface ServiceFeatureRow {
+  id: string;
+  service_key: string;
+  feature_key: string;
+  label: string | null;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface PackageServiceRow {
+  id: string;
+  package_id: string;
+  service_key: string;
+  is_enabled: boolean;
+  created_at: string;
+}
+
+export interface FeatureDependencyRow {
+  id: string;
+  feature_key: string;
+  requires_feature_key: string;
+  dependency_type: "required" | "optional";
+  created_at: string;
+}
+
+export interface TenantQuotaUsageRow {
+  id: string;
+  tenant_id: string;
+  resource_key: string;
+  current_value: number;
+  max_override: number | null;
+  updated_at: string;
 }

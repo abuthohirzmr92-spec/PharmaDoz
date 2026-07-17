@@ -6,6 +6,9 @@ import {
   Brain,
   Package,
   Settings,
+  ClipboardList,
+  Tag,
+  CreditCard,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { Permission } from "@/types";
@@ -60,6 +63,41 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
     ],
   },
   {
+    label: "Subscription Management",
+    items: [
+      {
+        href: "/platform/trials",
+        label: "Permintaan Trial",
+        icon: ClipboardList,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/subscriptions",
+        label: "Langganan Aktif",
+        icon: CreditCard,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/promotions",
+        label: "Promosi",
+        icon: Tag,
+        permission: "platform.quotas.manage",
+      },
+      {
+        href: "/platform/providers",
+        label: "Penyedia Pembayaran",
+        icon: CreditCard,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/billing",
+        label: "Monitor Penagihan",
+        icon: Settings,
+        permission: "platform.view",
+      },
+    ],
+  },
+  {
     label: "Sistem",
     items: [
       {
@@ -77,6 +115,24 @@ export const PLATFORM_NAV_GROUPS: PlatformNavGroup[] = [
       {
         href: "/platform/maintenance",
         label: "Maintenance",
+        icon: Activity,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/scheduler",
+        label: "Scheduler",
+        icon: Activity,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/audit",
+        label: "Audit & Log",
+        icon: Activity,
+        permission: "platform.view",
+      },
+      {
+        href: "/platform/runtime",
+        label: "Validasi Runtime",
         icon: Activity,
         permission: "platform.view",
       },

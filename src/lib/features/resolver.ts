@@ -17,6 +17,36 @@ export interface FeatureAccess {
   source: "package_default" | "package_override" | "tenant_override" | "subscription_blocked";
 }
 
+/**
+ * Pure: collect the transitive set of REQUIRED features a feature depends on
+ * (feature_dependencies graph). Circular-safe via a visited set.
+ */
+export function collectRequiredDependencies(
+  featureKey: string,
+  edges: { feature_key: string; requires_feature_key: string; dependency_type: string }[],
+): string[] {
+  const reqMap = new Map<string, string[]>();
+  for (const e of edges) {
+    if (e.dependency_type !== "required") continue;
+    const list = reqMap.get(e.feature_key) ?? [];
+    list.push(e.requires_feature_key);
+    reqMap.set(e.feature_key, list);
+  }
+  const result = new Set<string>();
+  const visited = new Set<string>();
+  const stack = [featureKey];
+  while (stack.length > 0) {
+    const cur = stack.pop() as string;
+    if (visited.has(cur)) continue;
+    visited.add(cur);
+    for (const req of reqMap.get(cur) ?? []) {
+      result.add(req);
+      stack.push(req);
+    }
+  }
+  return [...result];
+}
+
 export class FeatureResolver {
   /**
    * Check if a tenant has access to a specific feature.
@@ -235,5 +265,43 @@ export class FeatureResolver {
     }
 
     return results;
+  }
+
+  /**
+   * Required dependency feature keys that are NOT currently enabled for the
+   * tenant. Empty array = all required dependencies satisfied.
+   */
+  static async getUnmetDependencies(
+    tenantId: string,
+    featureKey: string,
+  ): Promise<string[]> {
+    if (!supabase) return []; // Demo mode — all features available
+
+    const { data } = await supabase
+      .from("feature_dependencies")
+      .select("feature_key, requires_feature_key, dependency_type");
+
+    const required = collectRequiredDependencies(
+      featureKey,
+      (data ?? []) as { feature_key: string; requires_feature_key: string; dependency_type: string }[],
+    );
+    if (required.length === 0) return [];
+
+    const enabled = new Set<string>(await FeatureResolver.getEnabledFeatures(tenantId));
+    return required.filter((r) => !enabled.has(r));
+  }
+
+  /**
+   * True only if the feature is accessible AND all its required dependencies
+   * are also enabled for the tenant.
+   */
+  static async hasFeatureWithDeps(
+    tenantId: string,
+    featureKey: FeatureFlagKey,
+  ): Promise<boolean> {
+    const ok = await FeatureResolver.canAccessFeature(tenantId, featureKey);
+    if (!ok) return false;
+    const unmet = await FeatureResolver.getUnmetDependencies(tenantId, featureKey);
+    return unmet.length === 0;
   }
 }

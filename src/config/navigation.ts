@@ -12,9 +12,12 @@ import type { Permission } from "@/types";
 
 export interface NavItem {
   label: string;
-  href: string;
+  /** Optional: group nodes (e.g. "Settings") have no href — expand/collapse only. */
+  href?: string;
   icon: LucideIcon;
   permission?: Permission;
+  /** Child items for a sidebar group. */
+  children?: NavItem[];
 }
 
 export const mainNavigation: NavItem[] = [

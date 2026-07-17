@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { hasPermission } from "@/lib/auth/permissions";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
-import { TENANT_NAVIGATION } from "@/config/navigation";
+import { TENANT_NAVIGATION, type NavItem as NavItemConfig } from "@/config/navigation";
 import { NavItem } from "./nav-item";
 import { OfflineIndicator } from "./offline-indicator";
 import { SyncStatus } from "./sync-status";
@@ -95,11 +95,21 @@ export function Sidebar() {
 
   const filteredNav = useMemo(
     () => {
-      const result = TENANT_NAVIGATION.filter(
-        (item) =>
-          !item.permission ||
-          (user && hasPermission(user.role, item.permission)),
-      );
+      const canSee = (permission?: NavItemConfig["permission"]) =>
+        !permission || (!!user && hasPermission(user.role, permission));
+
+      // Groups (items with children) are filtered recursively: keep visible
+      // children, and show the group if it is itself permitted OR has at
+      // least one visible child.
+      const result = TENANT_NAVIGATION.flatMap((item) => {
+        if (item.children && item.children.length > 0) {
+          const children = item.children.filter((c) => canSee(c.permission));
+          if (!canSee(item.permission) && children.length === 0) return [];
+          return [{ ...item, children }];
+        }
+        return canSee(item.permission) ? [item] : [];
+      });
+
       logSidebarRender({
         hasUser: !!user,
         role: user?.role ?? null,
@@ -159,11 +169,16 @@ export function Sidebar() {
         {filteredNav.length > 0 ? (
           filteredNav.map((item) => (
             <NavItem
-              key={item.href}
+              key={item.href ?? item.label}
               label={item.label}
               href={item.href}
               icon={<item.icon />}
               collapsed={!isExpanded}
+              subItems={item.children?.map((c) => ({
+                label: c.label,
+                href: c.href,
+                icon: <c.icon />,
+              }))}
             />
           ))
         ) : user ? (
