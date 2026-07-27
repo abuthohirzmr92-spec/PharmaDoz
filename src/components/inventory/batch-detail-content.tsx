@@ -108,7 +108,7 @@ export function BatchDetailContent() {
       </div>
 
       {/* Body — only this scrolls */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-270px)]">
         <table className="w-full text-[11px]">
           <tbody className="divide-y divide-neutral-50 dark:divide-neutral-800/50">
           {fefoBatches.map((b) => {

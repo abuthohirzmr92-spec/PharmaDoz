@@ -96,7 +96,7 @@ export function InventoryStockTable() {
       </div>
 
       {/* Product Table — single table with sticky header, body scrolls */}
-      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-230px)]">
         <table className="w-full">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">

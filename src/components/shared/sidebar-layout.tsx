@@ -102,7 +102,7 @@ export function SidebarLayout({ children }: { children: ReactNode }) {
 
         {/* Page content — fills remaining height, pages handle their own scroll */}
         <div
-          className="flex flex-1 flex-col overflow-y-auto"
+          className="flex flex-1 flex-col min-h-0 overflow-hidden"
           style={{ paddingLeft: SIDEBAR_CONTENT_GAP, paddingRight: 0, paddingTop: 12, paddingBottom: 12 }}
         >
           {children}
