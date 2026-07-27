@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/cn";
 import type { ReactNode } from "react";
@@ -23,9 +24,9 @@ const idleCls =
   "text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900 dark:text-neutral-400 dark:hover:bg-neutral-800 dark:hover:text-neutral-100";
 
 export function NavItem({ label, href, icon, collapsed, subItems }: NavItemProps) {
-  // Group node (has children, no direct navigation) — expand/collapse only.
+  // Group node (has children) — expand/collapse with accordion behavior.
   if (subItems && subItems.length > 0) {
-    return <NavGroup label={label} icon={icon} collapsed={collapsed} items={subItems} />;
+    return <NavGroup label={label} href={href} icon={icon} collapsed={collapsed} items={subItems} />;
   }
 
   return <NavLeaf label={label} href={href} icon={icon} collapsed={collapsed} />;
@@ -55,49 +56,72 @@ function NavLeaf({ label, href, icon, collapsed }: NavItemProps) {
 
 function NavGroup({
   label,
+  href,
   icon,
   collapsed,
   items,
 }: {
   label: string;
+  href?: string;
   icon: ReactNode;
   collapsed?: boolean;
   items: NavItemProps[];
 }) {
+  const pathname = usePathname();
+  const router = useRouter();
   const isActive = useIsActive();
-  const groupActive = items.some((c) => isActive(c.href));
 
-  // Revision #2 — initial accordion state derived from the active route,
-  // so reload / direct URL keeps the group expanded. Navigation stays
-  // route-based (<Link>); useState only drives the accordion UI.
+  // A group is "active" when the URL matches the group's own href OR any child's href.
+  const groupActive =
+    (!!href && (pathname === href || pathname.startsWith(href + "/"))) ||
+    items.some((c) => isActive(c.href));
+
+  // Open state is URL-derived (accordion: only one group open at a time).
   const [open, setOpen] = useState(groupActive);
 
-  // Collapsed (icon) sidebar mode: render child icons directly so every
-  // child remains reachable without an expandable panel.
+  // Sync open state with URL on navigation.
+  useEffect(() => {
+    setOpen(groupActive);
+  }, [groupActive]);
+
+  // Collapsed (icon) sidebar mode: render child icons directly.
   if (collapsed) {
     return (
       <div className="space-y-1">
-        {items.map((c) => (
-          <Link
-            key={c.href ?? c.label}
-            href={c.href ?? "#"}
-            title={c.label}
-            className={cn(leafBase, "justify-center px-2", isActive(c.href) ? activeCls : idleCls)}
-          >
-            <span className="h-5 w-5 shrink-0">{c.icon}</span>
-          </Link>
-        ))}
+        {items.map((c) => {
+          const isChildActive = c.href === href ? pathname === c.href : isActive(c.href);
+          return (
+            <Link
+              key={c.href ?? c.label}
+              href={c.href ?? "#"}
+              title={c.label}
+              className={cn(leafBase, "justify-center px-2", isChildActive ? activeCls : idleCls)}
+            >
+              <span className="h-5 w-5 shrink-0">{c.icon}</span>
+            </Link>
+          );
+        })}
       </div>
     );
   }
+
+  /** Click parent: navigate if href exists, toggle otherwise. */
+  const handleParentClick = () => {
+    if (href) {
+      router.push(href);
+      setOpen(true);
+    } else {
+      setOpen((o) => !o);
+    }
+  };
 
   return (
     <div>
       <button
         type="button"
-        onClick={() => setOpen((o) => !o)}
+        onClick={handleParentClick}
         aria-expanded={open}
-        className={cn(leafBase, "w-full", groupActive ? "text-brand-700 dark:text-brand-300" : idleCls)}
+        className={cn(leafBase, "w-full", groupActive ? activeCls : idleCls)}
       >
         <span className="h-5 w-5 shrink-0">{icon}</span>
         <span className="flex-1 text-left">{label}</span>
@@ -106,16 +130,19 @@ function NavGroup({
 
       {open && (
         <div className="mt-1 space-y-1 pl-4">
-          {items.map((c) => (
-            <Link
-              key={c.href ?? c.label}
-              href={c.href ?? "#"}
-              className={cn(leafBase, isActive(c.href) ? activeCls : idleCls)}
-            >
-              <span className="h-4 w-4 shrink-0">{c.icon}</span>
-              <span>{c.label}</span>
-            </Link>
-          ))}
+          {items.map((c) => {
+            const isChildActive = c.href === href ? pathname === c.href : isActive(c.href);
+            return (
+              <Link
+                key={c.href ?? c.label}
+                href={c.href ?? "#"}
+                className={cn(leafBase, isChildActive ? activeCls : idleCls)}
+              >
+                <span className="h-4 w-4 shrink-0">{c.icon}</span>
+                <span>{c.label}</span>
+              </Link>
+            );
+          })}
         </div>
       )}
     </div>

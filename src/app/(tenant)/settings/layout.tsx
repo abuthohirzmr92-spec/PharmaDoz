@@ -1,61 +1,26 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Building2, UserCircle, ArrowLeft } from "lucide-react";
-import { cn } from "@/lib/cn";
 
-const PRIMARY_TABS = [
-  { label: "Konfigurasi Apotek", href: "/settings/config", icon: Building2 },
-  { label: "Akun Saya", href: "/settings/account", icon: UserCircle },
-];
+function sectionTitle(pathname: string): string {
+  if (pathname.startsWith("/settings/config")) return "Konfigurasi Apotek";
+  if (pathname.startsWith("/settings/users")) return "Pengguna";
+  if (pathname.startsWith("/settings/integration")) return "Integrasi";
+  if (pathname.startsWith("/settings/subscription")) return "Langganan";
+  if (pathname.startsWith("/settings/account")) return "Akun Saya";
+  return "Settings";
+}
 
 export default function SettingsLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
 
   return (
-    <div className="mx-auto max-w-6xl space-y-6 px-4 py-6">
-      {/* Header */}
-      <div className="flex items-center gap-3">
-        <Link
-          href="/dashboard"
-          className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800 dark:hover:text-neutral-300"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Link>
-        <div>
-          <h1 className="text-xl font-bold text-neutral-900 dark:text-neutral-50">
-            Pengaturan
-          </h1>
-          <p className="text-sm text-neutral-500">Konfigurasi apotek dan akun Anda</p>
-        </div>
-      </div>
-
-      {/* Primary Tabs */}
-      <div className="flex gap-1 rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-700 dark:bg-neutral-900">
-        {PRIMARY_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = pathname.startsWith(tab.href);
-          return (
-            <Link
-              key={tab.href}
-              href={tab.href}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-50"
-                  : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300",
-              )}
-            >
-              <Icon className="h-4 w-4" />
-              {tab.label}
-            </Link>
-          );
-        })}
-      </div>
-
-      {/* Page Content */}
-      {children}
+    <div>
+      <p className="text-sm font-medium text-neutral-400">Settings</p>
+      <h1 className="mb-6 text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+        {sectionTitle(pathname)}
+      </h1>
+      <div>{children}</div>
     </div>
   );
 }

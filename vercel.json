@@ -1,0 +1,6 @@
+{
+  "crons": [
+    { "path": "/api/cron/subscription-sweep", "schedule": "7 3 * * *" },
+    { "path": "/api/cron/reminder-dispatch", "schedule": "17 3 * * *" }
+  ]
+}

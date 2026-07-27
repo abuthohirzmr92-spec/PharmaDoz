@@ -2,6 +2,10 @@ export const APP_NAME = "Apotek Manage";
 
 export const SIDEBAR_WIDTH = 260;
 export const SIDEBAR_COLLAPSED_WIDTH = 68;
+
+/** Gap between sidebar and main content — MEDISYNC Layout Standard v1.0 */
+export const SIDEBAR_CONTENT_GAP = 16;
+
 export const MOBILE_BOTTOM_NAV_HEIGHT = 56;
 
 export const TOAST_DURATION = 4000;

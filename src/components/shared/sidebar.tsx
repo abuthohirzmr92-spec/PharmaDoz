@@ -7,7 +7,6 @@ import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
 import {
   ChevronLeft,
-  Menu,
   Monitor,
   PanelLeftClose,
   PanelRightClose,
@@ -19,10 +18,6 @@ import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { TENANT_NAVIGATION, type NavItem as NavItemConfig } from "@/config/navigation";
 import { NavItem } from "./nav-item";
 import { OfflineIndicator } from "./offline-indicator";
-import { SyncStatus } from "./sync-status";
-import { RoleSwitcher } from "./role-switcher";
-import { SessionPanel } from "./session-panel";
-import { SidebarBranchSelector } from "@/components/layout/branch-selector";
 import { useTenantBranding } from "@/providers/tenant-brand-provider";
 import { logSidebarRender, isDiagnosticsEnabled } from "@/lib/diagnostics";
 import type { SidebarMode } from "@/store/sidebar-store";
@@ -191,21 +186,7 @@ export function Sidebar() {
         ) : null}
       </nav>
 
-      {/* Sync Status */}
-      <div className="px-3 pb-1">
-        <SyncStatus />
-      </div>
-
-      {/* Active Branch Context — operational context, no "Semua Cabang" */}
-      {isExpanded && <SidebarBranchSelector />}
-
-      {/* Session Panel */}
-      <SessionPanel collapsed={!isExpanded} />
-
-      {/* Role Switcher */}
-      <RoleSwitcher />
-
-      {/* Mode toggle */}
+      {/* Mode toggle — compact, keeps sidebar functionality accessible */}
       <ModeSwitcher mode={mode} collapsed={!isExpanded} />
     </aside>
   );

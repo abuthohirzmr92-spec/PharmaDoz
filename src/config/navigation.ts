@@ -6,6 +6,10 @@ import {
   FileText,
   Users,
   Settings,
+  TrendingUp,
+  AlertTriangle,
+  Clipboard,
+  Truck,
   type LucideIcon,
 } from "lucide-react";
 import type { Permission } from "@/types";
@@ -32,6 +36,15 @@ export const mainNavigation: NavItem[] = [
     href: "/inventory",
     icon: Package,
     permission: "inventory.stock.view",
+    children: [
+      { label: "Dashboard",  href: "/inventory",            icon: LayoutDashboard, permission: "inventory.stock.view" },
+      { label: "Stok",       href: "/inventory/stock",      icon: Package,         permission: "inventory.stock.view" },
+      { label: "Pembelian",  href: "/inventory/purchase",   icon: ShoppingCart,    permission: "inventory.stock.view" },
+      { label: "Mutasi",     href: "/inventory/movement",   icon: TrendingUp,      permission: "inventory.stock.view" },
+      { label: "Kadaluarsa", href: "/inventory/expired",    icon: AlertTriangle,   permission: "inventory.stock.view" },
+      { label: "Opname",     href: "/inventory/opname",     icon: Clipboard,       permission: "inventory.stock.view" },
+      { label: "Supplier",   href: "/inventory/suppliers",  icon: Truck,           permission: "inventory.stock.view" },
+    ],
   },
   {
     label: "Products",

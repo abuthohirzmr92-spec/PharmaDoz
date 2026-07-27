@@ -5,8 +5,10 @@ import Link from "next/link";
 import { usePackageStore } from "@/store/package-store";
 import { useAuthStore } from "@/store/auth-store";
 import { isSystemRole } from "@/lib/auth/permissions";
-import { Shield, Plus, Pencil, Trash2, Package } from "lucide-react";
+import { Shield, Plus, Pencil, Trash2, Package, Eye } from "lucide-react";
 import type { PackageRow } from "@/lib/repositories/package";
+import { packagePresentation } from "@/config/package-presentation";
+import { AppBadge } from "@/components/ui/app-badge";
 
 function formatRupiah(amount: number): string {
   if (amount === 0) return "Gratis";
@@ -69,64 +71,55 @@ export default function PackagesPage() {
           <p className="mt-1 text-sm text-neutral-500">Buat paket langganan pertama untuk tenant.</p>
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-neutral-200 dark:border-neutral-800">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">
-                <th className="px-4 py-3 font-medium text-neutral-500">Paket</th>
-                <th className="px-4 py-3 font-medium text-neutral-500">Tipe</th>
-                <th className="px-4 py-3 font-medium text-neutral-500 text-center">User</th>
-                <th className="px-4 py-3 font-medium text-neutral-500 text-center">Cabang</th>
-                <th className="px-4 py-3 font-medium text-neutral-500 text-right">Harga/Bulan</th>
-                <th className="px-4 py-3 font-medium text-neutral-500 text-center">Fitur</th>
-                <th className="px-4 py-3 font-medium text-neutral-500 text-center">Status</th>
-                <th className="px-4 py-3 font-medium text-neutral-500 text-right">Aksi</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-neutral-100 dark:divide-neutral-800">
-              {packages.map((pkg) => (
-                <tr key={pkg.id} className="bg-white hover:bg-neutral-50 dark:bg-neutral-950 dark:hover:bg-neutral-900">
-                  <td className="px-4 py-3">
-                    <p className="font-medium text-neutral-900 dark:text-neutral-50">{pkg.label}</p>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {packages.map((pkg) => {
+            const pres = packagePresentation(pkg.name);
+            return (
+              <div key={pkg.id} className="rounded-xl border border-neutral-200 p-4 dark:border-neutral-800">
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h3 className="font-semibold text-neutral-900 dark:text-neutral-50">{pkg.label}</h3>
                     <p className="text-xs text-neutral-400">{pkg.name}</p>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs font-medium ${
-                      pkg.isCustom ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400"
-                    }`}>
-                      {pkg.isCustom ? "Custom" : "Standar"}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center tabular-nums">{pkg.maxUsers}</td>
-                  <td className="px-4 py-3 text-center tabular-nums">{pkg.maxBranches}</td>
-                  <td className="px-4 py-3 text-right font-medium tabular-nums">{formatRupiah(pkg.monthlyPrice)}</td>
-                  <td className="px-4 py-3 text-center tabular-nums">{featureCount(pkg)}</td>
-                  <td className="px-4 py-3 text-center">
-                    <span className={`inline-flex h-2 w-2 rounded-full ${pkg.isActive ? "bg-green-500" : "bg-neutral-300"}`} />
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
-                      <Link
-                        href={`/platform/packages/${pkg.id}/edit`}
-                        className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 hover:text-neutral-600 dark:hover:bg-neutral-800"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Link>
-                      {pkg.isCustom && (
-                        <button
-                          onClick={() => handleDelete(pkg)}
-                          disabled={deletingId === pkg.id}
-                          className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 dark:hover:bg-red-950"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                  <AppBadge variant={pkg.isActive ? "success" : "neutral"}>{pkg.isActive ? "Aktif" : "Nonaktif"}</AppBadge>
+                </div>
+
+                {/* Preview panel — how this looks in the Owner Portal */}
+                <div className="mt-3 rounded-lg border border-brand-100 bg-brand-50/30 p-3 dark:border-brand-800 dark:bg-brand-950/20">
+                  <p className="mb-1 text-xs font-medium text-brand-700 dark:text-brand-300"><Eye className="inline h-3 w-3 mr-1" />Preview Owner</p>
+                  <p className="text-xs text-neutral-600 dark:text-neutral-400"><span className="font-medium">Untuk:</span> {pres.recommendedFor}</p>
+                  {pres.highlights.length > 0 && (
+                    <ul className="mt-1 space-y-0.5">
+                      {pres.highlights.map((h) => (
+                        <li key={h} className="text-xs text-neutral-600 dark:text-neutral-400">✔ {h}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+
+                <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  <span className="text-neutral-500">User</span><span className="text-right font-medium">{pkg.maxUsers}</span>
+                  <span className="text-neutral-500">Cabang</span><span className="text-right font-medium">{pkg.maxBranches}</span>
+                  <span className="text-neutral-500">Produk</span><span className="text-right font-medium">{pkg.maxProducts}</span>
+                  <span className="text-neutral-500">Fitur</span><span className="text-right font-medium">{featureCount(pkg)}</span>
+                  <span className="text-neutral-500">Harga</span><span className="text-right font-semibold">{formatRupiah(pkg.monthlyPrice)}</span>
+                </div>
+
+                <div className="mt-3 flex items-center justify-between">
+                  <span className={`rounded-full px-2 py-0.5 text-xs ${pkg.isCustom ? "bg-purple-50 text-purple-700 dark:bg-purple-950 dark:text-purple-400" : "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-400"}`}>
+                    {pkg.isCustom ? "Custom" : "Standar"}
+                  </span>
+                  <div className="flex gap-1">
+                    <Link href={`/platform/packages/${pkg.id}/edit`} className="rounded-lg p-1.5 text-neutral-400 hover:bg-neutral-100 dark:hover:bg-neutral-800"><Pencil className="h-4 w-4" /></Link>
+                    {pkg.isCustom && (
+                      <button onClick={() => handleDelete(pkg)} disabled={deletingId === pkg.id}
+                        className="rounded-lg p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600 disabled:opacity-40 dark:hover:bg-red-950"><Trash2 className="h-4 w-4" /></button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

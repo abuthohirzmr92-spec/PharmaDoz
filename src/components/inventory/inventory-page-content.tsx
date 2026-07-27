@@ -68,7 +68,7 @@ export function InventoryPageContent() {
         </p>
       </div>
 
-      <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-800 dark:bg-neutral-900">
+      <div className="mb-6 flex gap-1 overflow-x-auto rounded-xl border border-neutral-200 bg-neutral-100 p-1 dark:border-neutral-800 dark:bg-neutral-900">
         {TABS.map((tab) => {
           const Icon = tab.icon;
           const isActive = activeTab === tab.key;
@@ -85,10 +85,10 @@ export function InventoryPageContent() {
               key={tab.key}
               onClick={() => setActiveTab(tab.key)}
               className={cn(
-                "flex items-center gap-1.5 rounded-lg px-3 py-2 text-xs font-medium whitespace-nowrap transition-colors",
+                "flex items-center gap-1.5 rounded-lg border border-transparent px-3 py-2 text-xs font-medium whitespace-nowrap transition-all duration-200 ease-in-out",
                 isActive
-                  ? "bg-white text-brand-700 shadow-sm dark:bg-neutral-800 dark:text-brand-400"
-                  : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300",
+                  ? "border-brand-200 bg-white text-brand-700 font-semibold shadow-sm hover:border-brand-300 hover:shadow dark:border-brand-700 dark:bg-neutral-800 dark:text-brand-300 dark:hover:border-brand-600"
+                  : "border-transparent text-neutral-500 hover:bg-white/60 hover:text-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800/60 dark:hover:text-neutral-300",
               )}
             >
               <Icon className="h-3.5 w-3.5" />

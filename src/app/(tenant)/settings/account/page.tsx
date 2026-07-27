@@ -1,9 +1,8 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { User, Mail, Phone, Save, Loader2, CheckCircle2, Lock, Monitor, Palette, Shield, Building2, LogOut } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { User, Mail, Phone, Save, Loader2, CheckCircle2, Shield, Building2, LogOut, Languages, Globe, Bell } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/cn";
 import { useAuthStore } from "@/store/auth-store";
@@ -13,15 +12,7 @@ import { AppBadge } from "@/components/ui/app-badge";
 import { AvatarUpload } from "@/components/profile/avatar-upload";
 import { uploadAvatar, removeAvatar } from "@/lib/storage/avatar-storage";
 
-const ACCOUNT_TABS = [
-  { label: "Profil", href: "/settings/account", icon: User },
-  { label: "Keamanan", href: "/settings/account/security", icon: Lock },
-  { label: "Session", href: "/settings/account/session", icon: Monitor },
-  { label: "Tema", href: "/settings/account/theme", icon: Palette },
-];
-
 export default function ProfilePage() {
-  const pathname = usePathname();
   const user = useAuthStore((s) => s.user);
   const refreshUserProfile = useAuthStore((s) => s.refreshUserProfile);
 
@@ -138,21 +129,6 @@ export default function ProfilePage() {
 
   return (
     <div className="space-y-4">
-      {/* Account sub-tabs */}
-      <div className="flex gap-1 rounded-xl border border-neutral-200 bg-neutral-50 p-1 dark:border-neutral-700 dark:bg-neutral-900">
-        {ACCOUNT_TABS.map((tab) => {
-          const Icon = tab.icon;
-          const isActive = pathname === tab.href;
-          return (
-            <Link key={tab.href} href={tab.href}
-              className={cn("flex flex-1 items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive ? "bg-white text-neutral-900 shadow-sm dark:bg-neutral-800 dark:text-neutral-50" : "text-neutral-500 hover:text-neutral-700 dark:hover:text-neutral-300")}>
-              <Icon className="h-4 w-4" />{tab.label}
-            </Link>
-          );
-        })}
-      </div>
-
       {/* Profile Header */}
       <AppCard variant="elevated">
         <div className="flex items-start gap-4">
@@ -223,6 +199,30 @@ export default function ProfilePage() {
           <div><p className="text-xs text-neutral-400">Tenant</p><p className="font-medium truncate text-neutral-900 dark:text-neutral-50">{user?.tenantName ?? user?.pharmacyName ?? "—"}</p></div>
           <div><p className="text-xs text-neutral-400">Pharmacy</p><p className="font-medium truncate text-neutral-900 dark:text-neutral-50">{user?.pharmacyName ?? "—"}</p></div>
           <div><p className="text-xs text-neutral-400">User ID</p><p className="font-medium font-mono text-xs text-neutral-500 truncate">{user?.id?.slice(0, 8) ?? "—"}</p></div>
+        </div>
+      </AppCard>
+
+      {/* Preferensi — Coming Soon */}
+      <AppCard>
+        <div className="mb-3 flex items-center gap-2">
+          <Globe className="h-5 w-5 text-blue-500" />
+          <h3 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">Preferensi</h3>
+        </div>
+        <div className="space-y-2">
+          {[
+            { icon: Languages, label: "Bahasa", desc: "Pilih bahasa antarmuka aplikasi." },
+            { icon: Globe, label: "Timezone", desc: "Zona waktu untuk tanggal & laporan." },
+            { icon: Bell, label: "Notifikasi", desc: "Preferensi notifikasi & pengingat." },
+          ].map((p) => (
+            <div key={p.label} className="flex items-center gap-3 rounded-lg border border-neutral-100 p-3 opacity-70 dark:border-neutral-800">
+              <p.icon className="h-4 w-4 text-neutral-400" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium text-neutral-700 dark:text-neutral-300">{p.label}</p>
+                <p className="text-xs text-neutral-400">{p.desc}</p>
+              </div>
+              <AppBadge variant="warning">Coming Soon</AppBadge>
+            </div>
+          ))}
         </div>
       </AppCard>
 

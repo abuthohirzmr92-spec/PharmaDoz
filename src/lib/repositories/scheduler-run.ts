@@ -13,6 +13,8 @@ export interface SchedulerRunRecord {
   runDate: string;
   status: string;
   processedCount: number;
+  startedAt?: string | null;
+  finishedAt?: string | null;
 }
 
 /** Pure: is a run in a terminal state? */
@@ -38,6 +40,43 @@ export class SchedulerRunRepository extends BaseRepository {
       return this.handleError(error, "SchedulerRunRepository.startRun");
     }
     return (data as { id: string } | null)?.id ?? null;
+  }
+
+  /** List recent runs — optionally filtered by job_key. */
+  async listRecent(jobKey?: string, limit = 10): Promise<SchedulerRunRecord[]> {
+    if (!this.isConnected) return [];
+    let q = this.client
+      .from("scheduler_runs")
+      .select("id, job_key, run_date, status, processed_count, started_at, finished_at")
+      .order("run_date", { ascending: false })
+      .limit(limit);
+    if (jobKey) q = q.eq("job_key", jobKey);
+    const { data, error } = await q;
+    if (error) return this.handleError(error, "SchedulerRunRepository.listRecent");
+    return ((data ?? []) as any[]).map((r: any) => ({
+      id: r.id,
+      jobKey: r.job_key,
+      runDate: r.run_date,
+      status: r.status,
+      processedCount: r.processed_count ?? 0,
+      startedAt: r.started_at ?? null,
+      finishedAt: r.finished_at ?? null,
+    })) as SchedulerRunRecord[];
+  }
+
+  /** List distinct job keys that have at least one run recorded. */
+  async listJobKeys(): Promise<string[]> {
+    if (!this.isConnected) return [];
+    const { data, error } = await this.client
+      .from("scheduler_runs")
+      .select("job_key")
+      .order("job_key");
+    if (error) return this.handleError(error, "SchedulerRunRepository.listJobKeys");
+    const keys = new Set<string>();
+    for (const row of (data ?? []) as { job_key: string }[]) {
+      if (row.job_key) keys.add(row.job_key);
+    }
+    return [...keys];
   }
 
   async finishRun(

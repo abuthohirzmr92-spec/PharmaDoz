@@ -79,6 +79,18 @@ export class InvoiceRepository extends BaseRepository {
     return mapRows<InvoiceRecord>((data ?? []) as Record<string, unknown>[]);
   }
 
+  /** Batch fetch: all invoices for a set of tenant IDs in a single query. */
+  async listByTenants(tenantIds: string[]): Promise<InvoiceRecord[]> {
+    if (!this.isConnected || tenantIds.length === 0) return [];
+    const { data, error } = await this.client
+      .from("invoices")
+      .select(COLS)
+      .in("tenant_id", tenantIds)
+      .order("created_at", { ascending: false });
+    if (error) return this.handleError(error, "InvoiceRepository.listByTenants");
+    return mapRows<InvoiceRecord>((data ?? []) as Record<string, unknown>[]);
+  }
+
   /** Status transition (owned by BillingService). Persistence only. */
   async updateStatus(
     id: string,

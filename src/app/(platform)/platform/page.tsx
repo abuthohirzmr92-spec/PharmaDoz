@@ -4,16 +4,17 @@ import { useEffect } from "react";
 import { Shield, Store, AlertCircle } from "lucide-react";
 import { useAuthStore } from "@/store/auth-store";
 import { useSuperAdminStore } from "@/store/super-admin-store";
+import Link from "next/link";
 import { PlatformStatCards, PlatformPackageCards } from "@/components/admin/platform-stats";
+import { AppBadge } from "@/components/ui/app-badge";
+import { WidgetShell } from "@/components/subscription/widget-shell";
+import { useAsync } from "@/components/subscription/use-async";
 import { isDemoMode as checkDemoMode } from "@/config/env";
+import { sleKpiCards, attentionItems } from "@/lib/subscription/platform-dashboard-model";
+import { platformHealthHero } from "@/lib/subscription/platform-health-model";
+import { dashboardService } from "@/lib/services/dashboard-service";
+import type { PlatformOverview } from "@/types/subscription-dtos";
 import type { PlatformStats } from "@/types";
-
-const PLACEHOLDER_STATS: PlatformStats = {
-  totalPharmacies: 0,
-  totalUsers: 0,
-  pendingExpansions: 0,
-  activePackages: { basic: 0, professional: 0, enterprise: 0 },
-};
 
 export default function PlatformPage() {
   const isSystemUser = useAuthStore((s) => s.isSystemUser());
@@ -42,7 +43,12 @@ export default function PlatformPage() {
     );
   }
 
-  const displayStats = stats ?? PLACEHOLDER_STATS;
+  const displayStats: PlatformStats = stats ?? {
+    totalPharmacies: 0,
+    totalUsers: 0,
+    pendingExpansions: 0,
+    activePackages: { basic: 0, professional: 0, enterprise: 0 },
+  };
   const isDemo = checkDemoMode();
 
   return (
@@ -127,6 +133,9 @@ export default function PlatformPage() {
         </p>
       </div>
 
+      {/* ─── SLE Operations Section ─── */}
+      <SleOperationsSection />
+
       {/* Store Expansion Requests */}
       <div>
         <h2 className="mb-3 text-sm font-semibold text-neutral-700 dark:text-neutral-300">
@@ -149,6 +158,94 @@ export default function PlatformPage() {
             </p>
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+/* ─── SLE Operations Section (enhanced dashboard) ─── */
+function SleOperationsSection() {
+  const { data, loading, error } = useAsync<PlatformOverview>(
+    () => dashboardService.getPlatformOverview(),
+    [],
+  );
+
+  const kpis = data ? sleKpiCards(data) : [];
+  const attention = data ? attentionItems(data) : [];
+  const hero = platformHealthHero({ schedulerOk: true, providerOk: true, billingOk: true, databaseOk: true });
+
+  const attByPriority = { critical: attention.filter((a) => a.tone === "danger"), high: attention.filter((a) => a.tone === "warning"), medium: attention.filter((a) => a.tone === "info") };
+
+  return (
+    <div className="space-y-4">
+      {/* System Health Hero — above Attention Center */}
+      <div className="flex items-center justify-between rounded-2xl border bg-white p-4 dark:border-neutral-800 dark:bg-neutral-950">
+        <div className="flex items-center gap-3">
+          <span className="text-2xl" aria-hidden>{hero.icon}</span>
+          <div>
+            <p className="text-sm font-semibold text-neutral-900 dark:text-neutral-50">{hero.label}</p>
+            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-0.5">
+              {hero.items.map((i) => (
+                <span key={i.label} className="text-xs text-neutral-500">{i.ok ? "🟢" : "🔴"} {i.label}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+        <span className="text-xs text-neutral-400">Update terakhir: {new Date().toLocaleTimeString("id-ID")}</span>
+      </div>
+
+      {/* Attention Center */}
+      {attention.length > 0 && (
+        <WidgetShell title="⚠️ Pusat Perhatian" loading={false} error={null}>
+          <div className="space-y-3">
+            {(["critical", "high", "medium"] as const).map((pri) => {
+              const items = attByPriority[pri];
+              if (items.length === 0) return null;
+              const label = pri === "critical" ? "Kritis" : pri === "high" ? "Penting" : "Sedang";
+              return (
+                <div key={pri}>
+                  <p className="mb-1 text-xs font-medium text-neutral-500">{label}</p>
+                  {items.map((a) => (
+                    <Link key={a.key} href={a.href}
+                      className="flex items-center justify-between rounded-lg border border-neutral-200 p-2.5 text-sm hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50">
+                      <span className={a.tone === "danger" ? "text-red-700 dark:text-red-400 font-medium" : a.tone === "warning" ? "text-amber-700 dark:text-amber-400 font-medium" : "text-blue-700 dark:text-blue-400 font-medium"}>{a.message}</span>
+                      <span className="text-xs text-neutral-400">→</span>
+                    </Link>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </WidgetShell>
+      )}
+
+      {/* SLE KPI Cards with Drilldown */}
+      <WidgetShell title="Ringkasan Langganan" loading={loading} error={error} isEmpty={kpis.length === 0}>
+        <p className="mb-2 text-xs text-neutral-400">Update terakhir: {new Date().toLocaleTimeString("id-ID")}</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          {kpis.map((k) => (
+            <Link key={k.key} href={k.href ?? "#"} className="rounded-xl border border-neutral-200 p-3 text-center hover:bg-neutral-50 dark:border-neutral-800 dark:hover:bg-neutral-800/50">
+              <p className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">{k.value}</p>
+              <p className="text-xs text-neutral-500">{k.label}</p>
+              <AppBadge variant={k.tone}>{k.tone}</AppBadge>
+            </Link>
+          ))}
+        </div>
+      </WidgetShell>
+
+      {/* Quick links to subscription management pages */}
+      <div className="grid grid-cols-4 gap-2 text-center text-xs">
+        {[
+          { label: "Langganan", href: "/platform/subscriptions" },
+          { label: "Invoice", href: "/platform/billing" },
+          { label: "Trial", href: "/platform/trials" },
+          { label: "Promosi", href: "/platform/promotions" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href}
+            className="rounded-lg border border-neutral-200 p-2 text-neutral-600 hover:bg-neutral-50 dark:border-neutral-700 dark:text-neutral-400 dark:hover:bg-neutral-800">
+            {l.label} →
+          </Link>
+        ))}
       </div>
     </div>
   );

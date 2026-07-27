@@ -1,0 +1,145 @@
+
+> apotek-manage@0.1.0 dev
+> next dev
+
+▲ Next.js 16.2.6 (Turbopack)
+- Local:         http://localhost:3000
+- Network:       http://100.99.122.76:3000
+- Environments: .env.local
+✓ Ready in 2.4s
+
+ GET /login 200 in 2.1s (next.js: 756ms, proxy.ts: 21ms, application-code: 1322ms)
+[browser] A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+https://react.dev/link/hydration-mismatch
+
+  ...
+    <HotReload globalError={[...]} webSocket={WebSocket} staticIndicatorState={{pathname:null, ...}}>
+      <AppDevOverlayErrorBoundary globalError={[...]}>
+        <ReplaySsrOnlyErrors>
+        <DevRootHTTPAccessFallbackBoundary>
+          <HTTPAccessFallbackBoundary notFound={<NotAllowedRootHTTPFallbackError>}>
+            <HTTPAccessFallbackErrorBoundary pathname="/login" notFound={<NotAllowedRootHTTPFallbackError>} ...>
+              <RedirectBoundary>
+                <RedirectErrorBoundary router={{...}}>
+                  <Head>
+                  <__next_root_layout_boundary__>
+                    <LoadingBoundaryProvider loading={[...]}>
+                      <SegmentViewNode type="layout" pagePath="layout.tsx">
+                        <SegmentTrieNode>
+                        <link>
+                        <script>
+                        <script>
+                        <script>
+                        <RootLayout>
+                          <html lang="id" suppressHydrationWarning={true}>
+                            <body
+                              className="min-h-screen bg-neutral-50 text-neutral-900 antialiased dark:bg-neutral-950 d..."
+-                             data-new-gr-c-s-check-loaded="14.1311.0"
+-                             data-gr-ext-installed=""
+                            >
+                  ...
+ 
+    at <unknown> (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:3439:25)
+    at runWithFiberInDEV (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:965:74)
+    at emitPendingHydrationWarnings (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:3438:13)
+    at completeWork (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:6885:102)
+    at runWithFiberInDEV (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:965:131)
+    at completeUnitOfWork (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9622:23)
+    at performUnitOfWork (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9557:28)
+    at workLoopConcurrentByScheduler (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9551:58)
+    at renderRootConcurrent (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9534:71)
+    at performWorkOnRoot (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:9061:150)
+    at performWorkOnRootViaSchedulerTask (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:10255:9)
+    at MessagePort.performWorkUntilDeadline (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_0rpq4pf._.js:2647:64) (file://D:/bikin app/apotek-manage/.next/dev/static/chunks/node_modules_next_dist_compiled_react-dom_058-ah~._.js:3439:25)
+ GET /login 200 in 393ms (next.js: 20ms, proxy.ts: 19ms, application-code: 353ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /dashboard 200 in 1270ms (next.js: 273ms, proxy.ts: 201ms, application-code: 795ms)
+ POST /dashboard 200 in 1108ms (next.js: 158ms, proxy.ts: 590ms, application-code: 360ms)
+  └─ ƒ getUserOverrides("3faa6cb4-fa64-49da-9530-0f45e8219ff4", "a603dfc9-9dc6-4018-a287-5fd50d33010e") in 207ms src/lib/permissions/user-overrides.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 203ms (next.js: 24ms, proxy.ts: 77ms, application-code: 103ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 75ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 219ms (next.js: 22ms, proxy.ts: 91ms, application-code: 106ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 67ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 242ms (next.js: 31ms, proxy.ts: 100ms, application-code: 112ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 77ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 311ms (next.js: 75ms, proxy.ts: 89ms, application-code: 146ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 96ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription 200 in 498ms (next.js: 146ms, proxy.ts: 190ms, application-code: 162ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/integration 200 in 714ms (next.js: 213ms, proxy.ts: 336ms, application-code: 165ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription 200 in 946ms (next.js: 20ms, proxy.ts: 813ms, application-code: 113ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/plans 200 in 525ms (next.js: 246ms, proxy.ts: 169ms, application-code: 110ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+○ Compiling /settings/subscription/upgrade ...
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/upgrade?to=00000000-0000-0000-0000-000000000102 200 in 6.4s (next.js: 6.1s, proxy.ts: 174ms, application-code: 130ms)
+ GET /settings/subscription/upgrade?to=00000000-0000-0000-0000-000000000102 200 in 458ms (next.js: 30ms, proxy.ts: 218ms, application-code: 210ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/billing 200 in 600ms (next.js: 282ms, proxy.ts: 197ms, application-code: 121ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/plans 200 in 288ms (next.js: 21ms, proxy.ts: 163ms, application-code: 104ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/usage 200 in 481ms (next.js: 116ms, proxy.ts: 259ms, application-code: 105ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/activity 200 in 733ms (next.js: 102ms, proxy.ts: 490ms, application-code: 141ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription/settings 200 in 884ms (next.js: 113ms, proxy.ts: 628ms, application-code: 143ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/integration 200 in 1512ms (next.js: 20ms, proxy.ts: 1443ms, application-code: 50ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/subscription 200 in 239ms (next.js: 16ms, proxy.ts: 187ms, application-code: 36ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /settings/integration 200 in 272ms (next.js: 44ms, proxy.ts: 189ms, application-code: 40ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /dashboard 200 in 1417ms (next.js: 30ms, proxy.ts: 1330ms, application-code: 58ms)
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 293ms (next.js: 9ms, proxy.ts: 112ms, application-code: 172ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 139ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 337ms (next.js: 28ms, proxy.ts: 177ms, application-code: 132ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 91ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 216ms (next.js: 7ms, proxy.ts: 86ms, application-code: 123ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 107ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ POST /dashboard 200 in 228ms (next.js: 20ms, proxy.ts: 69ms, application-code: 139ms)
+  └─ ƒ getOnboardingState("3faa6cb4-fa64-49da-9530-0f45e8219ff4") in 107ms src/lib/tenant/onboarding-state.ts
+Using the user object as returned from supabase.auth.getSession() or from some supabase.auth.onAuthStateChange() events could be insecure! This value comes directly from the storage medium (usually cookies on the server) and may not be authentic. Use supabase.auth.getUser() instead which authenticates the data by contacting the Supabase Auth server.
+ GET /inventory 200 in 402ms (next.js: 122ms, proxy.ts: 216ms, application-code: 64ms)
+⨯ Error: The router state header was sent but could not be parsed.
+    at ignore-listed frames
+⨯ Error: The router state header was sent but could not be parsed.
+    at ignore-listed frames {
+  page: '/login'
+}
+ GET /login 500 in 3.7s (next.js: 2.9s, proxy.ts: 26ms, application-code: 745ms)
+ GET /login 200 in 516ms (next.js: 22ms, proxy.ts: 30ms, application-code: 463ms)
+ GET /login 200 in 321ms (next.js: 21ms, proxy.ts: 19ms, application-code: 282ms)
+○ Compiling /_error ...
+ GET /login 200 in 313ms (next.js: 21ms, proxy.ts: 10ms, application-code: 282ms)
+ GET /login 200 in 433ms (next.js: 15ms, proxy.ts: 27ms, application-code: 391ms)
+ GET /login 200 in 335ms (next.js: 16ms, proxy.ts: 11ms, application-code: 308ms)
+ GET /login 200 in 387ms (next.js: 19ms, proxy.ts: 19ms, application-code: 349ms)
+ GET /login 200 in 363ms (next.js: 12ms, proxy.ts: 14ms, application-code: 337ms)
+ GET /login 200 in 251ms (next.js: 15ms, proxy.ts: 15ms, application-code: 221ms)
+[?25h

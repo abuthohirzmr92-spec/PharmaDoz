@@ -2,12 +2,27 @@ import {
   LayoutDashboard, Package, Pill, ShoppingCart,
   FileText, Settings, Store, Wallet, TrendingUp, BookOpen,
   Building2, Users, Plug, UserCircle, CreditCard,
+  AlertTriangle, Clipboard, Truck,
 } from "lucide-react";
 import type { NavItem } from "./navigation";
 
 export const TENANT_NAVIGATION: NavItem[] = [
   { label: "Dashboard",     href: "/dashboard",  icon: LayoutDashboard, permission: "reports.sales.view" },
-  { label: "Inventory",     href: "/inventory",  icon: Package,         permission: "inventory.stock.view" },
+  {
+    label: "Inventory",
+    href: "/inventory",
+    icon: Package,
+    permission: "inventory.stock.view",
+    children: [
+      { label: "Dashboard",  href: "/inventory",            icon: LayoutDashboard, permission: "inventory.stock.view" },
+      { label: "Stok",       href: "/inventory/stock",      icon: Package,         permission: "inventory.stock.view" },
+      { label: "Pembelian",  href: "/inventory/purchase",   icon: ShoppingCart,    permission: "inventory.stock.view" },
+      { label: "Mutasi",     href: "/inventory/movement",   icon: TrendingUp,      permission: "inventory.stock.view" },
+      { label: "Kadaluarsa", href: "/inventory/expired",    icon: AlertTriangle,   permission: "inventory.stock.view" },
+      { label: "Opname",     href: "/inventory/opname",     icon: Clipboard,       permission: "inventory.stock.view" },
+      { label: "Supplier",   href: "/inventory/suppliers",  icon: Truck,           permission: "inventory.stock.view" },
+    ],
+  },
   { label: "Products",      href: "/products",   icon: Pill,            permission: "products.view" },
   { label: "Cashier",       href: "/cashier",    icon: ShoppingCart,    permission: "cashier.transaction.create" },
   { label: "Branches",      href: "/branches",   icon: Store,           permission: "settings.view" },

@@ -189,6 +189,27 @@ export class SubscriptionRepository extends BaseRepository {
     return ((data ?? []) as unknown[]).length > 0;
   }
 
+  /** Batch fetch: latest subscription per tenant for a set of tenant IDs. */
+  async listByTenants(tenantIds: string[]): Promise<SubscriptionRecord[]> {
+    if (!this.isConnected || tenantIds.length === 0) return [];
+    const { data, error } = await this.client
+      .from("subscriptions")
+      .select(SUBSCRIPTION_COLS)
+      .in("tenant_id", tenantIds)
+      .order("current_period_end", { ascending: false });
+    if (error) return this.handleError(error, "SubscriptionRepository.listByTenants");
+
+    const seen = new Set<string>();
+    const result: SubscriptionRecord[] = [];
+    for (const row of (data ?? []) as Record<string, unknown>[]) {
+      const tid = row.tenant_id as string;
+      if (seen.has(tid)) continue;
+      seen.add(tid);
+      result.push(mapRow<SubscriptionRecord>(row));
+    }
+    return result;
+  }
+
   /**
    * Extend the billing period end (renewal). `current_period_end` is a
    * billing/temporal field, NOT part of the CR-001 single-writer lifecycle set,

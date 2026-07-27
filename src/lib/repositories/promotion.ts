@@ -73,6 +73,53 @@ export class PromotionRepository extends BaseRepository {
     return valid ? offer : null;
   }
 
+  /** Create a new promotion code. Returns the inserted offer or throws. */
+  async create(input: {
+    code: string;
+    label?: string;
+    type: "percent" | "fixed" | "trial_extension";
+    value: number;
+    minAmount?: number;
+    maxDiscount?: number;
+    appliesToPlanId?: string;
+    validFrom?: string;
+    validTo?: string;
+    maxRedemptions?: number;
+  }): Promise<PromotionOffer> {
+    if (!this.isConnected) throw new Error("Repository tidak terhubung ke database.");
+    const { data, error } = await this.client
+      .from("marketing_promotions")
+      .insert({
+        code: input.code,
+        label: input.label ?? null,
+        type: input.type,
+        value: input.value,
+        min_amount: input.minAmount ?? null,
+        max_discount: input.maxDiscount ?? null,
+        applies_to_plan_id: input.appliesToPlanId ?? null,
+        valid_from: input.validFrom ?? null,
+        valid_to: input.validTo ?? null,
+        max_redemptions: input.maxRedemptions ?? null,
+        redeemed_count: 0,
+        is_active: true,
+      })
+      .select(COLS)
+      .single();
+    if (error) return this.handleError(error, "PromotionRepository.create");
+    return mapRow<PromotionOffer>(data as Record<string, unknown>);
+  }
+
+  /** List all promotions (active + inactive). Paginated at the application layer. */
+  async listAll(): Promise<PromotionOffer[]> {
+    if (!this.isConnected) return [];
+    const { data, error } = await this.client
+      .from("marketing_promotions")
+      .select(COLS)
+      .order("code", { ascending: true });
+    if (error) return this.handleError(error, "PromotionRepository.listAll");
+    return (data ?? []).map((row: Record<string, unknown>) => mapRow<PromotionOffer>(row));
+  }
+
   /**
    * Increment a promotion's redemption counter (frozen-schema redemption
    * record). NOTE: read-modify-write — not atomic under concurrency; a

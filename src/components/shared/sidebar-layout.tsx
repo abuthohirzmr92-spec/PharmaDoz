@@ -4,9 +4,10 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { useSidebarStore } from "@/store/sidebar-store";
 import { useAuthStore } from "@/store/auth-store";
-import { MOBILE_BOTTOM_NAV_HEIGHT } from "@/config/constants";
+import { MOBILE_BOTTOM_NAV_HEIGHT, SIDEBAR_CONTENT_GAP } from "@/config/constants";
 import { isPlatformUser } from "@/lib/auth/role-resolver";
 import { Sidebar } from "./sidebar";
+import { Topbar } from "./topbar";
 import { Menu, X } from "lucide-react";
 
 export function SidebarLayout({ children }: { children: ReactNode }) {
@@ -24,7 +25,7 @@ export function SidebarLayout({ children }: { children: ReactNode }) {
   const isSliding = mode === "sliding";
 
   return (
-    <div className="flex min-h-screen relative">
+    <div className="flex h-screen overflow-hidden relative">
       {/* Desktop: sticky sidebar (expanded / icon modes) */}
       {!isSliding && (
         <div className="hidden md:block">
@@ -93,10 +94,19 @@ export function SidebarLayout({ children }: { children: ReactNode }) {
 
       {/* Main content */}
       <main
-        className="flex flex-1 flex-col overflow-x-hidden"
+        className="flex flex-1 flex-col overflow-hidden"
         style={{ paddingBottom: MOBILE_BOTTOM_NAV_HEIGHT }}
       >
-        <div className="flex flex-1 flex-col p-2 sm:p-3 lg:p-4">{children}</div>
+        {/* Global Topbar */}
+        <Topbar />
+
+        {/* Page content — fills remaining height, pages handle their own scroll */}
+        <div
+          className="flex flex-1 flex-col overflow-y-auto"
+          style={{ paddingLeft: SIDEBAR_CONTENT_GAP, paddingRight: 0, paddingTop: 12, paddingBottom: 12 }}
+        >
+          {children}
+        </div>
       </main>
 
     </div>
