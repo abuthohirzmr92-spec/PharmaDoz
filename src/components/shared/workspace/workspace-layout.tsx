@@ -48,7 +48,7 @@ export function WorkspaceLayout({
     <SelectionCtx.Provider value={{ selectedId, select }}>
       <div
         className={cn(
-          "flex flex-col lg:flex-row lg:items-stretch gap-4",
+          "flex flex-col lg:flex-row lg:items-stretch gap-4 h-full min-h-0 overflow-hidden",
           className,
         )}
       >
@@ -80,7 +80,7 @@ export function MasterPanel({
   return (
     <div
       className={cn(
-        "min-w-0 flex flex-col min-h-0 overflow-hidden",
+        "min-w-0 flex flex-col min-h-0 h-full overflow-hidden",
         "rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950",
         className,
       )}
@@ -135,7 +135,7 @@ export function DetailPanel({
     return (
       <div
         className={cn(
-          "hidden lg:flex flex-col items-center justify-center",
+          "hidden lg:flex flex-col items-center justify-center h-full min-h-0 overflow-hidden",
           "rounded-xl border border-neutral-200 bg-neutral-50/50 dark:border-neutral-800 dark:bg-neutral-900/30",
           "p-6 text-center",
           className,
@@ -157,7 +157,7 @@ export function DetailPanel({
   return (
     <div
       className={cn(
-        "flex flex-col min-h-0 overflow-hidden",
+        "flex flex-col min-h-0 h-full overflow-hidden",
         "rounded-xl border border-neutral-200 bg-white dark:border-neutral-800 dark:bg-neutral-950",
         className,
       )}

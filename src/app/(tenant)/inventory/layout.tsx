@@ -16,11 +16,13 @@ export default function InventoryLayout({ children }: { children: React.ReactNod
   const pathname = usePathname();
 
   return (
-    <div className="flex flex-col flex-1 overflow-hidden">
-      <p className="text-sm font-medium text-neutral-400">Inventory</p>
-      <h1 className="mb-6 text-2xl font-bold text-neutral-900 dark:text-neutral-50">
-        {sectionTitle(pathname)}
-      </h1>
+    <div className="flex flex-col flex-1 min-h-0 h-full overflow-hidden">
+      <div className="shrink-0 mb-4">
+        <p className="text-xs font-semibold uppercase tracking-wider text-neutral-400">Inventory</p>
+        <h1 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+          {sectionTitle(pathname)}
+        </h1>
+      </div>
       <div className="flex-1 min-h-0 overflow-hidden">{children}</div>
     </div>
   );

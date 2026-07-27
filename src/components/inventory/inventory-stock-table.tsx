@@ -80,7 +80,7 @@ export function InventoryStockTable() {
   const isLoading = catalogLoading || productCatalog.size === 0;
 
   return (
-    <div className="flex flex-1 min-h-0 flex-col">
+    <div className="flex flex-1 min-h-0 flex-col h-full overflow-hidden">
       {/* Search — integrated into the workspace header area */}
       <div className="shrink-0 border-b border-neutral-100 px-4 py-3 dark:border-neutral-800">
         <div className="relative">
@@ -96,7 +96,7 @@ export function InventoryStockTable() {
       </div>
 
       {/* Product Table — single table with sticky header, body scrolls */}
-      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden max-h-[calc(100vh-230px)]">
+      <div className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden">
         <table className="w-full">
           <thead className="sticky top-0 z-10">
             <tr className="border-b border-neutral-200 bg-neutral-50 dark:border-neutral-800 dark:bg-neutral-900">

@@ -37,7 +37,7 @@ export default function StockWorkspacePage() {
     : "Pilih produk untuk melihat batch";
 
   return (
-    <WorkspaceLayout className="flex-1 overflow-hidden">
+    <WorkspaceLayout className="flex-1 min-h-0 h-full overflow-hidden">
       <MasterPanel flex={6}>
         <InventoryStockTable />
       </MasterPanel>
